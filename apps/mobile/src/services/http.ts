@@ -35,6 +35,11 @@ export function configureHttp(options: {
   onUnauthorized = options.onUnauthorized;
 }
 
+/** For the photo upload, which needs XMLHttpRequest to report progress. */
+export function getAuthToken(): string | null {
+  return readToken();
+}
+
 export type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;

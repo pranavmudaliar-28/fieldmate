@@ -2,12 +2,16 @@ import {
   createTaskSchema,
   listTasksQuerySchema,
   reassignTaskSchema,
+  rejectTaskSchema,
   updateTaskSchema,
 } from '@fieldmate/shared';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { AppConfig } from '../../config/env.js';
+import type { Logger } from '../../config/logger.js';
 import type { Database } from '../../db/client.js';
+import { createEvidenceRouter } from '../evidence/evidence.routes.js';
+import { createNoteRouter } from '../notes/note.routes.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/require-role.js';
 import { validate } from '../../middleware/validate.js';
@@ -22,10 +26,10 @@ export function createTaskRouter(deps: {
   db: Database;
   config: AppConfig;
   storage: StorageService;
+  logger: Logger;
 }): Router {
-  const controller = createTaskController(
-    createTaskService({ repository: createTaskRepository(deps.db), storage: deps.storage }),
-  );
+  const repository = createTaskRepository(deps.db);
+  const controller = createTaskController(createTaskService({ repository, storage: deps.storage }));
 
   const router = Router();
   const withTaskId = validate(taskParamsSchema, 'params');
@@ -52,7 +56,22 @@ export function createTaskRouter(deps: {
   router.post('/:taskId/cancel', requireRole('MANAGER'), withTaskId, controller.cancel);
   router.post('/:taskId/reopen', requireRole('MANAGER'), withTaskId, controller.reopen);
   router.post('/:taskId/complete', withTaskId, controller.complete);
-  // Worker-only routes (start, reject, evidence, notes) are added in 6E.
+
+  router.post('/:taskId/start', requireRole('FIELD_WORKER'), withTaskId, controller.start);
+  router.post(
+    '/:taskId/reject',
+    requireRole('FIELD_WORKER'),
+    withTaskId,
+    validate(rejectTaskSchema),
+    controller.reject,
+  );
+
+  router.use(
+    '/:taskId/evidence',
+    withTaskId,
+    createEvidenceRouter({ repository, storage: deps.storage, logger: deps.logger }),
+  );
+  router.use('/:taskId/notes', withTaskId, createNoteRouter({ repository }));
 
   return router;
 }

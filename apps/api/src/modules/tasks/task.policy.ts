@@ -8,7 +8,7 @@ import {
 } from '@fieldmate/shared';
 import { AppError } from '../../utils/app-error.js';
 
-export type Actor = { id: string; role: Role };
+export type Actor = { id: string; name: string; role: Role };
 
 export type TaskContext = {
   status: TaskStatus;

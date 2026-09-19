@@ -51,7 +51,7 @@ export function createApp({ config, logger, db, storage }: AppDeps): Express {
   const api = express.Router();
   api.use('/auth', createAuthRouter({ db, config }));
   api.use('/users', createUsersRouter({ db, config }));
-  api.use('/tasks', createTaskRouter({ db, config, storage }));
+  api.use('/tasks', createTaskRouter({ db, config, storage, logger }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);

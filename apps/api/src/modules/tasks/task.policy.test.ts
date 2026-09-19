@@ -3,9 +3,9 @@ import { TASK_STATUSES, type TaskAction, type TaskStatus } from '@fieldmate/shar
 import type { AppError } from '../../utils/app-error.js';
 import { assertCanPerform, assertCanViewTask, canViewTask, type Actor } from './task.policy.js';
 
-const MANAGER: Actor = { id: 'manager-1', role: 'MANAGER' };
-const WORKER: Actor = { id: 'worker-1', role: 'FIELD_WORKER' };
-const OTHER_WORKER: Actor = { id: 'worker-2', role: 'FIELD_WORKER' };
+const MANAGER: Actor = { id: 'manager-1', name: 'Anita Rao', role: 'MANAGER' };
+const WORKER: Actor = { id: 'worker-1', name: 'Priya Nair', role: 'FIELD_WORKER' };
+const OTHER_WORKER: Actor = { id: 'worker-2', name: 'Sam Lee', role: 'FIELD_WORKER' };
 
 const task = (status: TaskStatus, currentWorkerId = WORKER.id) => ({ status, currentWorkerId });
 

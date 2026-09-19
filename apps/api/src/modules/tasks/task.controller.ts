@@ -2,6 +2,7 @@ import type {
   CreateTaskInput,
   ListTasksQuery,
   ReassignTaskInput,
+  RejectTaskInput,
   UpdateTaskInput,
 } from '@fieldmate/shared';
 import type { Request, RequestHandler } from 'express';
@@ -11,9 +12,13 @@ import { decodeCursor } from '../../utils/cursor.js';
 import type { Actor } from './task.policy.js';
 import type { TaskService } from './task.service.js';
 
-function actor(req: Request): Actor {
+export function actor(req: Request): Actor {
   if (!req.user) throw new AppError('UNAUTHENTICATED', 'Authentication is required.');
-  return { id: req.user.id, role: req.user.role };
+  return { id: req.user.id, name: req.user.name, role: req.user.role };
+}
+
+export function taskIdOf(req: Request): string {
+  return validated<{ taskId: string }>(req, 'params').taskId;
 }
 
 function taskId(req: Request): string {
@@ -58,5 +63,16 @@ export function createTaskController(service: TaskService) {
     res.json(await service.complete(actor(req), taskId(req)));
   };
 
-  return { list, create, get, update, assign, cancel, reopen, complete };
+  const start: RequestHandler = async (req, res) => {
+    res.json(await service.start(actor(req), taskId(req)));
+  };
+
+  const reject: RequestHandler = async (req, res) => {
+    const { reason } = validated<RejectTaskInput>(req);
+    await service.reject(actor(req), taskId(req), reason);
+    // The worker loses access to the task, so there is nothing to return.
+    res.status(204).end();
+  };
+
+  return { list, create, get, update, assign, cancel, reopen, complete, start, reject };
 }

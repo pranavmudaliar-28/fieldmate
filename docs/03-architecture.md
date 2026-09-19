@@ -462,6 +462,9 @@ About `app.config.ts`: the original tree lists `app.json`. A dynamic config is t
 | Integration tests | — | Run serially (`--runInBand`); `npm test` in the API runs unit then integration | They share one test database and truncate between cases; Jest ignores `maxWorkers` in a project config |
 | Mobile tests | RNTL | `await render(...)` and `userEvent` for every interaction | RNTL 14 renders asynchronously; synchronous `fireEvent` left act scopes open and broke later renders in the same file |
 | Drizzle migration journal | — | `db:reset` drops the `drizzle` schema as well as `public` | Drizzle records applied migrations in its own schema; dropping only `public` left the database empty but "migrated" |
+| Image type check | `file-type` | Own two-signature check (`detectImageType`), built in 6E | Only JPEG and PNG are allowed, so a few lines replace a dependency |
+| Photo compression | `expo-image-manipulator` | SDK 57's contextual API (`ImageManipulator.manipulate(...).renderAsync()`); file size read with `expo-file-system`'s `File` | The older `manipulateAsync` is deprecated in SDK 57 |
+| Upload progress | XMLHttpRequest | As planned: `fetch` cannot report upload progress in React Native | — |
 
 ## 14. Resolved questions (approved 2026-09-16)
 

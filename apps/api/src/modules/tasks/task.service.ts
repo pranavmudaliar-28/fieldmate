@@ -175,6 +175,29 @@ export function createTaskService(deps: { repository: TaskRepository; storage: S
       return detail(taskId);
     },
 
+    async start(actor: Actor, taskId: string): Promise<TaskDetail> {
+      const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        assertCanPerform('start', actor, { status: task.status, currentWorkerId: task.workerId });
+        await repository.setStatus(tx, taskId, 'IN_PROGRESS', null);
+        return true;
+      });
+
+      if (result === undefined) throw taskNotFound();
+      return detail(taskId);
+    },
+
+    /** The reason is kept on the assignment so managers can see why (BR-008). */
+    async reject(actor: Actor, taskId: string, reason: string): Promise<void> {
+      const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        assertCanPerform('reject', actor, { status: task.status, currentWorkerId: task.workerId });
+        await repository.recordRejection(tx, task.assignmentId, reason);
+        await repository.setStatus(tx, taskId, 'REJECTED', null);
+        return true;
+      });
+
+      if (result === undefined) throw taskNotFound();
+    },
+
     async cancel(actor: Actor, taskId: string): Promise<TaskDetail> {
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
         assertCanPerform('cancel', actor, { status: task.status, currentWorkerId: task.workerId });
