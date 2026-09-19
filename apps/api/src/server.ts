@@ -2,6 +2,8 @@ import { createApp } from './app.js';
 import { ConfigError, loadConfig } from './config/env.js';
 import { createLogger } from './config/logger.js';
 import { createDb } from './db/client.js';
+import { createDeviceTokenRepository } from './modules/users/device-token.repository.js';
+import { createExpoPushService } from './services/push/expo-push.service.js';
 import { createS3StorageService } from './services/storage/s3-storage.service.js';
 
 function main(): void {
@@ -19,7 +21,12 @@ function main(): void {
   const logger = createLogger(config.logLevel);
   const { db, close: closeDb } = createDb(config.databaseUrl);
   const storage = createS3StorageService(config);
-  const app = createApp({ config, logger, db, storage });
+  const push = createExpoPushService({
+    tokens: createDeviceTokenRepository(db),
+    logger,
+    accessToken: config.push.expoAccessToken,
+  });
+  const app = createApp({ config, logger, db, storage, push });
 
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port, appEnv: config.appEnv }, 'FieldMate API listening');

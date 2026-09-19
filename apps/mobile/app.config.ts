@@ -39,7 +39,27 @@ const config: ExpoConfig = {
     },
     predictiveBackGestureEnabled: false,
   },
-  plugins: ['expo-router'],
+  plugins: [
+    'expo-router',
+    [
+      'expo-camera',
+      {
+        cameraPermission: 'FieldMate uses the camera to capture photo evidence for your tasks.',
+        // Photos only: no microphone or audio recording permission.
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationAlwaysAndWhenInUsePermission:
+          'FieldMate uses your location only when you tap "Use current location" while creating a task.',
+      },
+    ],
+    'expo-notifications',
+    'expo-secure-store',
+  ],
   experiments: {
     typedRoutes: true,
   },

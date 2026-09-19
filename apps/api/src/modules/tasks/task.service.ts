@@ -9,7 +9,14 @@ import {
   type UpdateTaskInput,
   type UserSummary,
 } from '@fieldmate/shared';
+import type { Logger } from '../../config/logger.js';
+import {
+  pushMessages,
+  type PushMessage,
+  type PushService,
+} from '../../services/push/push.service.js';
 import type { StorageService } from '../../services/storage/storage.service.js';
+import type { DeviceTokenRepository } from '../users/device-token.repository.js';
 import { AppError } from '../../utils/app-error.js';
 import { encodeCursor, type TaskCursor } from '../../utils/cursor.js';
 import { toTaskDetail, toTaskListItem } from './task.mapper.js';
@@ -18,8 +25,26 @@ import type { TaskRepository } from './task.repository.js';
 
 const taskNotFound = () => new AppError('TASK_NOT_FOUND', 'Task was not found.');
 
-export function createTaskService(deps: { repository: TaskRepository; storage: StorageService }) {
-  const { repository, storage } = deps;
+export function createTaskService(deps: {
+  repository: TaskRepository;
+  storage: StorageService;
+  push: PushService;
+  tokens: DeviceTokenRepository;
+  logger: Logger;
+}) {
+  const { repository, storage, push, tokens, logger } = deps;
+
+  /**
+   * Pushes are sent after the change is committed and never block the response:
+   * a delivery problem must not fail the action that triggered it (docs/05 §10).
+   */
+  function notify(userIds: string[], message: PushMessage): void {
+    void push
+      .send(userIds, message)
+      .catch((error: unknown) =>
+        logger.warn({ err: error, type: message.type }, 'Failed to send push notification'),
+      );
+  }
 
   /** Loads the task fresh so responses always reflect the committed state. */
   async function detail(taskId: string): Promise<TaskDetail> {
@@ -103,7 +128,9 @@ export function createTaskService(deps: { repository: TaskRepository; storage: S
         longitude: location.longitude ?? null,
       });
 
-      return detail(taskId);
+      const task = await detail(taskId);
+      notify([input.workerId], pushMessages.taskAssigned(taskId, task.title));
+      return task;
     },
 
     /** Title, description and location only; status changes have their own actions. */
@@ -149,7 +176,14 @@ export function createTaskService(deps: { repository: TaskRepository; storage: S
       });
 
       if (changed === undefined) throw taskNotFound();
-      return detail(taskId);
+
+      const task = await detail(taskId);
+      // Only a real change is worth a push, and a rejected task is no longer
+      // visible to its worker, so it is skipped (docs/05 §10).
+      if (changed && task.status !== 'REJECTED') {
+        notify([task.assignment.worker.id], pushMessages.taskUpdated(taskId, task.title));
+      }
+      return task;
     },
 
     async reassign(actor: Actor, taskId: string, workerId: string): Promise<TaskDetail> {
@@ -172,7 +206,10 @@ export function createTaskService(deps: { repository: TaskRepository; storage: S
       });
 
       if (result === undefined) throw taskNotFound();
-      return detail(taskId);
+
+      const task = await detail(taskId);
+      notify([workerId], pushMessages.taskAssigned(taskId, task.title));
+      return task;
     },
 
     async start(actor: Actor, taskId: string): Promise<TaskDetail> {
@@ -244,7 +281,12 @@ export function createTaskService(deps: { repository: TaskRepository; storage: S
       });
 
       if (result === undefined) throw taskNotFound();
-      return detail(taskId);
+
+      const task = await detail(taskId);
+      // Everyone who manages the work hears about it, except whoever did it.
+      const managerIds = (await tokens.listManagerIds()).filter((id) => id !== actor.id);
+      notify(managerIds, pushMessages.taskCompleted(taskId, task.title, actor.name));
+      return task;
     },
   };
 }

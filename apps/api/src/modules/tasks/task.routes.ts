@@ -10,8 +10,10 @@ import { z } from 'zod';
 import type { AppConfig } from '../../config/env.js';
 import type { Logger } from '../../config/logger.js';
 import type { Database } from '../../db/client.js';
+import type { PushService } from '../../services/push/push.service.js';
 import { createEvidenceRouter } from '../evidence/evidence.routes.js';
 import { createNoteRouter } from '../notes/note.routes.js';
+import { createDeviceTokenRepository } from '../users/device-token.repository.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { requireRole } from '../../middleware/require-role.js';
 import { validate } from '../../middleware/validate.js';
@@ -27,9 +29,18 @@ export function createTaskRouter(deps: {
   config: AppConfig;
   storage: StorageService;
   logger: Logger;
+  push: PushService;
 }): Router {
   const repository = createTaskRepository(deps.db);
-  const controller = createTaskController(createTaskService({ repository, storage: deps.storage }));
+  const controller = createTaskController(
+    createTaskService({
+      repository,
+      storage: deps.storage,
+      push: deps.push,
+      tokens: createDeviceTokenRepository(deps.db),
+      logger: deps.logger,
+    }),
+  );
 
   const router = Router();
   const withTaskId = validate(taskParamsSchema, 'params');

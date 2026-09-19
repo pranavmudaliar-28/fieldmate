@@ -13,6 +13,7 @@ import {
   typography,
 } from '../../src/constants/theme';
 import { useAuth } from '../../src/features/auth/auth-context';
+import { NotificationPrompt } from '../../src/features/notifications/NotificationPrompt';
 import { useTaskList } from '../../src/features/tasks/hooks';
 
 const SECTION_LIMIT = 10;
@@ -48,6 +49,8 @@ export default function ManagerDashboard() {
         >
           Hello, {user?.name.split(' ')[0] ?? 'there'}
         </Text>
+
+        <NotificationPrompt role="MANAGER" />
 
         <Button
           label="Create task"

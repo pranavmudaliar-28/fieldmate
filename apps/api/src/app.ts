@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createTaskRouter } from './modules/tasks/task.routes.js';
 import { createUsersRouter } from './modules/users/users.routes.js';
+import type { PushService } from './services/push/push.service.js';
 import type { StorageService } from './services/storage/storage.service.js';
 
 export type AppDeps = {
@@ -17,9 +18,10 @@ export type AppDeps = {
   logger: Logger;
   db: Database;
   storage: StorageService;
+  push: PushService;
 };
 
-export function createApp({ config, logger, db, storage }: AppDeps): Express {
+export function createApp({ config, logger, db, storage, push }: AppDeps): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -51,7 +53,7 @@ export function createApp({ config, logger, db, storage }: AppDeps): Express {
   const api = express.Router();
   api.use('/auth', createAuthRouter({ db, config }));
   api.use('/users', createUsersRouter({ db, config }));
-  api.use('/tasks', createTaskRouter({ db, config, storage, logger }));
+  api.use('/tasks', createTaskRouter({ db, config, storage, logger, push }));
   app.use('/api/v1', api);
 
   app.use(notFoundHandler);
