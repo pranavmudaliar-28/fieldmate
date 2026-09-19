@@ -1,0 +1,12 @@
+# Keep LF line endings in the repository and working tree on every OS
+# (matches .editorconfig and Prettier's endOfLine: lf).
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
