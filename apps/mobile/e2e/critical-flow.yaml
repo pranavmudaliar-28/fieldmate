@@ -1,0 +1,131 @@
+# The critical flow from docs/02 §29: manager assigns work, the worker does it
+# in the field, and the manager sees the result.
+#
+# Prerequisites:
+#   1. docker compose up -d
+#   2. npm run db:reset -w @fieldmate/api && npm run db:seed -w @fieldmate/api
+#   3. npm run dev -w @fieldmate/api
+#   4. A development build installed on the emulator or device
+#
+# Run: npm run e2e -w @fieldmate/mobile
+appId: com.slasheasy.fieldmate.dev
+env:
+  MANAGER_EMAIL: manager@fieldmate.dev
+  WORKER_EMAIL: worker1@fieldmate.dev
+  PASSWORD: FieldMate-dev-1
+  TASK_TITLE: E2E meter swap
+---
+- clearState
+- launchApp:
+    permissions:
+      camera: allow
+      notifications: allow
+
+# ---------- Manager: log in and create a task ----------
+- runFlow:
+    file: login.yaml
+    env:
+      EMAIL: ${MANAGER_EMAIL}
+      PASSWORD: ${PASSWORD}
+
+- assertVisible: 'Hello, Anita'
+- tapOn:
+    id: 'create-task-button'
+
+- tapOn:
+    id: 'task-title'
+- inputText: ${TASK_TITLE}
+- tapOn:
+    id: 'task-description'
+- inputText: 'Replace the meter and photograph the serial number.'
+- hideKeyboard
+
+# Assign it to the worker who will do the work
+- tapOn:
+    id: 'task-worker-select'
+- tapOn: 'Priya Nair'
+
+- tapOn:
+    id: 'task-address'
+- inputText: '14 Harbour Rd, Unit 3'
+- hideKeyboard
+- tapOn:
+    id: 'task-submit'
+
+# The new task opens, assigned and waiting for the worker
+- assertVisible: ${TASK_TITLE}
+- assertVisible: 'Assigned'
+- assertVisible: 'Priya Nair'
+
+- back
+- runFlow: logout.yaml
+
+# ---------- Worker: do the work ----------
+- runFlow:
+    file: login.yaml
+    env:
+      EMAIL: ${WORKER_EMAIL}
+      PASSWORD: ${PASSWORD}
+
+- assertVisible: 'Hello, Priya'
+- assertVisible: ${TASK_TITLE}
+- tapOn: ${TASK_TITLE}
+
+# Completing is not offered before the work starts
+- assertNotVisible:
+    id: 'action-complete'
+- tapOn:
+    id: 'action-start'
+- assertVisible: 'In progress'
+
+# Without a photo, completion stays blocked and says why
+- assertVisible: 'At least 1 photo is required to complete this task.'
+
+# Capture evidence with the real camera
+- tapOn:
+    id: 'add-photo'
+- tapOn:
+    id: 'shutter'
+- assertVisible:
+    id: 'photo-preview'
+- tapOn:
+    id: 'use-photo'
+- assertVisible: 'Photo added'
+
+# Add a note
+- tapOn:
+    id: 'note-input'
+- inputText: 'Meter replaced; serial visible in the photo.'
+- hideKeyboard
+- tapOn:
+    id: 'add-note'
+- assertVisible: 'Note added'
+
+# Complete the task
+- tapOn:
+    id: 'action-complete'
+- assertVisible: 'Complete task'
+- tapOn:
+    id: 'confirm-complete'
+- assertVisible: 'Task completed'
+- assertVisible: 'Your manager has been notified.'
+- tapOn: 'Back to task'
+- assertVisible: 'You completed this task'
+
+- back
+- back
+- runFlow: logout.yaml
+
+# ---------- Manager: review the finished work ----------
+- runFlow:
+    file: login.yaml
+    env:
+      EMAIL: ${MANAGER_EMAIL}
+      PASSWORD: ${PASSWORD}
+
+- assertVisible: 'Recently completed'
+- tapOn: ${TASK_TITLE}
+- assertVisible: 'Completed'
+- assertVisible: 'Photos (1)'
+- assertVisible: 'Notes (1)'
+- assertVisible: 'Meter replaced; serial visible in the photo.'

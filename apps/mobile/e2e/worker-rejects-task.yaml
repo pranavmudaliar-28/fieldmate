@@ -1,0 +1,90 @@
+# Second flow: the worker cannot do the job, and the manager picks it up.
+appId: com.slasheasy.fieldmate.dev
+env:
+  MANAGER_EMAIL: manager@fieldmate.dev
+  WORKER_EMAIL: worker1@fieldmate.dev
+  PASSWORD: FieldMate-dev-1
+  TASK_TITLE: E2E locked site
+  REASON: Site locked, no key
+---
+- clearState
+- launchApp:
+    permissions:
+      notifications: allow
+
+# Manager creates a task for the worker
+- runFlow:
+    file: login.yaml
+    env:
+      EMAIL: ${MANAGER_EMAIL}
+      PASSWORD: ${PASSWORD}
+- tapOn:
+    id: 'create-task-button'
+- tapOn:
+    id: 'task-title'
+- inputText: ${TASK_TITLE}
+- tapOn:
+    id: 'task-description'
+- inputText: 'Check the meter behind the locked gate.'
+- hideKeyboard
+- tapOn:
+    id: 'task-worker-select'
+- tapOn: 'Priya Nair'
+- tapOn:
+    id: 'task-address'
+- inputText: '9 Depot Lane'
+- hideKeyboard
+- tapOn:
+    id: 'task-submit'
+- assertVisible: ${TASK_TITLE}
+- back
+- runFlow: logout.yaml
+
+# Worker rejects it with a reason
+- runFlow:
+    file: login.yaml
+    env:
+      EMAIL: ${WORKER_EMAIL}
+      PASSWORD: ${PASSWORD}
+- tapOn: ${TASK_TITLE}
+- tapOn:
+    id: 'action-reject'
+- assertVisible: "Tell your manager why you can't do this task."
+
+# The reason is required
+- assertVisible:
+    id: 'submit-reject'
+    enabled: false
+- tapOn:
+    id: 'reject-reason'
+- inputText: ${REASON}
+- hideKeyboard
+- tapOn:
+    id: 'submit-reject'
+- assertVisible: 'Reject this task? It will be removed from your list.'
+- tapOn: 'Reject task'
+
+# It disappears from the worker's list
+- assertVisible: 'Hello, Priya'
+- assertNotVisible: ${TASK_TITLE}
+- runFlow: logout.yaml
+
+# The manager sees it under "Needs attention", with the reason
+- runFlow:
+    file: login.yaml
+    env:
+      EMAIL: ${MANAGER_EMAIL}
+      PASSWORD: ${PASSWORD}
+- assertVisible: 'Needs attention'
+- assertVisible: ${REASON}
+- tapOn: ${TASK_TITLE}
+- assertVisible: 'Rejected'
+
+# The manager hands it to someone else
+- tapOn:
+    id: 'action-reassign'
+- tapOn: 'Sam Lee'
+- assertVisible: 'Reassign to Sam Lee?'
+- tapOn: 'Reassign'
+- assertVisible: 'Sam Lee'
+- assertVisible: 'Assigned'

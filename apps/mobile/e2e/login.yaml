@@ -1,0 +1,14 @@
+# Reusable sign-in. Callers pass EMAIL and PASSWORD.
+appId: com.slasheasy.fieldmate.dev
+---
+- assertVisible: 'FieldMate'
+- assertVisible: 'Welcome back'
+- tapOn:
+    id: 'login-email'
+- inputText: ${EMAIL}
+- tapOn:
+    id: 'login-password'
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: 'login-submit'

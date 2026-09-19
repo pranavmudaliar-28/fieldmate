@@ -1,0 +1,10 @@
+# Shared settings for the FieldMate end-to-end flows.
+# Run with: npm run e2e -w @fieldmate/mobile
+appId: com.slasheasy.fieldmate.dev
+---
+# Credentials come from the development seed (db:seed).
+env:
+  MANAGER_EMAIL: manager@fieldmate.dev
+  WORKER_EMAIL: worker1@fieldmate.dev
+  PASSWORD: FieldMate-dev-1
+  TASK_TITLE: E2E meter swap

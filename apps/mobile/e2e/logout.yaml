@@ -1,0 +1,8 @@
+# Signs the current user out from a dashboard.
+appId: com.slasheasy.fieldmate.dev
+---
+- tapOn:
+    id: 'logout-button'
+- assertVisible: 'Log out?'
+- tapOn: 'Log out'
+- assertVisible: 'Welcome back'

@@ -84,6 +84,7 @@ export default function ManagerTaskList() {
 
       {query.isSuccess ? (
         <FlatList
+          testID="manager-task-list"
           data={tasks}
           keyExtractor={(task) => task.id}
           contentContainerStyle={styles.list}
