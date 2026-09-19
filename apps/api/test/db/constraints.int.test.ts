@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import {
   devicePushTokens,
   taskAssignments,
@@ -146,9 +146,10 @@ describe('task_assignments constraints', () => {
   it('allows a new assignment once the previous one has ended (reassignment)', async () => {
     const { task, assignment } = await insertTask();
     const other = await insertUser();
+    // Use the database clock, exactly as the repository does.
     await db
       .update(taskAssignments)
-      .set({ endedAt: new Date() })
+      .set({ endedAt: sql`now()` })
       .where(eq(taskAssignments.id, assignment.id));
 
     const [next] = await db

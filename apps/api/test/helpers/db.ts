@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { TaskStatus } from '@fieldmate/shared';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { createDb, type Database, type DbHandle } from '../../src/db/client.js';
 import {
   taskAssignments,
@@ -81,7 +81,7 @@ export async function recordRejection(taskId: string, reason: string): Promise<v
   const db = testDb();
   await db
     .update(taskAssignments)
-    .set({ rejectionReason: reason, rejectedAt: new Date() })
+    .set({ rejectionReason: reason, rejectedAt: sql`now()` })
     .where(and(eq(taskAssignments.taskId, taskId), isNull(taskAssignments.endedAt)));
   await forceStatus(taskId, 'REJECTED');
 }

@@ -311,7 +311,9 @@ export function createTaskRepository(db: Database) {
     async reassign(tx: TaskWriter, taskId: string, assignmentId: string, workerId: string) {
       await tx
         .update(taskAssignments)
-        .set({ endedAt: new Date() })
+        // The database clock sets both assigned_at and ended_at, so a slightly
+        // slow API clock can never trip the "ended_at >= assigned_at" check.
+        .set({ endedAt: sql`now()` })
         .where(eq(taskAssignments.id, assignmentId));
       await tx.insert(taskAssignments).values({ taskId, workerId });
     },
@@ -319,7 +321,7 @@ export function createTaskRepository(db: Database) {
     async recordRejection(tx: TaskWriter, assignmentId: string, reason: string): Promise<void> {
       await tx
         .update(taskAssignments)
-        .set({ rejectionReason: reason, rejectedAt: new Date() })
+        .set({ rejectionReason: reason, rejectedAt: sql`now()` })
         .where(eq(taskAssignments.id, assignmentId));
     },
 
