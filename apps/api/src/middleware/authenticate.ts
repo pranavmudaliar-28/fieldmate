@@ -29,13 +29,17 @@ export function authenticate(deps: { db: Database; config: AppConfig }): Request
         name: users.name,
         email: users.email,
         role: users.role,
+        isActive: users.isActive,
         tokenVersion: users.tokenVersion,
       })
       .from(users)
       .where(eq(users.id, claims.userId))
       .limit(1);
 
-    if (!user || user.tokenVersion !== claims.tokenVersion) return next(unauthenticated());
+    // A deactivated account loses access immediately, mid-session (docs/07 §2).
+    if (!user || !user.isActive || user.tokenVersion !== claims.tokenVersion) {
+      return next(unauthenticated());
+    }
 
     req.user = { id: user.id, name: user.name, email: user.email, role: user.role as Role };
     next();

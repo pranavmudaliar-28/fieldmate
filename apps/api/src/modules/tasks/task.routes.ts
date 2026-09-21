@@ -1,4 +1,5 @@
 import {
+  TASK_MANAGING_ROLES,
   createTaskSchema,
   listTasksQuerySchema,
   reassignTaskSchema,
@@ -48,24 +49,39 @@ export function createTaskRouter(deps: {
   router.use(authenticate(deps));
 
   router.get('/', validate(listTasksQuerySchema, 'query'), controller.list);
-  router.post('/', requireRole('MANAGER'), validate(createTaskSchema), controller.create);
+  router.post(
+    '/',
+    requireRole(...TASK_MANAGING_ROLES),
+    validate(createTaskSchema),
+    controller.create,
+  );
   router.get('/:taskId', withTaskId, controller.get);
   router.patch(
     '/:taskId',
-    requireRole('MANAGER'),
+    requireRole(...TASK_MANAGING_ROLES),
     withTaskId,
     validate(updateTaskSchema),
     controller.update,
   );
   router.post(
     '/:taskId/assignment',
-    requireRole('MANAGER'),
+    requireRole(...TASK_MANAGING_ROLES),
     withTaskId,
     validate(reassignTaskSchema),
     controller.assign,
   );
-  router.post('/:taskId/cancel', requireRole('MANAGER'), withTaskId, controller.cancel);
-  router.post('/:taskId/reopen', requireRole('MANAGER'), withTaskId, controller.reopen);
+  router.post(
+    '/:taskId/cancel',
+    requireRole(...TASK_MANAGING_ROLES),
+    withTaskId,
+    controller.cancel,
+  );
+  router.post(
+    '/:taskId/reopen',
+    requireRole(...TASK_MANAGING_ROLES),
+    withTaskId,
+    controller.reopen,
+  );
   router.post('/:taskId/complete', withTaskId, controller.complete);
 
   router.post('/:taskId/start', requireRole('FIELD_WORKER'), withTaskId, controller.start);

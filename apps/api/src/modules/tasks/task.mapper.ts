@@ -1,4 +1,10 @@
-import type { EvidenceMimeType, TaskDetail, TaskListItem, Role } from '@fieldmate/shared';
+import {
+  managesTasks,
+  type EvidenceMimeType,
+  type Role,
+  type TaskDetail,
+  type TaskListItem,
+} from '@fieldmate/shared';
 import type { StorageService } from '../../services/storage/storage.service.js';
 import type { TaskDetailRows, TaskListRow } from './task.repository.js';
 
@@ -14,7 +20,7 @@ export function toTaskListItem(row: TaskListRow, role: Role): TaskListItem {
     address: row.address,
     worker: { id: row.workerId, name: row.workerName },
     // Rejection details are for managers; workers no longer see a rejected task.
-    rejection: role === 'MANAGER' ? rejection(row.rejectionReason, row.rejectedAt) : null,
+    rejection: managesTasks(role) ? rejection(row.rejectionReason, row.rejectedAt) : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     completedAt: row.completedAt?.toISOString() ?? null,

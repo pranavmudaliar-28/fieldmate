@@ -1,4 +1,5 @@
 import {
+  TASK_MANAGING_ROLES,
   listUsersQuerySchema,
   registerPushTokenSchema,
   type ListResponse,
@@ -57,7 +58,7 @@ export function createUsersRouter(deps: { db: Database; config: AppConfig }): Ro
   router.get(
     '/',
     authenticate(deps),
-    requireRole('MANAGER'),
+    requireRole(...TASK_MANAGING_ROLES),
     validate(listUsersQuerySchema, 'query'),
     listWorkers,
   );

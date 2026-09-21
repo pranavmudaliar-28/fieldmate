@@ -213,7 +213,7 @@ export function createTaskRepository(db: Database) {
 
   const findFieldWorker = async (workerId: string) => {
     const [worker] = await db
-      .select({ id: users.id, role: users.role })
+      .select({ id: users.id, role: users.role, isActive: users.isActive })
       .from(users)
       .where(eq(users.id, workerId))
       .limit(1);
@@ -325,11 +325,12 @@ export function createTaskRepository(db: Database) {
         .where(eq(taskAssignments.id, assignmentId));
     },
 
+    /** Only active workers can take new work (docs/07 §2). */
     async listFieldWorkers() {
       return db
         .select({ id: users.id, name: users.name })
         .from(users)
-        .where(eq(users.role, 'FIELD_WORKER'))
+        .where(and(eq(users.role, 'FIELD_WORKER'), eq(users.isActive, true)))
         .orderBy(users.name);
     },
   };

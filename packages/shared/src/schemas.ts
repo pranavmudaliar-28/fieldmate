@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FIELD_LIMITS, PAGINATION, PUSH_PLATFORMS, TASK_STATUSES } from './constants.js';
+import { FIELD_LIMITS, PAGINATION, PUSH_PLATFORMS, ROLES, TASK_STATUSES } from './constants.js';
 
 const requiredText = (max: number, label: string) =>
   z
@@ -113,6 +113,68 @@ export const listUsersQuerySchema = z.strictObject({
 });
 
 export const uuidParamSchema = z.uuid();
+
+/* ---------------------------------------------------------------- admin */
+
+const password = z
+  .string({ error: 'Password is required.' })
+  .min(
+    FIELD_LIMITS.passwordMin,
+    `Password must be at least ${FIELD_LIMITS.passwordMin} characters.`,
+  )
+  .max(
+    FIELD_LIMITS.passwordMax,
+    `Password must be at most ${FIELD_LIMITS.passwordMax} characters.`,
+  );
+
+const email = z
+  .string({ error: 'Email is required.' })
+  .trim()
+  .toLowerCase()
+  .min(1, 'Email is required.')
+  .max(FIELD_LIMITS.email, 'Enter a valid email address.')
+  .pipe(z.email('Enter a valid email address.'));
+
+export const createUserSchema = z.strictObject({
+  name: requiredText(FIELD_LIMITS.userName, 'Name'),
+  email,
+  role: z.enum(ROLES, 'Choose a role.'),
+  password,
+});
+export type CreateUserInput = z.input<typeof createUserSchema>;
+
+export const updateUserSchema = z
+  .strictObject({
+    name: requiredText(FIELD_LIMITS.userName, 'Name').optional(),
+    email: email.optional(),
+    role: z.enum(ROLES, 'Choose a role.').optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((body) => Object.values(body).some((value) => value !== undefined), {
+    message: 'Provide at least one field to update.',
+  });
+export type UpdateUserInput = z.input<typeof updateUserSchema>;
+
+export const setPasswordSchema = z.strictObject({ password });
+export type SetPasswordInput = z.input<typeof setPasswordSchema>;
+
+export const listManagedUsersQuerySchema = z.strictObject({
+  /** Matches name or email. */
+  search: z.string().trim().max(254).optional(),
+  role: z.enum(ROLES).optional(),
+  isActive: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === 'true')),
+  limit: z.coerce
+    .number('Limit must be a number.')
+    .int('Limit must be a whole number.')
+    .min(1, `Limit must be between 1 and ${PAGINATION.maxLimit}.`)
+    .max(PAGINATION.maxLimit, `Limit must be between 1 and ${PAGINATION.maxLimit}.`)
+    .default(PAGINATION.defaultLimit),
+  cursor: z.string().max(400).optional(),
+});
+export type ListManagedUsersQuery = z.output<typeof listManagedUsersQuerySchema>;
 
 /** First issue formatted as "field: message" (or just "message" at the root). */
 export function formatZodError(error: z.ZodError): string {

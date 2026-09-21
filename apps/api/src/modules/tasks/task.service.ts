@@ -58,6 +58,9 @@ export function createTaskService(deps: {
     if (!worker || worker.role !== 'FIELD_WORKER') {
       throw new AppError('INVALID_WORKER', 'Select a field worker to assign this task to.');
     }
+    if (!worker.isActive) {
+      throw new AppError('INVALID_WORKER', 'That worker is deactivated and cannot take new tasks.');
+    }
   }
 
   /** Loads the task for an action, then applies visibility, role and status rules. */

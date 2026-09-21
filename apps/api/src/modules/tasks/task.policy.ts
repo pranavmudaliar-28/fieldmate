@@ -2,6 +2,7 @@ import {
   TASK_ACTIONS,
   isRoleAllowed,
   isStatusAllowed,
+  managesTasks,
   type Role,
   type TaskAction,
   type TaskStatus,
@@ -20,9 +21,9 @@ const taskNotFound = () => new AppError('TASK_NOT_FOUND', 'Task was not found.')
 const forbidden = () =>
   new AppError('FORBIDDEN', 'You do not have permission to perform this action.');
 
-/** Managers see every task; a worker sees only the task currently assigned to them. */
+/** Managers and admins see every task; a worker sees only their current one. */
 export function canViewTask(actor: Actor, task: TaskContext): boolean {
-  return actor.role === 'MANAGER' || task.currentWorkerId === actor.id;
+  return managesTasks(actor.role) || task.currentWorkerId === actor.id;
 }
 
 /**

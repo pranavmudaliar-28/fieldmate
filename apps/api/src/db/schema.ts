@@ -1,6 +1,7 @@
 import { ROLES, TASK_STATUSES } from '@fieldmate/shared';
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   index,
   integer,
@@ -30,11 +31,14 @@ export const users = pgTable(
     email: varchar('email', { length: 254 }).notNull().unique(),
     passwordHash: text('password_hash').notNull(),
     role: userRole('role').notNull(),
+    /** A deactivated user cannot sign in and receives no new work (docs/07 §2). */
+    isActive: boolean('is_active').notNull().default(true),
     tokenVersion: integer('token_version').notNull().default(0),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
   (t) => [
+    index('users_role_idx').on(t.role),
     check('users_name_not_blank', sql`length(trim(${t.name})) > 0`),
     check('users_email_lowercase', sql`${t.email} = lower(${t.email})`),
     check('users_token_version_non_negative', sql`${t.tokenVersion} >= 0`),

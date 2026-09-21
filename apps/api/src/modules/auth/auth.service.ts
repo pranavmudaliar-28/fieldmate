@@ -21,6 +21,10 @@ export function createAuthService(deps: { repository: AuthRepository; config: Ap
       const passwordMatches = await verifyPassword(user.passwordHash, password);
       if (!passwordMatches) throw invalidCredentials();
 
+      // A deactivated account is refused with the same message, so the response
+      // never reveals that the account exists (docs/07 §3).
+      if (!user.isActive) throw invalidCredentials();
+
       const token = await signAccessToken(
         { userId: user.id, tokenVersion: user.tokenVersion },
         deps.config,

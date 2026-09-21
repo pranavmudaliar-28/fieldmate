@@ -12,6 +12,7 @@ import {
 import { usePushNotifications } from './usePushNotifications';
 
 const EXPLANATION: Record<Role, string> = {
+  ADMIN: 'Get notified when tasks are completed.',
   MANAGER: 'Get notified when tasks are completed.',
   FIELD_WORKER: 'Get notified when tasks are assigned to you.',
 };

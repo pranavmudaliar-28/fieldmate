@@ -1,5 +1,12 @@
-export const ROLES = ['MANAGER', 'FIELD_WORKER'] as const;
+export const ROLES = ['ADMIN', 'MANAGER', 'FIELD_WORKER'] as const;
 export type Role = (typeof ROLES)[number];
+
+/** Roles allowed to manage tasks: admins have every manager power (docs/07 §2). */
+export const TASK_MANAGING_ROLES = ['ADMIN', 'MANAGER'] as const satisfies readonly Role[];
+
+export function managesTasks(role: Role): boolean {
+  return (TASK_MANAGING_ROLES as readonly Role[]).includes(role);
+}
 
 export const TASK_STATUSES = [
   'ASSIGNED',

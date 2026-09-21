@@ -25,6 +25,7 @@ if (!databaseUrl) {
 const password = process.env.SEED_PASSWORD ?? 'FieldMate-dev-1';
 
 const accounts = [
+  { email: 'admin@fieldmate.dev', name: 'Root Admin', role: 'ADMIN' as const },
   { email: 'manager@fieldmate.dev', name: 'Anita Rao', role: 'MANAGER' as const },
   { email: 'worker1@fieldmate.dev', name: 'Priya Nair', role: 'FIELD_WORKER' as const },
   { email: 'worker2@fieldmate.dev', name: 'Sam Lee', role: 'FIELD_WORKER' as const },

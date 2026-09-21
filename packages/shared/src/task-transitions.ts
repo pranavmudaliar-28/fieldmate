@@ -14,13 +14,25 @@ type ActionRule = {
  * The API enforces it; the mobile app uses it only to decide which actions to show.
  */
 export const TASK_ACTIONS = {
-  edit: { from: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'], to: null, roles: ['MANAGER'] },
-  reassign: { from: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'], to: 'ASSIGNED', roles: ['MANAGER'] },
+  edit: { from: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'], to: null, roles: ['ADMIN', 'MANAGER'] },
+  reassign: {
+    from: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'],
+    to: 'ASSIGNED',
+    roles: ['ADMIN', 'MANAGER'],
+  },
   start: { from: ['ASSIGNED'], to: 'IN_PROGRESS', roles: ['FIELD_WORKER'] },
   reject: { from: ['ASSIGNED'], to: 'REJECTED', roles: ['FIELD_WORKER'] },
-  complete: { from: ['IN_PROGRESS'], to: 'COMPLETED', roles: ['MANAGER', 'FIELD_WORKER'] },
-  cancel: { from: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'], to: 'CANCELLED', roles: ['MANAGER'] },
-  reopen: { from: ['COMPLETED'], to: 'ASSIGNED', roles: ['MANAGER'] },
+  complete: {
+    from: ['IN_PROGRESS'],
+    to: 'COMPLETED',
+    roles: ['ADMIN', 'MANAGER', 'FIELD_WORKER'],
+  },
+  cancel: {
+    from: ['ASSIGNED', 'IN_PROGRESS', 'REJECTED'],
+    to: 'CANCELLED',
+    roles: ['ADMIN', 'MANAGER'],
+  },
+  reopen: { from: ['COMPLETED'], to: 'ASSIGNED', roles: ['ADMIN', 'MANAGER'] },
   addEvidence: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
   deleteEvidence: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
   addNote: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },

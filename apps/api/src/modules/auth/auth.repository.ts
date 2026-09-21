@@ -1,3 +1,4 @@
+import type { Role } from '@fieldmate/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { devicePushTokens, users } from '../../db/schema.js';
@@ -6,8 +7,9 @@ export type AuthUserRecord = {
   id: string;
   name: string;
   email: string;
-  role: 'MANAGER' | 'FIELD_WORKER';
+  role: Role;
   passwordHash: string;
+  isActive: boolean;
   tokenVersion: number;
 };
 
@@ -21,6 +23,7 @@ export function createAuthRepository(db: Database) {
           email: users.email,
           role: users.role,
           passwordHash: users.passwordHash,
+          isActive: users.isActive,
           tokenVersion: users.tokenVersion,
         })
         .from(users)

@@ -4,6 +4,15 @@ export type UserSummary = { id: string; name: string };
 
 export type User = { id: string; name: string; email: string; role: Role };
 
+/** A user as an admin sees them (docs/07 §2). */
+export type ManagedUser = User & {
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /** False when the account can be deleted outright; true means deactivate instead. */
+  hasHistory: boolean;
+};
+
 export type LoginResponse = { token: string; user: User };
 
 export type TaskLocation = {
