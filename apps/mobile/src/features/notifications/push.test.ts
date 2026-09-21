@@ -2,19 +2,35 @@ import * as Notifications from 'expo-notifications';
 import { apiRequest } from '../../services/http';
 import {
   getPermissionState,
+  isExpoGo,
   isPushSupported,
   registerDeviceForPush,
   requestPermission,
 } from './push';
 
 jest.mock('expo-notifications');
-// A getter, so a test can switch to "simulator" after the module is imported.
+
+// Getters, so a test can switch to "simulator" or "Expo Go" after import.
 const mockDeviceState = { isDevice: true };
 jest.mock('expo-device', () => ({
   get isDevice() {
     return mockDeviceState.isDevice;
   },
 }));
+
+const mockEnvironment = { executionEnvironment: 'standalone' };
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  ExecutionEnvironment: { StoreClient: 'storeClient', Standalone: 'standalone', Bare: 'bare' },
+  default: {
+    get executionEnvironment() {
+      return mockEnvironment.executionEnvironment;
+    },
+    expoConfig: { extra: { eas: { projectId: 'test-project' } } },
+    easConfig: undefined,
+  },
+}));
+
 jest.mock('../../services/http', () => ({
   ...jest.requireActual('../../services/http'),
   apiRequest: jest.fn(),
@@ -29,10 +45,38 @@ const permissions = (status: string, canAskAgain: boolean) =>
 beforeEach(() => {
   jest.clearAllMocks();
   mockDeviceState.isDevice = true;
+  mockEnvironment.executionEnvironment = 'standalone';
   mockApiRequest.mockResolvedValue(undefined as never);
   notifications.getExpoPushTokenAsync.mockResolvedValue({
     data: 'ExponentPushToken[abc123]',
   } as Notifications.ExpoPushToken);
+});
+
+describe('where push is supported', () => {
+  it('works in a development or production build on a device', () => {
+    expect(isPushSupported()).toBe(true);
+    expect(isExpoGo()).toBe(false);
+  });
+
+  it('is unsupported in Expo Go, which cannot do Android push (SDK 53+)', async () => {
+    mockEnvironment.executionEnvironment = 'storeClient';
+
+    expect(isExpoGo()).toBe(true);
+    expect(isPushSupported()).toBe(false);
+    await expect(getPermissionState()).resolves.toBe('unsupported');
+    await expect(registerDeviceForPush()).resolves.toBeNull();
+    // The module is never touched, so it cannot throw at import time.
+    expect(notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockApiRequest).not.toHaveBeenCalled();
+  });
+
+  it('is unsupported on a simulator, and never asks', async () => {
+    mockDeviceState.isDevice = false;
+
+    await expect(getPermissionState()).resolves.toBe('unsupported');
+    await expect(requestPermission()).resolves.toBe('unsupported');
+    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+  });
 });
 
 describe('permission state', () => {
@@ -43,13 +87,6 @@ describe('permission state', () => {
   ])('maps %s', async (_case, response, expected) => {
     notifications.getPermissionsAsync.mockResolvedValue(response);
     await expect(getPermissionState()).resolves.toBe(expected);
-  });
-
-  it('reports simulators as unsupported and never asks', async () => {
-    mockDeviceState.isDevice = false;
-    await expect(getPermissionState()).resolves.toBe('unsupported');
-    await expect(requestPermission()).resolves.toBe('unsupported');
-    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled();
   });
 
   it('asks the system when requesting permission', async () => {
@@ -92,19 +129,5 @@ describe('registerDeviceForPush', () => {
     notifications.getExpoPushTokenAsync.mockRejectedValue(new Error('no project id'));
 
     await expect(registerDeviceForPush()).resolves.toBeNull();
-  });
-
-  it('reports an unsupported device rather than registering', async () => {
-    mockDeviceState.isDevice = false;
-    await expect(registerDeviceForPush()).resolves.toBeNull();
-    expect(mockApiRequest).not.toHaveBeenCalled();
-  });
-});
-
-describe('isPushSupported', () => {
-  it('follows the device check', () => {
-    expect(isPushSupported()).toBe(true);
-    mockDeviceState.isDevice = false;
-    expect(isPushSupported()).toBe(false);
   });
 });

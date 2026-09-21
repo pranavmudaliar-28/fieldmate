@@ -1,12 +1,12 @@
 import type { PushNotificationData, Role } from '@fieldmate/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { taskKeys } from '../tasks/hooks';
 import {
   configureAndroidChannel,
   getPermissionState,
+  loadNotifications,
   registerDeviceForPush,
   requestPermission,
   type PermissionState,
@@ -20,6 +20,7 @@ function isTaskNotification(data: unknown): data is PushNotificationData {
 /**
  * Registers the device, refreshes a task when a push about it arrives, and
  * opens that task when the notification is tapped (docs/02 §6.3, docs/04 §4).
+ * Does nothing where push is unsupported, such as Expo Go.
  */
 export function usePushNotifications(role: Role | undefined) {
   const router = useRouter();
@@ -53,30 +54,38 @@ export function usePushNotifications(role: Role | undefined) {
 
   useEffect(() => {
     if (!role) return;
+    let received: { remove: () => void } | undefined;
+    let tapped: { remove: () => void } | undefined;
+    let cancelled = false;
 
-    // A push about a task means its details may have changed.
-    const received = Notifications.addNotificationReceivedListener((notification) => {
-      const data = notification.request.content.data;
-      if (isTaskNotification(data)) {
-        void queryClient.invalidateQueries({ queryKey: taskKeys.detail(data.taskId) });
-        void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
-      }
-    });
+    void (async () => {
+      const notifications = loadNotifications();
+      if (!notifications || cancelled) return;
 
-    const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      if (isTaskNotification(data)) openTask(data.taskId);
-    });
+      // A push about a task means its details may have changed.
+      received = notifications.addNotificationReceivedListener((notification) => {
+        const data = notification.request.content.data;
+        if (isTaskNotification(data)) {
+          void queryClient.invalidateQueries({ queryKey: taskKeys.detail(data.taskId) });
+          void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+        }
+      });
 
-    // Opening the app from a notification while it was closed.
-    void Notifications.getLastNotificationResponseAsync().then((response) => {
-      const data = response?.notification.request.content.data;
-      if (data && isTaskNotification(data)) openTask(data.taskId);
-    });
+      tapped = notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data;
+        if (isTaskNotification(data)) openTask(data.taskId);
+      });
+
+      // Opening the app from a notification while it was closed.
+      const last = await notifications.getLastNotificationResponseAsync();
+      const data = last?.notification.request.content.data;
+      if (!cancelled && data && isTaskNotification(data)) openTask(data.taskId);
+    })();
 
     return () => {
-      received.remove();
-      tapped.remove();
+      cancelled = true;
+      received?.remove();
+      tapped?.remove();
     };
   }, [role, queryClient, openTask]);
 

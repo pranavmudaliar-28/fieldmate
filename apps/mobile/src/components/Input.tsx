@@ -20,7 +20,7 @@ export type InputProps = TextInputProps & {
 };
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
-  { label, error, helper, required = false, secure = false, testID, ...inputProps },
+  { label, error, helper, required = false, secure = false, testID, style, ...inputProps },
   ref,
 ) {
   const [focused, setFocused] = useState(false);
@@ -33,12 +33,20 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         {required ? ' *' : ''}
       </Text>
       <View
-        style={[styles.field, focused && styles.fieldFocused, Boolean(error) && styles.fieldError]}
+        style={[
+          styles.field,
+          // A multi-line field must fill its row, or the caret sits centred.
+          inputProps.multiline ? styles.fieldMultiline : null,
+          focused && styles.fieldFocused,
+          Boolean(error) && styles.fieldError,
+        ]}
       >
         <TextInput
           ref={ref}
           testID={testID}
-          style={styles.input}
+          // The caller's style is merged, never replaced: dropping flex here
+          // collapsed multi-line fields so they could not be tapped.
+          style={[styles.input, inputProps.multiline && styles.inputMultiline, style]}
           placeholderTextColor={colors.textSecondary}
           maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
           accessibilityLabel={label}
@@ -98,9 +106,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
   },
+  fieldMultiline: { alignItems: 'stretch' },
   fieldFocused: { borderColor: colors.primary, borderWidth: 2 },
   fieldError: { borderColor: colors.error },
   input: { flex: 1, ...typography.body, color: colors.textPrimary, paddingVertical: spacing.sm },
+  inputMultiline: { textAlignVertical: 'top' },
   toggle: { minWidth: 48, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' },
   toggleLabel: { ...typography.secondary, color: colors.primary },
   error: { ...typography.secondary, color: colors.errorText },
