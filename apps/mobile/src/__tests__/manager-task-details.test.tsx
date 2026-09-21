@@ -48,6 +48,12 @@ async function renderDetails(task: TaskDetail) {
   await waitFor(() => expect(screen.getByText('Replace water meter')).toBeTruthy());
 }
 
+/** Secondary actions live behind the header's overflow button. */
+async function openOverflow() {
+  await userEvent.setup().press(screen.getByTestId('header-overflow'));
+  await waitFor(() => expect(screen.getByTestId('task-overflow-menu')).toBeTruthy());
+}
+
 beforeEach(() => jest.clearAllMocks());
 
 describe('Manager task details (S-005)', () => {
@@ -64,8 +70,12 @@ describe('Manager task details (S-005)', () => {
   it('offers edit, reassign and cancel for an assigned task', async () => {
     await renderDetails(buildTask());
 
-    expect(screen.getByTestId('action-edit')).toBeTruthy();
+    // One action in the bar; the rest behind the overflow, so nothing is cut off.
     expect(screen.getByTestId('action-reassign')).toBeTruthy();
+    expect(screen.queryByTestId('action-edit')).toBeNull();
+
+    await openOverflow();
+    expect(screen.getByTestId('action-edit')).toBeTruthy();
     expect(screen.getByTestId('action-cancel')).toBeTruthy();
     expect(screen.queryByTestId('action-complete')).toBeNull();
     expect(screen.queryByTestId('action-reopen')).toBeNull();
@@ -111,6 +121,7 @@ describe('Manager task details (S-005)', () => {
 
   it('warns that cancelling cannot be undone', async () => {
     await renderDetails(buildTask());
+    await openOverflow();
     await userEvent.setup().press(screen.getByTestId('action-cancel'));
 
     await waitFor(() =>
@@ -125,13 +136,13 @@ describe('Manager task details (S-005)', () => {
     );
 
     expect(screen.getByTestId('action-reopen')).toBeTruthy();
-    expect(screen.queryByTestId('action-edit')).toBeNull();
-    expect(screen.queryByTestId('action-cancel')).toBeNull();
+    expect(screen.queryByTestId('header-overflow')).toBeNull();
   });
 
   it('offers no actions for a cancelled task', async () => {
     await renderDetails(buildTask({ status: 'CANCELLED' }));
 
+    expect(screen.queryByTestId('header-overflow')).toBeNull();
     for (const action of ['edit', 'reassign', 'cancel', 'complete', 'reopen']) {
       expect(screen.queryByTestId(`action-${action}`)).toBeNull();
     }

@@ -79,6 +79,7 @@ export function TaskListScreen({ onOpenTask, onCreateTask }: TaskListScreenProps
           testID="manager-task-list"
           data={tasks}
           keyExtractor={(task) => task.id}
+          style={styles.flex}
           contentContainerStyle={[styles.list, { paddingBottom: tabBarSpacing }]}
           refreshControl={
             <RefreshControl
@@ -114,6 +115,7 @@ export function TaskListScreen({ onOpenTask, onCreateTask }: TaskListScreenProps
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   create: {
     width: 46,
     height: 46,

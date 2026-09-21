@@ -36,6 +36,9 @@ export function FilterChips<T>({ options, selected, onSelect, testID }: FilterCh
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      // Without this the row claims the column's spare height and the chips,
+      // which stretch on the cross axis by default, become tall ovals.
+      style={styles.scroller}
       contentContainerStyle={styles.row}
       testID={testID}
     >
@@ -78,12 +81,18 @@ export function FilterChips<T>({ options, selected, onSelect, testID }: FilterCh
 }
 
 const styles = StyleSheet.create({
-  row: { gap: spacing.sm, paddingHorizontal: layout.screenPadding, paddingVertical: spacing.sm },
+  scroller: { flexGrow: 0, flexShrink: 0 },
+  row: {
+    gap: spacing.sm,
+    paddingHorizontal: layout.screenPadding,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    minHeight: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,

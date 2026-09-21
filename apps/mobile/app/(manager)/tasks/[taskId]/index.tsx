@@ -1,13 +1,16 @@
 import { allowedActions, type TaskDetail, type UserSummary } from '@fieldmate/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { ActionBar } from '../../../../src/components/ActionBar';
+import { AppHeader } from '../../../../src/components/AppHeader';
 import { Button } from '../../../../src/components/Button';
 import { ConfirmationDialog } from '../../../../src/components/ConfirmationDialog';
+import { Icon } from '../../../../src/components/Icon';
+import { OverflowMenu, type OverflowAction } from '../../../../src/components/OverflowMenu';
 import { EmptyState, ErrorState, LoadingState } from '../../../../src/components/States';
 import { useToast } from '../../../../src/components/Toast';
-import { colors, layout, spacing } from '../../../../src/constants/theme';
+import { colors, layout, radius, spacing } from '../../../../src/constants/theme';
 import { WorkerPicker } from '../../../../src/features/assignments/WorkerPicker';
 import { TaskDetailView } from '../../../../src/features/tasks/TaskDetailView';
 import { useTask, useTaskAction } from '../../../../src/features/tasks/hooks';
@@ -26,6 +29,7 @@ export default function ManagerTaskDetails() {
 
   const [pending, setPending] = useState<PendingAction>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pendingWorker, setPendingWorker] = useState<UserSummary | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -56,9 +60,11 @@ export default function ManagerTaskDetails() {
 
   if (task.isPending) {
     return (
-      <View style={styles.padded}>
-        <Stack.Screen options={{ headerShown: true, title: 'Task details' }} />
-        <LoadingState variant="detail" />
+      <View style={styles.screen}>
+        <AppHeader title="Task details" onBack={() => router.back()} />
+        <View style={styles.padded}>
+          <LoadingState variant="detail" />
+        </View>
       </View>
     );
   }
@@ -67,21 +73,24 @@ export default function ManagerTaskDetails() {
     const notAvailable =
       task.error instanceof ApiError && (task.error.status === 404 || task.error.status === 403);
     return (
-      <>
-        <Stack.Screen options={{ headerShown: true, title: 'Task details' }} />
-        {notAvailable ? (
-          <EmptyState
-            title="This task is no longer available"
-            message="It may have been removed or reassigned."
-            action={{
-              label: 'Go to dashboard',
-              onPress: () => router.replace('/(manager)/(tabs)'),
-            }}
-          />
-        ) : (
-          <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
-        )}
-      </>
+      <View style={styles.screen}>
+        <AppHeader title="Task details" onBack={() => router.back()} />
+        <View style={styles.padded}>
+          {notAvailable ? (
+            <EmptyState
+              icon="help-circle-outline"
+              title="This task is no longer available"
+              message="It may have been removed or reassigned."
+              action={{
+                label: 'Go to dashboard',
+                onPress: () => router.replace('/(manager)/(tabs)'),
+              }}
+            />
+          ) : (
+            <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
+          )}
+        </View>
+      </View>
     );
   }
 
@@ -91,9 +100,64 @@ export default function ManagerTaskDetails() {
   const hasEvidence = detail.evidence.length > 0;
   const busy = cancel.isPending || reopen.isPending || complete.isPending || reassign.isPending;
 
+  /**
+   * One action in the bar and the rest behind the overflow. Five buttons used
+   * to share a single row, and the last of them ran off the screen edge.
+   */
+  const primary = canComplete
+    ? 'complete'
+    : actions.includes('reopen')
+      ? 'reopen'
+      : actions.includes('reassign')
+        ? 'reassign'
+        : null;
+
+  const secondary: OverflowAction[] = [];
+  if (actions.includes('edit')) {
+    secondary.push({
+      label: 'Edit task',
+      icon: 'create-outline',
+      testID: 'action-edit',
+      onPress: () => router.push(`/(manager)/tasks/${taskId}/edit`),
+    });
+  }
+  if (actions.includes('reassign') && primary !== 'reassign') {
+    secondary.push({
+      label: 'Reassign',
+      icon: 'swap-horizontal-outline',
+      testID: 'action-reassign',
+      onPress: () => setPickerOpen(true),
+    });
+  }
+  if (actions.includes('cancel')) {
+    secondary.push({
+      label: 'Cancel task',
+      icon: 'ban-outline',
+      destructive: true,
+      testID: 'action-cancel',
+      onPress: () => setPending('cancel'),
+    });
+  }
+
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ headerShown: true, title: 'Task details' }} />
+      <AppHeader
+        title="Task details"
+        onBack={() => router.back()}
+        right={
+          secondary.length > 0 ? (
+            <Pressable
+              onPress={() => setMenuOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="More actions"
+              testID="header-overflow"
+              style={styles.overflowButton}
+            >
+              <Icon name="ellipsis-horizontal" size={22} color={colors.onPrimary} />
+            </Pressable>
+          ) : null
+        }
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -108,63 +172,45 @@ export default function ManagerTaskDetails() {
         </TaskDetailView>
       </ScrollView>
 
-      {actions.length > 0 ? (
+      {primary ? (
         <ActionBar hint={canComplete && !hasEvidence ? EVIDENCE_HINT : undefined}>
-          {canComplete ? (
+          {primary === 'complete' ? (
             <Button
               label="Complete task"
+              icon="checkmark"
               testID="action-complete"
               onPress={() => setPending('complete')}
               disabled={!hasEvidence || busy}
               disabledReason={EVIDENCE_HINT}
-              style={styles.action}
             />
           ) : null}
-
-          {actions.includes('reopen') ? (
+          {primary === 'reopen' ? (
             <Button
               label="Reopen task"
+              icon="refresh"
               testID="action-reopen"
               onPress={() => setPending('reopen')}
               disabled={busy}
-              style={styles.action}
             />
           ) : null}
-
-          {actions.includes('reassign') ? (
+          {primary === 'reassign' ? (
             <Button
               label="Reassign"
-              variant={canComplete ? 'secondary' : 'primary'}
+              icon="swap-horizontal-outline"
               testID="action-reassign"
               onPress={() => setPickerOpen(true)}
               disabled={busy}
-              style={styles.action}
-            />
-          ) : null}
-
-          {actions.includes('edit') ? (
-            <Button
-              label="Edit"
-              variant="secondary"
-              testID="action-edit"
-              onPress={() => router.push(`/(manager)/tasks/${taskId}/edit`)}
-              disabled={busy}
-              style={styles.action}
-            />
-          ) : null}
-
-          {actions.includes('cancel') ? (
-            <Button
-              label="Cancel task"
-              variant="destructive"
-              testID="action-cancel"
-              onPress={() => setPending('cancel')}
-              disabled={busy}
-              style={styles.action}
             />
           ) : null}
         </ActionBar>
       ) : null}
+
+      <OverflowMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        actions={secondary}
+        testID="task-overflow-menu"
+      />
 
       <ConfirmationDialog
         visible={pending === 'complete'}
@@ -233,6 +279,13 @@ export default function ManagerTaskDetails() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.md },
-  padded: { flex: 1, padding: layout.screenPadding, backgroundColor: colors.background },
-  action: { flex: 1, minWidth: 120 },
+  padded: { flex: 1, padding: layout.screenPadding },
+  overflowButton: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

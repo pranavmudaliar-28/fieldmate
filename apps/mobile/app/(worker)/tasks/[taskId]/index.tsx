@@ -106,7 +106,7 @@ export default function WorkerTaskDetails() {
           <RefreshControl refreshing={task.isRefetching} onRefresh={() => void task.refetch()} />
         }
       >
-        <TaskDetailView task={detail} showAssignment={false} />
+        <TaskDetailView task={detail} showAssignment={false} showEvidence={false} />
 
         <View style={styles.section}>
           <Text
