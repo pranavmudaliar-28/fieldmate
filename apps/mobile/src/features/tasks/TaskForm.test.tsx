@@ -9,7 +9,8 @@ jest.mock('./api');
 // The map itself is a web view; stand in for it so the field's own behaviour shows.
 jest.mock('../location/MapPicker', () => {
   const { View } = jest.requireActual('react-native');
-  return { MapPicker: ({ testID }: { testID?: string }) => <View testID={testID} /> };
+  const stub = ({ testID }: { testID?: string }) => <View testID={testID} />;
+  return { MapPreview: stub, MapPickerModal: stub };
 });
 
 const api = tasksApi as jest.Mocked<typeof tasksApi>;

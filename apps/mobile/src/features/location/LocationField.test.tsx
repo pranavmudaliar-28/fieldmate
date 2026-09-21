@@ -4,17 +4,24 @@ import { LocationField, type LocationValue } from './LocationField';
 import type { LocationProvider, PlaceSuggestion } from './provider';
 import { setLocationProvider } from './useAddressSearch';
 
-/** Stands in for the web view, and lets a test report a dragged pin. */
+/**
+ * Stands in for the web views. The preview is still; the full-screen picker is
+ * where a point is chosen, so a test reports one through its confirm.
+ */
 let reportMove: ((point: { latitude: number; longitude: number }) => void) | null = null;
 jest.mock('./MapPicker', () => {
-  const { View } = jest.requireActual('react-native');
+  const { Pressable, View } = jest.requireActual('react-native');
   return {
-    MapPicker: (props: {
+    MapPreview: (props: { testID?: string; onPress: () => void }) => (
+      <Pressable testID={props.testID} onPress={props.onPress} accessibilityRole="button" />
+    ),
+    MapPickerModal: (props: {
+      visible: boolean;
       testID?: string;
-      onMove: (p: { latitude: number; longitude: number }) => void;
+      onConfirm: (p: { latitude: number; longitude: number }) => void;
     }) => {
-      reportMove = props.onMove;
-      return <View testID={props.testID} />;
+      reportMove = props.onConfirm;
+      return props.visible ? <View testID={props.testID} /> : null;
     },
   };
 });
@@ -152,6 +159,21 @@ describe('LocationField', () => {
       expect(screen.getByTestId('task-address').props.value).toBe('Refreshed address'),
     );
     expect(screen.getByTestId('task-address-details').props.value).toBe('Gate 4');
+  });
+
+  /**
+   * Dragging a marker inside the form's scroll view meant the form scrolled
+   * instead. The map is now still here and the pin is placed full-screen.
+   */
+  it('opens the full-screen map from the preview', async () => {
+    const user = userEvent.setup();
+    await render(<Harness />);
+    await pickSuggestion(user);
+
+    expect(screen.queryByTestId('map-picker-modal')).toBeNull();
+
+    await user.press(screen.getByTestId('map-picker'));
+    expect(screen.getByTestId('map-picker-modal')).toBeTruthy();
   });
 
   it('removes the pin without touching the address', async () => {

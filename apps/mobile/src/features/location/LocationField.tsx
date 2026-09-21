@@ -12,7 +12,7 @@ import {
   toneColors,
   typography,
 } from '../../constants/theme';
-import { MapPicker } from './MapPicker';
+import { MapPickerModal, MapPreview } from './MapPicker';
 import type { PlaceSuggestion } from './provider';
 import {
   SEARCH_UNAVAILABLE_MESSAGE,
@@ -48,6 +48,7 @@ export function LocationField({
 }: LocationFieldProps) {
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(!value.address);
+  const [mapOpen, setMapOpen] = useState(false);
   const [reverseFailed, setReverseFailed] = useState(false);
   const { suggestions, searching, unavailable } = useAddressSearch(query, searchOpen && !disabled);
 
@@ -195,11 +196,22 @@ export function LocationField({
 
       {hasPin ? (
         <>
-          <MapPicker
+          <MapPreview
             latitude={value.latitude as number}
             longitude={value.longitude as number}
-            onMove={(point) => void movePin(point)}
+            onPress={() => setMapOpen(true)}
             testID="map-picker"
+          />
+          <MapPickerModal
+            visible={mapOpen}
+            latitude={value.latitude as number}
+            longitude={value.longitude as number}
+            onConfirm={(point) => {
+              setMapOpen(false);
+              void movePin(point);
+            }}
+            onClose={() => setMapOpen(false)}
+            testID="map-picker-modal"
           />
           {reverseFailed ? (
             <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.warning}>
