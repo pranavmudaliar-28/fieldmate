@@ -16,6 +16,7 @@ import { TaskCard } from '../../../src/components/TaskCard';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  fontFamily,
   layout,
   radius,
   spacing,
@@ -145,7 +146,7 @@ const styles = StyleSheet.create({
   },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipLabel: { ...typography.secondary, color: colors.textPrimary },
-  chipLabelSelected: { color: colors.onPrimary, fontWeight: '600' },
+  chipLabelSelected: { color: colors.onPrimary, fontFamily: fontFamily.semibold },
   list: { paddingHorizontal: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.sm },
   padded: { paddingHorizontal: layout.screenPadding },
 });

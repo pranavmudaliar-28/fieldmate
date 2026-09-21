@@ -35,6 +35,26 @@ describe('theme tokens', () => {
     expect(contrast(colors.onPrimary, colors.error)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('accent is only ever a fill: its label is readable, its own text is not', () => {
+    expect(contrast(colors.onAccent, colors.accent)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.onAccent, colors.accentPressed)).toBeGreaterThanOrEqual(4.5);
+    // Guards the rule the palette depends on — yellow text on paper is illegible.
+    expect(contrast(colors.accent, colors.surface)).toBeLessThan(3);
+  });
+
+  it('text on the inverse surface meets WCAG AA', () => {
+    expect(contrast(colors.textOnInverse, colors.surfaceInverse)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.textOnInverseMuted, colors.surfaceInverse)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(colors.accent, colors.surfaceInverse)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(Object.entries(toneColors))(
+    '%s status dot meets the 3:1 floor for meaningful graphics',
+    (_tone, pair) => {
+      expect(contrast(pair.dot, colors.surface)).toBeGreaterThanOrEqual(3);
+    },
+  );
+
   it('defines an appearance for every task status', () => {
     expect(Object.keys(statusAppearance).sort()).toEqual([...TASK_STATUSES].sort());
   });
@@ -42,6 +62,7 @@ describe('theme tokens', () => {
   it('keeps touch targets at least 48dp', () => {
     expect(layout.minTouchTarget).toBeGreaterThanOrEqual(48);
     expect(layout.buttonHeightMedium).toBeGreaterThanOrEqual(48);
-    expect(layout.buttonHeightLarge).toBe(52);
+    // Raised from 52 in the redesign: the primary action is used with gloves.
+    expect(layout.buttonHeightLarge).toBeGreaterThanOrEqual(56);
   });
 });

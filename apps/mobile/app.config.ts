@@ -50,8 +50,10 @@ const config: ExpoConfig = {
         recordAudioAndroid: false,
       },
     ],
+    'expo-font',
     'expo-notifications',
     'expo-secure-store',
+    'expo-splash-screen',
   ],
   experiments: {
     typedRoutes: true,

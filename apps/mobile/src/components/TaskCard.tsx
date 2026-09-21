@@ -74,7 +74,7 @@ export function TaskCard({
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  title: { ...typography.body, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  title: { ...typography.cardTitle, color: colors.textPrimary, flex: 1 },
   meta: { ...typography.secondary, color: colors.textSecondary },
   footer: {
     flexDirection: 'row',

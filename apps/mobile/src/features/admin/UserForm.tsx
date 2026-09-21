@@ -9,6 +9,7 @@ import { Input } from '../../components/Input';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  fontFamily,
   layout,
   radius,
   spacing,
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
   },
   roleOptionSelected: { borderColor: colors.primary, borderWidth: 2 },
   roleName: { ...typography.body, color: colors.textPrimary },
-  roleNameSelected: { color: colors.primary, fontWeight: '600' },
+  roleNameSelected: { color: colors.primary, fontFamily: fontFamily.semibold },
   roleHint: { ...typography.caption, color: colors.textSecondary },
   error: { ...typography.secondary, color: colors.errorText },
 });

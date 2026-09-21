@@ -19,6 +19,7 @@ import { EmptyState, ErrorState, LoadingState } from '../../src/components/State
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  fontFamily,
   layout,
   radius,
   spacing,
@@ -196,13 +197,13 @@ const styles = StyleSheet.create({
   },
   chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipLabel: { ...typography.secondary, color: colors.textPrimary },
-  chipLabelSelected: { color: colors.onPrimary, fontWeight: '600' },
+  chipLabelSelected: { color: colors.onPrimary, fontFamily: fontFamily.semibold },
   actions: { flexDirection: 'row', gap: spacing.sm },
   action: { flex: 1 },
   list: { paddingHorizontal: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.sm },
   padded: { paddingHorizontal: layout.screenPadding },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  name: { ...typography.body, fontWeight: '600', color: colors.textPrimary, flex: 1 },
+  name: { ...typography.bodyStrong, color: colors.textPrimary, flex: 1 },
   meta: { ...typography.secondary, color: colors.textSecondary },
   inactiveBadge: {
     backgroundColor: toneColors.neutral.tint,
