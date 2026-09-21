@@ -22,6 +22,7 @@ import {
   typography,
 } from '../../src/constants/theme';
 import { SESSION_EXPIRED_MESSAGE, useAuth } from '../../src/features/auth/auth-context';
+import { homeRouteFor } from '../../src/features/auth/home-route';
 import { useIsOnline } from '../../src/hooks/use-network-status';
 import { ApiError } from '../../src/services/http';
 
@@ -45,7 +46,7 @@ export default function LoginScreen() {
   });
 
   if (status === 'signedIn' && user) {
-    return <Redirect href={user.role === 'MANAGER' ? '/(manager)' : '/(worker)'} />;
+    return <Redirect href={homeRouteFor(user.role)} />;
   }
 
   const onSubmit = handleSubmit(async ({ email, password }) => {
