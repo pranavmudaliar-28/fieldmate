@@ -14,7 +14,7 @@ import {
   spacing,
   typography,
 } from '../../constants/theme';
-import { useCurrentLocation } from '../location/use-current-location';
+import { LocationField } from '../location/LocationField';
 import { WorkerPicker } from '../assignments/WorkerPicker';
 
 export type TaskFormValues = CreateTaskInput;
@@ -37,7 +37,6 @@ export function TaskForm({
   onSubmit,
   onDirtyChange,
 }: TaskFormProps) {
-  const location = useCurrentLocation();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [workerName, setWorkerName] = useState(defaultValues?.workerName ?? '');
 
@@ -55,6 +54,7 @@ export function TaskForm({
       workerId: defaultValues?.workerId ?? '',
       location: {
         address: defaultValues?.location?.address ?? '',
+        addressDetails: defaultValues?.location?.addressDetails ?? null,
         latitude: defaultValues?.location?.latitude ?? null,
         longitude: defaultValues?.location?.longitude ?? null,
       },
@@ -62,31 +62,11 @@ export function TaskForm({
     mode: 'onSubmit',
   });
 
-  const coordinates = watch('location');
-  const hasCoordinates =
-    coordinates?.latitude !== null &&
-    coordinates?.latitude !== undefined &&
-    coordinates?.longitude !== null &&
-    coordinates?.longitude !== undefined;
-
   const selectWorker = (worker: UserSummary) => {
     setValue('workerId', worker.id, { shouldDirty: true, shouldValidate: true });
     setWorkerName(worker.name);
     setPickerOpen(false);
     onDirtyChange?.(true);
-  };
-
-  const captureLocation = async () => {
-    const coords = await location.capture();
-    if (!coords) return;
-    setValue('location.latitude', coords.latitude, { shouldDirty: true });
-    setValue('location.longitude', coords.longitude, { shouldDirty: true });
-    onDirtyChange?.(true);
-  };
-
-  const clearCoordinates = () => {
-    setValue('location.latitude', null, { shouldDirty: true });
-    setValue('location.longitude', null, { shouldDirty: true });
   };
 
   const submit = handleSubmit((values) => onSubmit(values));
@@ -176,69 +156,26 @@ export function TaskForm({
 
         <Controller
           control={control}
-          name="location.address"
-          render={({ field: { onChange, onBlur, value } }) => (
-            <Input
-              label="Address"
-              required
-              testID="task-address"
-              value={value}
-              onChangeText={(text) => {
-                onChange(text);
+          name="location"
+          render={({ field: { onChange, value } }) => (
+            <LocationField
+              value={{
+                address: value?.address ?? '',
+                addressDetails: value?.addressDetails ?? null,
+                latitude: value?.latitude ?? null,
+                longitude: value?.longitude ?? null,
+              }}
+              onChange={(next) => {
+                onChange(next);
                 onDirtyChange?.(true);
               }}
-              onBlur={onBlur}
               {...(errors.location?.address?.message
-                ? { error: errors.location.address.message }
+                ? { addressError: errors.location.address.message }
                 : {})}
-              editable={!submitting}
+              disabled={submitting}
             />
           )}
         />
-
-        <View style={styles.field}>
-          <Button
-            label={hasCoordinates ? 'Update current location' : 'Use current location'}
-            variant="secondary"
-            size="md"
-            onPress={() => void captureLocation()}
-            loading={location.status === 'loading'}
-            disabled={submitting}
-            testID="task-capture-location"
-          />
-
-          {hasCoordinates ? (
-            <View style={styles.coordinates}>
-              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.coordinatesText}>
-                Coordinates captured: {coordinates.latitude}, {coordinates.longitude}
-              </Text>
-              <Button
-                label="Clear"
-                variant="ghost"
-                size="md"
-                onPress={clearCoordinates}
-                fullWidth={false}
-              />
-            </View>
-          ) : null}
-
-          {location.message ? (
-            <View style={styles.permission} testID="location-permission-message">
-              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.permissionText}>
-                {location.message}
-              </Text>
-              {location.status === 'denied' ? (
-                <Button
-                  label="Open Settings"
-                  variant="ghost"
-                  size="md"
-                  onPress={location.openSettings}
-                  fullWidth={false}
-                />
-              ) : null}
-            </View>
-          ) : null}
-        </View>
 
         {submitError ? (
           <Text

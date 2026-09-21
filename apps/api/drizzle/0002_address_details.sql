@@ -1,0 +1,1 @@
+ALTER TABLE "task_locations" ADD COLUMN "address_details" varchar(300);

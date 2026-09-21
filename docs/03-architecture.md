@@ -66,7 +66,7 @@ The package also holds plain TypeScript with no dependencies:
 | Camera | `expo-camera` | [C] |
 | Photo compression | `expo-image-manipulator` | Resize so the long edge is at most 2048 px, JPEG quality 0.7; re-encoding also **removes EXIF** data, including GPS [T] |
 | Image display | `expo-image` | Caching and fast rendering [T] |
-| Location | `expo-location` | Only the "Use current location" button [D] |
+| Location | `react-native-webview` + Photon/OpenStreetMap over `fetch` | Customer address search and a map with a draggable pin; no device-location permission (7D, docs/07 §1). `expo-location` was removed. |
 | Push | `expo-notifications`, `expo-device`, `expo-constants` | [D] |
 | Network status | `@react-native-community/netinfo` | "You're offline" banner [C] |
 | Open in Maps | React Native `Linking` (no library) | `geo:` / `maps:` / https fallback [D] |
@@ -139,7 +139,7 @@ src/services/http.ts                ← fetch wrapper: base URL, bearer token, e
 | `features/assignments` | Worker picker, reassign hook |
 | `features/evidence` | Camera screen logic, compression, upload with progress, delete photo |
 | `features/notes` | Add note form and hook, notes list |
-| `features/location` | "Use current location" hook, Open in Maps helper |
+| `features/location` | `LocationProvider` interface, Photon implementation, search hook, map picker, address field, Open in Maps helper |
 | `features/notifications` | Asking permission, registering and removing the push token, handling taps on a push |
 
 ### 3.3 Server state (TanStack Query)

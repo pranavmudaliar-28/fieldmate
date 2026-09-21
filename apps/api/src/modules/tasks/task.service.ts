@@ -127,6 +127,7 @@ export function createTaskService(deps: {
         createdBy: actor.id,
         workerId: input.workerId,
         address: location.address,
+        addressDetails: location.addressDetails ?? null,
         latitude: location.latitude ?? null,
         longitude: location.longitude ?? null,
       });
@@ -156,6 +157,7 @@ export function createTaskService(deps: {
         const locationChanged =
           newLocation !== undefined &&
           (newLocation.address !== current.task.address ||
+            (newLocation.addressDetails ?? null) !== current.task.addressDetails ||
             (newLocation.latitude ?? null) !== current.task.latitude ||
             (newLocation.longitude ?? null) !== current.task.longitude);
 
@@ -170,6 +172,7 @@ export function createTaskService(deps: {
         if (locationChanged && newLocation) {
           await repository.updateLocation(tx, taskId, {
             address: newLocation.address,
+            addressDetails: newLocation.addressDetails ?? null,
             latitude: newLocation.latitude ?? null,
             longitude: newLocation.longitude ?? null,
           });

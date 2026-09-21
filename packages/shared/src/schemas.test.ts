@@ -1,4 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
+import { FIELD_LIMITS } from './constants.js';
 import {
   createNoteSchema,
   createTaskSchema,
@@ -47,9 +48,35 @@ describe('loginSchema', () => {
 });
 
 describe('createTaskSchema', () => {
-  it('accepts a valid task and defaults coordinates to null', () => {
+  it('accepts a valid task and defaults coordinates and details to null', () => {
     const parsed = createTaskSchema.parse(validTask);
-    expect(parsed.location).toEqual({ address: '14 Harbour Rd', latitude: null, longitude: null });
+    expect(parsed.location).toEqual({
+      address: '14 Harbour Rd',
+      addressDetails: null,
+      latitude: null,
+      longitude: null,
+    });
+  });
+
+  it('keeps the door-level details, trimmed', () => {
+    const parsed = createTaskSchema.parse({
+      ...validTask,
+      location: { ...validTask.location, addressDetails: '  Flat 3B, rear gate  ' },
+    });
+    expect(parsed.location.addressDetails).toBe('Flat 3B, rear gate');
+  });
+
+  it('rejects details longer than the column allows', () => {
+    const result = createTaskSchema.safeParse({
+      ...validTask,
+      location: {
+        ...validTask.location,
+        addressDetails: 'x'.repeat(FIELD_LIMITS.addressDetails + 1),
+      },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(formatZodError(result.error)).toContain('Details must be at most 300 characters.');
   });
 
   it('rejects whitespace-only required fields', () => {

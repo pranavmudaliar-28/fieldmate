@@ -117,6 +117,8 @@ export const taskLocations = pgTable(
     latitude: numeric('latitude', { precision: 9, scale: 6, mode: 'number' }),
     longitude: numeric('longitude', { precision: 9, scale: 6, mode: 'number' }),
     address: varchar('address', { length: 500 }).notNull(),
+    /** Door-level detail a map cannot know: flat, floor, gate, landmark. */
+    addressDetails: varchar('address_details', { length: 300 }),
     createdAt: ts('created_at').notNull().defaultNow(),
   },
   (t) => [

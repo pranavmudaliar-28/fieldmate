@@ -24,7 +24,7 @@ function buildTask(overrides: Partial<TaskDetail> = {}): TaskDetail {
     title: 'Replace water meter',
     description: 'Old meter leaking.',
     status: 'ASSIGNED' as TaskStatus,
-    location: { address: '14 Harbour Rd', latitude: null, longitude: null },
+    location: { address: '14 Harbour Rd', addressDetails: null, latitude: null, longitude: null },
     assignment: { worker: WORKER, assignedAt: '2026-09-16T09:12:00.000Z', rejection: null },
     evidence: [],
     notes: [],

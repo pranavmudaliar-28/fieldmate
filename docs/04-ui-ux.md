@@ -260,21 +260,29 @@ Wireframes are schematic: `[ Button ]` is a button, `( chip )` a filter chip, `�
 │ └───────────────────────┘   │
 │ Assign to *                 │ (hidden in edit mode)
 │ ┌ Select a worker     ⌄ ┐   │ → BottomSheet worker list
+│ Customer location *         │
+│ Search address              │
+│ ┌ Street, area or landmark┐ │ type-ahead, 400 ms debounce
+│ ┌───────────────────────┐   │ suggestion rows: primary + secondary
 │ Address *                   │
+│ ┌───────────────────────┐   │ editable; helper if no pin
 │ ┌───────────────────────┐   │
-│ [ ◎ Use current location ]  │ secondary md
-│ ✓ Coordinates captured  ✕   │ after capture: caption + clear
-│   -33.8688, 151.2093        │
+│ │      map with pin     │   │ WebView, OSM tiles; drag to correct
+│ └───────────────────────┘   │
+│ Pin: -33.8688, 151.2093  ✕  │ caption + Remove pin
+│ Flat / floor / gate, landmark│
+│ ┌───────────────────────┐   │ optional, max 300
 ├▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔┤
 │ [      Create task       ]  │ ActionBar primary (edit: "Save changes")
 └─────────────────────────────┘
 ```
 - Required fields are marked `*`, and screen readers hear "required".
 - **Checking:** the first submit checks all fields, scrolls to the first error and focuses it. After that, each field is checked again as it changes.
-- **Use current location:**
-  - Undetermined permission: the system prompt appears.
-  - Denied permission: an inline PermissionPrompt says "Location access is off. You can still type the address." with **Open Settings**.
-  - While fetching: the button shows loading. A timeout or failure shows an inline error with Retry.
+- **Address search** (docs/07 §1):
+  - Searching starts after a pause in typing and at three characters; an earlier request is abandoned when the query changes, so results never arrive out of order.
+  - Picking a suggestion fills the address and drops the pin. Dragging the pin refreshes the address; if that fails, the old address stays and a note says so.
+  - If the service cannot be reached: "Address search is unavailable. You can still type the address yourself." Typing and saving keep working.
+  - No location permission is requested; the app never uses the manager's own position.
 - **Worker picker sheet:**
   - A list of workers with Avatar and name.
   - Loading shows skeleton rows; an error shows ErrorState.
@@ -488,7 +496,6 @@ Every state, with its exact wording. Messages are short, plain and never technic
 | Permission | When asked | If denied |
 |---|---|---|
 | **Camera** | When S-009 opens (the first time the worker taps **Add photo**) | S-009 shows PermissionPrompt + **Open Settings**; no photo can be added |
-| **Location** | When the manager taps **Use current location** on S-004 | Inline message; the address can still be typed; coordinates stay empty |
 | **Notifications** | After the first successful login, when the dashboard loads. On iOS, a short explanation card comes first: "Get notified when tasks are assigned to you" (worker) / "…when tasks are completed" (manager), with **Turn on** / **Not now** | The app works normally. A dismissible info banner on the dashboard says "Notifications are off. Turn them on in Settings to hear about task updates." with **Open Settings**. Once dismissed, it stays hidden on that device [T] |
 
 - On Android 13+, the system notification prompt appears when **Turn on** is tapped.

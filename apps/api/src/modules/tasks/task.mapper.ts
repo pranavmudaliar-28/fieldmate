@@ -50,6 +50,7 @@ export async function toTaskDetail(
     status: task.status,
     location: {
       address: task.address,
+      addressDetails: task.addressDetails,
       latitude: task.latitude,
       longitude: task.longitude,
     },

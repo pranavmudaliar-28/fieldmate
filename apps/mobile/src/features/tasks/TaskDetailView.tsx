@@ -11,7 +11,7 @@ import {
   typography,
 } from '../../constants/theme';
 import { formatCoordinates, formatDateTime } from '../../utils/format';
-import { openInMaps } from '../location/use-current-location';
+import { openInMaps } from '../location/open-in-maps';
 
 /** Read-only body of S-005 and S-008; each screen adds its own actions. */
 export function TaskDetailView({
@@ -68,6 +68,15 @@ export function TaskDetailView({
         <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.body}>
           {task.location.address}
         </Text>
+        {task.location.addressDetails ? (
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.addressDetails}
+            testID="address-details"
+          >
+            {task.location.addressDetails}
+          </Text>
+        ) : null}
         {coordinates ? (
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.caption}>
             {coordinates}
@@ -159,6 +168,7 @@ const styles = StyleSheet.create({
   section: { gap: spacing.xs },
   sectionTitle: { ...typography.sectionTitle, color: colors.textPrimary },
   body: { ...typography.body, color: colors.textPrimary },
+  addressDetails: { ...typography.body, color: colors.textSecondary },
   caption: { ...typography.caption, color: colors.textSecondary },
   note: { gap: 2, paddingVertical: spacing.xs },
   rejection: {

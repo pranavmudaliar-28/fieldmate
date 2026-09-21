@@ -17,6 +17,8 @@ export type LoginResponse = { token: string; user: User };
 
 export type TaskLocation = {
   address: string;
+  /** Flat, floor, gate or landmark, as typed by the manager. */
+  addressDetails: string | null;
   latitude: number | null;
   longitude: number | null;
 };

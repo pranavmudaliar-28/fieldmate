@@ -24,24 +24,30 @@ Today a manager types a free-text address and can capture **their own** GPS posi
 | Decision | Choice |
 |---|---|
 | How a location is chosen | **Address search with suggestions, plus a map with a draggable pin** [D] |
-| Provider | **Google Maps + Places** [D] |
+| Provider | **Photon (OpenStreetMap) search + OpenStreetMap tiles** — free, no key, no billing account [D] |
+| Typing an address by hand | **Always allowed**, in the style of food-delivery apps [D] |
+| Door-level detail | **A separate field** (flat, floor, gate, landmark), stored as `address_details` [D] |
 | "Use my current location" | **Removed** [D] |
 
 ### How it will work (replaces docs/02 F-005)
-1. The manager types in **Search address**; suggestions appear as they type.
+1. The manager types in **Search address**; suggestions appear after a short pause in typing.
 2. Picking a suggestion fills the address and its coordinates, and drops a pin on a small map.
 3. The pin can be **dragged** to correct the exact spot (a gate, a rear entrance); the address updates to match.
-4. **Address and coordinates are now both required**, because a picked place always has both. (Today coordinates are optional.)
-5. Workers still see the address and "Open in Maps"; the location remains a reference, never verified [D, unchanged].
+4. The address field stays **editable**, and **coordinates remain optional** — a site with no map entry (a plot behind a depot, a new building) must still be bookable. Without a pin the worker sees the address as text.
+5. **Flat / floor / gate, landmark** is captured separately, because a map cannot know it and it is what the worker actually needs at the door.
+6. Workers still see the address and "Open in Maps"; the location remains a reference, never verified [D, unchanged].
+
+### Why not Google
+You asked whether this could be free for testing. Google Places requires a billing account with a card even inside its free allowance. Photon is an OpenStreetMap search service **built for type-ahead** (unlike Nominatim, whose policy forbids autocomplete), and OpenStreetMap tiles are free to use for an app of this size with attribution. Neither needs a key or a card.
 
 ### What this needs from you
-- A **Google Cloud project** with **Places API**, **Geocoding API** and **Maps SDK for Android/iOS** enabled, and **billing enabled** (Google requires a card even within the free monthly allowance).
-- Two API keys (one Android, one iOS), each restricted to our app identifiers.
+Nothing. No account, no key, no card.
 
 ### Cost and safety notes
-- Google bills per session and per map load; a small team stays well inside the free allowance, but the account must exist.
-- Keys restricted to our app identifiers; the keys live in the build configuration, never in the repository.
-- Search requests go **from the app to Google directly** [T]; no customer address is sent anywhere else.
+- Both services are **best-effort public services** with no uptime guarantee. When search fails the app says so and the manager types the address instead, so a task can always be created.
+- The app identifies itself with a User-Agent, as both services' policies require, and asks for a short result list.
+- Search requests go **from the app to Photon directly** [T]; no customer address is sent anywhere else. No key exists to leak.
+- Moving to Google later is a swap of one file (`src/features/location/osm-provider.ts`) behind the `LocationProvider` interface; the screens do not change. Setup instructions are kept in docs/08.
 
 ### Effect on existing data
 Existing tasks keep their address; those without coordinates simply show no pin until they're edited.
@@ -132,10 +138,10 @@ Migration is additive, so existing rows are untouched: everyone stays active, an
 | 7A | Database: `ADMIN` role, `is_active`, migration | Constraint and migration tests |
 | 7B | API: admin endpoints, guardrails, deactivated-user rules | Integration tests for every rule, including the last-admin guard |
 | 7C | Mobile: admin area, Users screens, admin navigation | Screen tests |
-| 7D | Location: Google Places search, map pin, removal of the current-GPS button | Screen tests; a live check on your phone |
+| 7D | Location: Photon address search, OSM map pin, door-level details, removal of the current-GPS button | Screen tests; a live check on your phone |
 | 7E | Documentation and a final check of the whole flow | Full suite, live run |
 
-Each step ends with a report, as in the earlier phases. Steps 7A–7C need nothing from you; **7D is blocked until the Google keys exist.**
+Each step ends with a report, as in the earlier phases. No step needs an account or a key from you.
 
 ---
 
@@ -145,10 +151,11 @@ Unless you ask for them: audit logs of admin actions, self-service password rese
 
 ---
 
-## 6. Open questions
+## 6. Questions and answers
 
-| # | Question |
-|---|---|
-| Q1 | Do you want the admin's own role shown in the app header, so it's obvious which account is in use? (small, cosmetic) |
-| Q2 | Should a deactivated user's name still appear on their old tasks and photos? (Recommended: yes — removing it would rewrite history.) |
-| Q3 | For the Google keys: will you create the Google Cloud project, or should I write step-by-step instructions for it? |
+| # | Question | Answer |
+|---|---|---|
+| Q1 | Do you want the admin's own role shown in the app header, so it's obvious which account is in use? (small, cosmetic) | Open |
+| Q2 | Should a deactivated user's name still appear on their old tasks and photos? | Yes — removing it would rewrite history. Built that way. |
+| Q3 | For the Google keys: will you create the Google Cloud project, or should I write step-by-step instructions for it? | Neither: you asked for a free option, so the app uses Photon + OpenStreetMap. Google instructions remain in docs/08 if you ever switch. |
+| Q4 | What should happen when address search is unavailable? | Type the address by hand, as food-delivery apps allow, with a separate field for flat/floor/gate. Built that way. |

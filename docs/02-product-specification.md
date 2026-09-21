@@ -59,7 +59,7 @@ The worker **cannot** create, edit, assign, reassign, transfer, cancel or reopen
 | F-002 | Task Management | Create, view, list (with a status filter), edit (title, description, location), cancel, reopen. |
 | F-003 | Task Assignment | One worker per task, assigned when the task is created; reassign before completion. |
 | F-004 | Assigned Tasks | The worker's list of tasks assigned to them; start; reject with a reason. |
-| F-005 | Field Location | A required typed address; optional latitude and longitude from a "Use current location" button; a reference only, never verified; "Open in Maps" hands off to the device's native Maps app. |
+| F-005 | Customer Location | The **customer's** site: address search with suggestions, a draggable map pin, and a separate field for flat/floor/gate and landmark. The address may also be typed by hand, and coordinates stay optional. A reference only, never verified; "Open in Maps" hands off to the device's native Maps app. Revised in docs/07 §1. |
 | F-006 | Photo / Field Evidence | Native camera only; preview, then retake or use; JPEG/PNG, compressed on the device, 10 MB maximum; several photos per task; the uploader can delete their own photos while the task is IN_PROGRESS. |
 | F-007 | Notes | Several per task; append-only; the worker adds them while the task is IN_PROGRESS. |
 | F-008 | Task Completion | Worker or manager; the task must be IN_PROGRESS and have at least 1 photo; completion is confirmed on S-010 or in a dialog. |
@@ -124,7 +124,7 @@ Any other status change is refused with a **409 Conflict** error.
 | BR-011 | A manager can reopen a COMPLETED task. It goes back to ASSIGNED with the same worker, who has to start it again. | D |
 | BR-012 | Only the person who uploaded a photo can delete it, and only while the task is IN_PROGRESS. | D |
 | BR-013 | Location is only a reference. The app never checks where the worker actually is. | D |
-| BR-014 | Title, description, address and worker are required when creating a task. Latitude and longitude are optional. | D |
+| BR-014 | Title, description, address and worker are required when creating a task. Latitude, longitude and the address details are optional. | D |
 | BR-015 | The server enforces every rule above; the app's own restrictions are only there for usability. | C |
 
 ### 4.4 Consequences of the rules
@@ -166,12 +166,14 @@ Every screen supports the states in §8. Only the screens S-001 to S-010 exist. 
   - **Title** (required)
   - **Description** (required, multi-line)
   - **Worker** (required; picker listing FIELD_WORKER users)
-  - **Address** (required)
-  - **Use current location** (optional)
-- **Use current location:** asks for location permission, then fills in latitude and longitude and shows them as "Coordinates captured". The manager can clear them.
+  - **Search address** (optional aid): suggestions appear after a pause in typing; picking one fills the address and drops a map pin
+  - **Address** (required, always editable)
+  - **Map pin** (optional): draggable to the exact spot; the address follows it; it can be removed
+  - **Flat / floor / gate, landmark** (optional, max 300 characters)
+- **When search is unavailable:** the app says so and the manager types the address; a task can always be created.
 - Primary action: **Create task**. A successful create goes to S-005 of the new task and sends the worker a push.
 - **Edit mode**, opened from S-005:
-  - Title, description and address can be changed, and the "Use current location" coordinates can be captured again or cleared.
+  - Title, description and the whole location (address, pin, details) can be changed.
   - The worker field is hidden, because reassigning is a separate action.
   - Primary action: **Save changes**, which sends the assigned worker a push.
 - Leaving with unsaved changes asks "Discard changes?" first.
@@ -243,7 +245,7 @@ Actions by status:
 ### 6.1 Manager
 ```
 Login ─► Manager Dashboard
-          ├─► Create task ─► fill title/description/worker/address (+GPS) ─► Create
+          ├─► Create task ─► fill title/description/worker/location ─► Create
           │                   ─► Task Details (ASSIGNED)   [push → worker]
           ├─► Needs attention (REJECTED) ─► Task Details ─► Reassign | Cancel
           ├─► Recently completed ─► Task Details ─► review evidence/notes ─► Reopen?
@@ -319,7 +321,7 @@ app/
 | **Error** | Any failed request | A readable message, never technical details, with a **Retry** button; form errors appear next to each field |
 | **Success** | Create, save, reassign, start, reject, cancel, reopen, complete, upload, add note, delete photo | Short toast or banner confirmation; the data refreshes |
 | **Disabled** | Buttons while a request is running; Complete with 0 photos; actions not allowed in the current status | Greyed out, with a reason where it helps ("At least 1 photo is required") |
-| **Permission denied** | Camera (S-009), location (S-004 GPS button), notifications | Explanation plus **Open Settings**; for location the manager can still type an address; for notifications the app works without pushes |
+| **Permission denied** | Camera (S-009), notifications | Explanation plus **Open Settings**; for notifications the app works without pushes. The app no longer asks for location permission. |
 | **Network unavailable** | Global | An "You're offline" banner; buttons that need the network are disabled; the last loaded data stays visible; everything refreshes when the connection returns. No offline queue. |
 | **Conflict (409)** | Status changes | Show the server's message (e.g. "This task was cancelled") and refresh the task |
 | **Forbidden / not found** | Task routes | "This task is no longer available" with a way back |
@@ -338,6 +340,7 @@ The server's checks are the ones that count [C]. The app runs the same checks be
 | Task title | Required, 1–200 characters [T] |
 | Task description | Required, 1–5000 characters [T] |
 | Address | Required, 1–500 characters [T] |
+| Address details (flat / floor / gate, landmark) | Optional, at most 300 characters [T] |
 | Latitude / longitude | Optional, but always both or neither; latitude between −90 and 90, longitude between −180 and 180 |
 | Worker | Required; must be an existing FIELD_WORKER |
 | Reject reason | Required, 1–1000 characters [T] |
@@ -353,7 +356,7 @@ Text is trimmed before checking, so a value that's only spaces counts as empty [
 - Multiple workers per task; workers transferring tasks.
 - Manager approve/reject review; manager notes or photos.
 - Editing or deleting notes; photos from the gallery; file types other than photos.
-- GPS verification, map SDKs, geocoding, route directions inside the app.
+- GPS verification of where the worker is, paid map SDKs, route directions inside the app. (Address search and a map pin for picking the customer's location are in scope — docs/07 §1.)
 - Offline queue or sync; in-app notification inbox; pushes for reject, cancel or reopen.
 - Analytics, dashboards with metrics, reports, exports.
 - Chat, payments, marketplace, CRM, AI, general project management.
@@ -369,7 +372,7 @@ Text is trimmed before checking, so a value that's only spaces counts as empty [
 | D-02 | A worker starts a task explicitly with "Start task" | 1 |
 | D-03 | One worker per task; managers can reassign before completion; workers can't transfer | 1 |
 | D-04 | One organisation; managers see all tasks | 1 |
-| D-05 | Location: typed address plus optional GPS; reference only | 1 |
+| D-05 | Location: the customer's site — address search, optional map pin, optional door-level details; reference only (revised in 7) | 1 |
 | D-06 | Completion requires at least 1 photo | 1 |
 | D-07 | Several photos per task; the uploader can delete their own until completion | 1 |
 | D-08 | Managers can edit, cancel and reopen; workers can reject | 1 |
@@ -384,4 +387,4 @@ Text is trimmed before checking, so a value that's only spaces counts as empty [
 | D-17 | Photos and notes can only be added while IN_PROGRESS | 2 |
 | D-18 | My Tasks shows Active and Completed; rejected, cancelled and reassigned tasks are hidden | 2 |
 | D-19 | Task List has status filter chips; "Open in Maps" links to the native Maps app | 2 |
-| D-20 | Title, description, worker and address are required; coordinates are optional | 2 |
+| D-20 | Title, description, worker and address are required; coordinates and address details are optional | 2 |

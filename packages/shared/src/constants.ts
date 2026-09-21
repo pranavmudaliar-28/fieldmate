@@ -39,6 +39,7 @@ export const FIELD_LIMITS = {
   taskTitle: 200,
   taskDescription: 5000,
   address: 500,
+  addressDetails: 300,
   rejectionReason: 1000,
   note: 5000,
   pushToken: 255,

@@ -95,6 +95,7 @@ The index on `users.email` [C] comes from the UNIQUE constraint.
 | latitude | numeric(9,6) | yes | | CHECK `latitude BETWEEN -90 AND 90` |
 | longitude | numeric(9,6) | yes | | CHECK `longitude BETWEEN -180 AND 180` |
 | address | varchar(500) | no | | CHECK `length(trim(address)) > 0` |
+| address_details | varchar(300) | yes | | Flat / floor / gate, landmark (added in 7D, docs/07 §1) |
 | created_at | timestamptz | no | now() | |
 
 - CHECK `(latitude IS NULL) = (longitude IS NULL)`: both or neither.
@@ -225,6 +226,7 @@ export const taskLocations = pgTable('task_locations', {
   latitude: numeric('latitude', { precision: 9, scale: 6, mode: 'number' }),
   longitude: numeric('longitude', { precision: 9, scale: 6, mode: 'number' }),
   address: varchar('address', { length: 500 }).notNull(),
+  addressDetails: varchar('address_details', { length: 300 }),
   createdAt: ts('created_at').notNull().defaultNow(),
 }, (t) => [
   check('task_locations_lat_range', sql`${t.latitude} BETWEEN -90 AND 90`),
@@ -354,7 +356,12 @@ export type UserSummary = { id: string; name: string };
 
 export type User = { id: string; name: string; email: string; role: Role };
 
-export type TaskLocation = { address: string; latitude: number | null; longitude: number | null };
+export type TaskLocation = {
+  address: string;
+  addressDetails: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
 
 export type TaskListItem = {
   id: string;
@@ -414,6 +421,8 @@ export const loginSchema = z.object({
 
 export const locationSchema = z.object({
   address: trimmed(500, 'Address'),
+  addressDetails: z.string().trim().max(300, 'Details must be at most 300 characters.')
+    .nullable().default(null),
   latitude: z.number().min(-90).max(90).nullable().default(null),
   longitude: z.number().min(-180).max(180).nullable().default(null),
 }).strict().refine((l) => (l.latitude === null) === (l.longitude === null), {
@@ -523,7 +532,12 @@ Upsert on `token` → `user_id = me`. **204.** **Errors:** 401 · 422.
   "title": "Replace water meter at Block C",
   "description": "Old meter leaking; replace and photograph serial number.",
   "workerId": "8a1d…",
-  "location": { "address": "14 Harbour Rd, Unit 3", "latitude": -33.8688, "longitude": 151.2093 }
+  "location": {
+    "address": "14 Harbour Rd, Unit 3",
+    "addressDetails": "Flat 3B, rear gate",
+    "latitude": -33.8688,
+    "longitude": 151.2093
+  }
 }
 ```
 **Transaction:** check the worker is a FIELD_WORKER → insert `tasks` (ASSIGNED, created_by = me) → insert `task_locations` → insert `task_assignments` (open).

@@ -50,13 +50,6 @@ const config: ExpoConfig = {
         recordAudioAndroid: false,
       },
     ],
-    [
-      'expo-location',
-      {
-        locationAlwaysAndWhenInUsePermission:
-          'FieldMate uses your location only when you tap "Use current location" while creating a task.',
-      },
-    ],
     'expo-notifications',
     'expo-secure-store',
   ],

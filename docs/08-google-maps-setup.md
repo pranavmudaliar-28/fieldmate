@@ -1,5 +1,7 @@
 # Google Maps setup (for the customer location search)
 
+> **Not needed today.** You chose the free route, so the app uses Photon (OpenStreetMap) search and OpenStreetMap tiles, with no key and no billing account. Keep this page for the day you want Google's data instead: switching is a swap of `apps/mobile/src/features/location/osm-provider.ts` behind the `LocationProvider` interface, with no change to the screens.
+
 Do this once. It takes about 15 minutes. At the end you'll have **two API keys** to send me — one for Android, one for iOS.
 
 Google requires a card on file even though normal use for a small team stays inside the free monthly allowance. You can cap spending in step 7 so it can never surprise you.

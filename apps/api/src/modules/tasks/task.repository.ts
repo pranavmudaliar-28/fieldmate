@@ -35,6 +35,7 @@ export type TaskDetailRows = {
     updatedAt: Date;
     completedAt: Date | null;
     address: string;
+    addressDetails: string | null;
     latitude: number | null;
     longitude: number | null;
     workerId: string;
@@ -164,6 +165,7 @@ export function createTaskRepository(db: Database) {
         updatedAt: tasks.updatedAt,
         completedAt: tasks.completedAt,
         address: taskLocations.address,
+        addressDetails: taskLocations.addressDetails,
         latitude: taskLocations.latitude,
         longitude: taskLocations.longitude,
         workerId: users.id,
@@ -234,6 +236,7 @@ export function createTaskRepository(db: Database) {
       createdBy: string;
       workerId: string;
       address: string;
+      addressDetails: string | null;
       latitude: number | null;
       longitude: number | null;
     }): Promise<string> {
@@ -252,6 +255,7 @@ export function createTaskRepository(db: Database) {
         await tx.insert(taskLocations).values({
           taskId: task.id,
           address: input.address,
+          addressDetails: input.addressDetails,
           latitude: input.latitude,
           longitude: input.longitude,
         });
@@ -287,7 +291,12 @@ export function createTaskRepository(db: Database) {
     async updateLocation(
       tx: TaskWriter,
       taskId: string,
-      location: { address: string; latitude: number | null; longitude: number | null },
+      location: {
+        address: string;
+        addressDetails: string | null;
+        latitude: number | null;
+        longitude: number | null;
+      },
     ): Promise<void> {
       await tx.update(taskLocations).set(location).where(eq(taskLocations.taskId, taskId));
     },

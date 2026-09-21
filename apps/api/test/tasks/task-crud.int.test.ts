@@ -50,7 +50,27 @@ describe('POST /api/v1/tasks', () => {
   it('accepts a task without coordinates', async () => {
     const res = await createTask({ ...validTask(), location: { address: 'Depot gate' } });
     expect(res.status).toBe(201);
-    expect(res.body.location).toEqual({ address: 'Depot gate', latitude: null, longitude: null });
+    expect(res.body.location).toEqual({
+      address: 'Depot gate',
+      addressDetails: null,
+      latitude: null,
+      longitude: null,
+    });
+  });
+
+  it('stores the door-level address details alongside the address', async () => {
+    const res = await createTask({
+      ...validTask(),
+      location: {
+        address: '14 Harbour Rd',
+        addressDetails: 'Flat 3B, rear gate by the blue shutter',
+        latitude: -33.8688,
+        longitude: 151.2093,
+      },
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.location.addressDetails).toBe('Flat 3B, rear gate by the blue shutter');
   });
 
   it.each([
@@ -164,11 +184,37 @@ describe('PATCH /api/v1/tasks/:taskId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.title).toBe('Replace water meter at Block D');
-    expect(res.body.location).toEqual({ address: 'New address', latitude: null, longitude: null });
+    expect(res.body.location).toEqual({
+      address: 'New address',
+      addressDetails: null,
+      latitude: null,
+      longitude: null,
+    });
     expect(res.body.description).toBe(created.description);
     expect(new Date(res.body.updatedAt).getTime()).toBeGreaterThan(
       new Date(created.updatedAt).getTime(),
     );
+  });
+
+  it('replaces the whole location, so omitted details are cleared', async () => {
+    const { body: created } = await createTask({
+      ...validTask(),
+      location: { address: '14 Harbour Rd', addressDetails: 'Flat 3B' },
+    });
+
+    const withDetails = await request(app)
+      .patch(`/api/v1/tasks/${created.id}`)
+      .auth(manager.token, { type: 'bearer' })
+      .send({ location: { address: '14 Harbour Rd', addressDetails: 'Flat 4A, side door' } });
+    expect(withDetails.status).toBe(200);
+    expect(withDetails.body.location.addressDetails).toBe('Flat 4A, side door');
+
+    const withoutDetails = await request(app)
+      .patch(`/api/v1/tasks/${created.id}`)
+      .auth(manager.token, { type: 'bearer' })
+      .send({ location: { address: '14 Harbour Rd' } });
+    expect(withoutDetails.status).toBe(200);
+    expect(withoutDetails.body.location.addressDetails).toBeNull();
   });
 
   it('leaves updatedAt untouched when nothing actually changes', async () => {

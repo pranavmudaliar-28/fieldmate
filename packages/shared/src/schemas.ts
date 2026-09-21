@@ -29,6 +29,16 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const locationSchema = z
   .strictObject({
     address: requiredText(FIELD_LIMITS.address, 'Address'),
+    /** Flat, floor, gate or landmark; optional, because not every site has one. */
+    addressDetails: z
+      .string()
+      .trim()
+      .max(
+        FIELD_LIMITS.addressDetails,
+        `Details must be at most ${FIELD_LIMITS.addressDetails} characters.`,
+      )
+      .nullable()
+      .default(null),
     latitude: z
       .number('Latitude must be a number.')
       .min(-90, 'Latitude must be between -90 and 90.')
