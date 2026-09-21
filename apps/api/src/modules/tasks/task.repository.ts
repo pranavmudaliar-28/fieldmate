@@ -11,6 +11,16 @@ import {
 } from '../../db/schema.js';
 import type { TaskCursor } from '../../utils/cursor.js';
 
+/** The `tasks` columns that record when a lifecycle step happened. */
+export type TaskProgressColumn = 'acceptedAt' | 'departedAt' | 'arrivedAt' | 'startedAt';
+
+export const ALL_PROGRESS_COLUMNS = [
+  'acceptedAt',
+  'departedAt',
+  'arrivedAt',
+  'startedAt',
+] as const satisfies readonly TaskProgressColumn[];
+
 export type TaskListRow = {
   id: string;
   title: string;
@@ -33,6 +43,10 @@ export type TaskDetailRows = {
     status: TaskStatus;
     createdAt: Date;
     updatedAt: Date;
+    acceptedAt: Date | null;
+    departedAt: Date | null;
+    arrivedAt: Date | null;
+    startedAt: Date | null;
     completedAt: Date | null;
     address: string;
     addressDetails: string | null;
@@ -163,6 +177,10 @@ export function createTaskRepository(db: Database) {
         status: tasks.status,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
+        acceptedAt: tasks.acceptedAt,
+        departedAt: tasks.departedAt,
+        arrivedAt: tasks.arrivedAt,
+        startedAt: tasks.startedAt,
         completedAt: tasks.completedAt,
         address: taskLocations.address,
         addressDetails: taskLocations.addressDetails,
@@ -315,6 +333,38 @@ export function createTaskRepository(db: Database) {
 
     async touchTask(tx: TaskWriter, taskId: string): Promise<void> {
       await tx.update(tasks).set({ updatedAt: new Date() }).where(eq(tasks.id, taskId));
+    },
+
+    /**
+     * Moves a task through the worker's lifecycle, stamping the moment on the
+     * database clock so a slow API clock cannot order the steps wrongly.
+     */
+    async advance(
+      tx: TaskWriter,
+      taskId: string,
+      status: TaskStatus,
+      stamp: TaskProgressColumn,
+    ): Promise<void> {
+      await tx
+        .update(tasks)
+        .set({ status, [stamp]: sql`now()`, updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
+    },
+
+    /**
+     * Undoes one step, clearing the stamp it set. Reassigning and reopening
+     * clear every stamp, because the next worker starts the journey over.
+     */
+    async clearProgress(
+      tx: TaskWriter,
+      taskId: string,
+      columns: readonly TaskProgressColumn[],
+    ): Promise<void> {
+      const cleared = Object.fromEntries(columns.map((column) => [column, null]));
+      await tx
+        .update(tasks)
+        .set({ ...cleared, updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
     },
 
     async reassign(tx: TaskWriter, taskId: string, assignmentId: string, workerId: string) {

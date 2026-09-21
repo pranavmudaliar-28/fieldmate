@@ -66,6 +66,8 @@ export type TaskDetail = {
     assignedAt: string;
     rejection: Rejection | null;
   };
+  /** When each step of the worker's lifecycle happened; null until it does. */
+  progress: TaskProgress;
   /** Oldest first. */
   evidence: Evidence[];
   /** Oldest first. */
@@ -73,6 +75,15 @@ export type TaskDetail = {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+};
+
+/** Cleared when a task is reassigned or reopened: the next worker starts over. */
+export type TaskProgress = {
+  acceptedAt: string | null;
+  departedAt: string | null;
+  arrivedAt: string | null;
+  /** When work actually began on site — the start of "time on site". */
+  startedAt: string | null;
 };
 
 export type Paginated<T> = { items: T[]; nextCursor: string | null };

@@ -71,10 +71,17 @@ export const toneColors: Record<Tone, { text: string; tint: string; dot: string 
   neutral: { text: colors.neutralText, tint: colors.neutralTint, dot: '#7A8496' },
 };
 
-/** Task status appearance. Icons are Ionicons names and are now rendered. */
+/**
+ * Task status appearance. Icons are Ionicons names and are now rendered.
+ * The travel steps share the "in motion" tone; the icon and the word are what
+ * tell them apart, which is why status is never carried by colour alone.
+ */
 export const statusAppearance: Record<TaskStatus, { label: string; tone: Tone; icon: IconName }> = {
   ASSIGNED: { label: 'Assigned', tone: 'info', icon: 'mail-unread-outline' },
-  IN_PROGRESS: { label: 'In progress', tone: 'warning', icon: 'time-outline' },
+  ACCEPTED: { label: 'Accepted', tone: 'info', icon: 'thumbs-up-outline' },
+  GOING_TO_LOCATION: { label: 'Going to location', tone: 'warning', icon: 'car-outline' },
+  REACHED_LOCATION: { label: 'Reached location', tone: 'warning', icon: 'location-outline' },
+  IN_PROGRESS: { label: 'In progress', tone: 'warning', icon: 'construct-outline' },
   COMPLETED: { label: 'Completed', tone: 'success', icon: 'checkmark-circle-outline' },
   REJECTED: { label: 'Rejected', tone: 'error', icon: 'close-circle-outline' },
   CANCELLED: { label: 'Cancelled', tone: 'neutral', icon: 'ban-outline' },

@@ -33,7 +33,7 @@ PostgreSQL. All timestamps are `timestamptz`, stored in UTC. IDs are `uuid DEFAU
 ### 2.1 Enums
 ```sql
 CREATE TYPE user_role   AS ENUM ('MANAGER', 'FIELD_WORKER');
-CREATE TYPE task_status AS ENUM ('ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'CANCELLED');
+CREATE TYPE task_status AS ENUM ('ASSIGNED', 'ACCEPTED', 'GOING_TO_LOCATION', 'REACHED_LOCATION', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'CANCELLED');
 ```
 
 ### 2.2 `users`
@@ -60,6 +60,10 @@ The index on `users.email` [C] comes from the UNIQUE constraint.
 | created_by | uuid | no | | FK → users.id **ON DELETE RESTRICT** |
 | created_at | timestamptz | no | now() | |
 | updated_at | timestamptz | no | now() | |
+| accepted_at | timestamptz | yes | | When the worker accepted (added in 8I) |
+| departed_at | timestamptz | yes | | When the worker set off |
+| arrived_at | timestamptz | yes | | When the worker confirmed arrival |
+| started_at | timestamptz | yes | | When work began on site; "time on site" is measured from here |
 | completed_at | timestamptz | yes | | CHECK `(status = 'COMPLETED') = (completed_at IS NOT NULL)` |
 
 - Indexes: `tasks_created_by_idx (created_by)` [C], `tasks_status_idx (status)` [C], `tasks_updated_at_id_idx (updated_at DESC, id DESC)` [B3].
@@ -169,7 +173,7 @@ const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' 
 const id = () => uuid('id').primaryKey().defaultRandom();
 
 export const userRole = pgEnum('user_role', ROLES);            // ['MANAGER','FIELD_WORKER']
-export const taskStatus = pgEnum('task_status', TASK_STATUSES); // 5 values
+export const taskStatus = pgEnum('task_status', TASK_STATUSES); // 8 values
 
 export const users = pgTable('users', {
   id: id(),
@@ -345,7 +349,8 @@ Notes:
 export const ROLES = ['MANAGER', 'FIELD_WORKER'] as const;
 export type Role = (typeof ROLES)[number];
 
-export const TASK_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'CANCELLED'] as const;
+// Lifecycle order. IN_PROGRESS is only reachable through `start` (docs/02 §4.2).
+export const TASK_STATUSES = ['ASSIGNED', 'ACCEPTED', 'GOING_TO_LOCATION', 'REACHED_LOCATION', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'CANCELLED'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const EVIDENCE_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
@@ -370,6 +375,13 @@ export type TaskListItem = {
   address: string;
   worker: UserSummary;                                      // current assignee
   rejection: { reason: string; rejectedAt: string } | null; // manager responses only; always null for workers
+  /** When each lifecycle step happened; cleared on reassign and reopen. */
+  progress: {
+    acceptedAt: string | null;
+    departedAt: string | null;
+    arrivedAt: string | null;
+    startedAt: string | null;
+  };
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
@@ -562,18 +574,35 @@ Upsert on `token` → `user_id = me`. **204.** **Errors:** 401 · 422.
 ### 7.11 `POST /api/v1/tasks/:taskId/assignment` — Auth M
 **Request** `{ "workerId": "…" }`
 **Guard:** status ∈ {ASSIGNED, IN_PROGRESS, REJECTED}; the worker is a FIELD_WORKER; if status ≠ REJECTED, the new worker must differ from the current one.
-**Transaction:** close the open assignment (`ended_at = now()`) → insert a new open row → `status = ASSIGNED`, `updated_at = now()`.
+**Transaction:** close the open assignment (`ended_at = now()`) → insert a new open row → `status = ASSIGNED`, all four progress stamps cleared, `updated_at = now()`.
 **After commit:** push `TASK_ASSIGNED` to the new worker.
 **200** `TaskDetail`. **Errors:** 400 · 401 · 403 · 404 · 409 INVALID_STATUS_TRANSITION / SAME_WORKER · 422 VALIDATION_ERROR / INVALID_WORKER.
 
-### 7.12 `POST /api/v1/tasks/:taskId/start` — Auth W
-**Guard:** current assignee; status = ASSIGNED.
-**Transaction:** `status = IN_PROGRESS`, `updated_at = now()`.
-**200** `TaskDetail`. **Errors:** 400 · 401 · 403 (manager) · 404 · 409.
+### 7.12 The worker's lifecycle — Auth W
+
+One endpoint per step, each moving the task exactly one place forward. The step
+stamps its own column on the **database clock**, so the timestamps can only run
+forwards even if an API clock drifts.
+
+| Endpoint | From | To | Stamps |
+|---|---|---|---|
+| `POST /api/v1/tasks/:taskId/accept` | ASSIGNED | ACCEPTED | `accepted_at` |
+| `POST /api/v1/tasks/:taskId/depart` | ACCEPTED | GOING_TO_LOCATION | `departed_at` |
+| `POST /api/v1/tasks/:taskId/arrive` | GOING_TO_LOCATION | REACHED_LOCATION | `arrived_at` |
+| `POST /api/v1/tasks/:taskId/start` | REACHED_LOCATION | IN_PROGRESS | `started_at` |
+| `POST /api/v1/tasks/:taskId/step-back` | ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION | the previous status | clears that step's stamp |
+
+**Guard:** current assignee, and the status must allow that step. Starting work
+from ASSIGNED, ACCEPTED or GOING_TO_LOCATION is refused — a task only becomes
+IN_PROGRESS when the worker confirms they have begun on site.
+**After commit:** push `TASK_UPDATED` to the worker.
+**200** `TaskDetail`. **Errors:** 400 · 401 · 403 (manager) · 404 · 409 INVALID_STATUS_TRANSITION.
 
 ### 7.13 `POST /api/v1/tasks/:taskId/reject` — Auth W
 **Request** `{ "reason": "Site locked, no key" }`
-**Guard:** current assignee; status = ASSIGNED.
+**Guard:** current assignee; status is ASSIGNED, ACCEPTED, GOING_TO_LOCATION or
+REACHED_LOCATION — a worker who travels and finds a problem can still hand the
+task back, but not once the work itself has started.
 **Transaction:** set `rejection_reason` and `rejected_at = now()` on the open assignment; `status = REJECTED`, `updated_at = now()`.
 **204.** The worker can't see the task after rejecting it [B6].
 **Errors:** 400 · 401 · 403 · 404 · 409 · 422.
@@ -638,7 +667,11 @@ Holding the lock during the upload stops the task being completed or cancelled h
 | GET | /api/v1/tasks/:taskId | ✓ | ✓ own |
 | PATCH | /api/v1/tasks/:taskId | ✓ | ✗ |
 | POST | /api/v1/tasks/:taskId/assignment | ✓ | ✗ |
+| POST | /api/v1/tasks/:taskId/accept | ✗ | ✓ own |
+| POST | /api/v1/tasks/:taskId/depart | ✗ | ✓ own |
+| POST | /api/v1/tasks/:taskId/arrive | ✗ | ✓ own |
 | POST | /api/v1/tasks/:taskId/start | ✗ | ✓ own |
+| POST | /api/v1/tasks/:taskId/step-back | ✗ | ✓ own |
 | POST | /api/v1/tasks/:taskId/reject | ✗ | ✓ own |
 | POST | /api/v1/tasks/:taskId/cancel | ✓ | ✗ |
 | POST | /api/v1/tasks/:taskId/reopen | ✓ | ✗ |

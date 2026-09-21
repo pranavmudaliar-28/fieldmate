@@ -47,6 +47,7 @@ function buildTask(overrides: Partial<TaskDetail> = {}): TaskDetail {
       assignedAt: '2026-09-16T09:12:00.000Z',
       rejection: null,
     },
+    progress: { acceptedAt: null, departedAt: null, arrivedAt: null, startedAt: null },
     evidence: [],
     notes: [],
     createdAt: '2026-09-16T09:12:00.000Z',
@@ -93,24 +94,70 @@ beforeEach(() => {
 });
 
 describe('Worker task details (S-008)', () => {
-  it('offers Start and Reject for an assigned task', async () => {
+  it('offers Accept and Reject for an assigned task, and nothing to work with yet', async () => {
     await renderDetails(buildTask());
 
-    expect(screen.getByTestId('action-start')).toBeTruthy();
+    // Accepting is the only way forward; a task is never started from here.
+    expect(screen.getByTestId('action-accept')).toBeTruthy();
     expect(screen.getByTestId('action-reject')).toBeTruthy();
+    expect(screen.queryByTestId('action-start')).toBeNull();
     expect(screen.queryByTestId('add-photo')).toBeNull();
     expect(screen.queryByTestId('note-input')).toBeNull();
   });
 
-  it('starts the task', async () => {
-    await renderDetails(buildTask());
-    mockApiRequest.mockResolvedValue(buildTask({ status: 'IN_PROGRESS' }) as never);
+  it.each([
+    ['ASSIGNED', 'action-accept', '/tasks/task-1/accept'],
+    ['ACCEPTED', 'action-depart', '/tasks/task-1/depart'],
+    ['GOING_TO_LOCATION', 'action-arrive', '/tasks/task-1/arrive'],
+    ['REACHED_LOCATION', 'action-start', '/tasks/task-1/start'],
+  ] as const)('takes the next step from %s', async (status, testID, path) => {
+    await renderDetails(buildTask({ status }));
+    mockApiRequest.mockResolvedValue(buildTask({ status }) as never);
 
-    await userEvent.setup().press(screen.getByTestId('action-start'));
+    await userEvent.setup().press(screen.getByTestId(testID));
+
+    await waitFor(() => expect(mockApiRequest).toHaveBeenCalledWith(path, { method: 'POST' }));
+  });
+
+  /** The whole point of the change: assigning or accepting must not start work. */
+  it.each(['ASSIGNED', 'ACCEPTED', 'GOING_TO_LOCATION'] as const)(
+    'offers no photos or notes while %s',
+    async (status) => {
+      await renderDetails(buildTask({ status }));
+
+      expect(screen.queryByTestId('add-photo')).toBeNull();
+      expect(screen.queryByTestId('note-input')).toBeNull();
+      expect(screen.queryByTestId('action-complete')).toBeNull();
+    },
+  );
+
+  it('can undo a mistapped step, but not once work has started', async () => {
+    await renderDetails(buildTask({ status: 'REACHED_LOCATION' }));
+    mockApiRequest.mockResolvedValue(buildTask({ status: 'GOING_TO_LOCATION' }) as never);
+
+    await userEvent.setup().press(screen.getByTestId('action-step-back'));
 
     await waitFor(() =>
-      expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/start', { method: 'POST' }),
+      expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/step-back', { method: 'POST' }),
     );
+  });
+
+  it('shows how far the job has got', async () => {
+    await renderDetails(
+      buildTask({
+        status: 'REACHED_LOCATION',
+        progress: {
+          acceptedAt: '2026-09-16T09:20:00.000Z',
+          departedAt: '2026-09-16T09:35:00.000Z',
+          arrivedAt: '2026-09-16T10:02:00.000Z',
+          startedAt: null,
+        },
+      }),
+    );
+
+    expect(screen.getByTestId('worker-journey')).toBeTruthy();
+    expect(screen.getByText('Arrived on site')).toBeTruthy();
+    expect(screen.getByText('Work started')).toBeTruthy();
   });
 
   it('requires a reason to reject and confirms first', async () => {
@@ -147,7 +194,15 @@ describe('Worker task details (S-008)', () => {
     expect(screen.getByTestId('add-photo')).toBeTruthy();
     expect(screen.getByTestId('note-input')).toBeTruthy();
     expect(screen.queryByTestId('action-start')).toBeNull();
+    // Once work has started there is no backing out and no undo.
     expect(screen.queryByTestId('action-reject')).toBeNull();
+    expect(screen.queryByTestId('action-step-back')).toBeNull();
+  });
+
+  /** Arriving and finding a problem is the realistic rejection (docs/02 §4.2). */
+  it('can still be rejected after travelling to site', async () => {
+    await renderDetails(buildTask({ status: 'REACHED_LOCATION' }));
+    expect(screen.getByTestId('action-reject')).toBeTruthy();
   });
 
   it('disables Complete until a photo exists, and explains why', async () => {

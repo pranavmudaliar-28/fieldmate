@@ -1,4 +1,4 @@
-import type { TaskListItem } from '@fieldmate/shared';
+import { WORKER_PROGRESS_STATUSES, type TaskListItem } from '@fieldmate/shared';
 import { useRouter } from 'expo-router';
 import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '../../../src/components/AppHeader';
@@ -20,11 +20,15 @@ type Section = { title: string; data: TaskListItem[]; emptyMessage: string };
 export default function MyTasks() {
   const router = useRouter();
   const tabBarSpacing = useTabBarSpacing();
-  const active = useTaskList(['IN_PROGRESS', 'ASSIGNED']);
+  // Every step the worker has taken on but not finished.
+  const active = useTaskList([...WORKER_PROGRESS_STATUSES]);
   const completed = useTaskList(['COMPLETED']);
 
-  const activeTasks = (active.data?.pages.flatMap((page) => page.items) ?? []).sort((a, b) =>
-    a.status === b.status ? 0 : a.status === 'IN_PROGRESS' ? -1 : 1,
+  // Furthest along first: the job in hand sits above what is still waiting.
+  const activeTasks = (active.data?.pages.flatMap((page) => page.items) ?? []).sort(
+    (a, b) =>
+      WORKER_PROGRESS_STATUSES.indexOf(b.status as never) -
+      WORKER_PROGRESS_STATUSES.indexOf(a.status as never),
   );
   const completedTasks = completed.data?.pages.flatMap((page) => page.items) ?? [];
 

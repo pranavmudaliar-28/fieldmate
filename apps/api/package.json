@@ -11,7 +11,7 @@
     "test": "npm run test:unit && npm run test:int",
     "test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects unit",
     "test:int": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --selectProjects integration --runInBand",
-    "db:generate": "tsx --env-file-if-exists=.env node_modules/drizzle-kit/bin.cjs generate",
+    "db:generate": "tsx --env-file-if-exists=.env ../../node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "db:reset": "tsx --env-file-if-exists=.env scripts/reset-db.ts",
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",

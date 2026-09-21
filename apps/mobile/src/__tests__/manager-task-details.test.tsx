@@ -26,6 +26,7 @@ function buildTask(overrides: Partial<TaskDetail> = {}): TaskDetail {
     status: 'ASSIGNED' as TaskStatus,
     location: { address: '14 Harbour Rd', addressDetails: null, latitude: null, longitude: null },
     assignment: { worker: WORKER, assignedAt: '2026-09-16T09:12:00.000Z', rejection: null },
+    progress: { acceptedAt: null, departedAt: null, arrivedAt: null, startedAt: null },
     evidence: [],
     notes: [],
     createdAt: '2026-09-16T09:12:00.000Z',

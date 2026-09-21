@@ -71,9 +71,23 @@ env:
 - assertVisible: ${TASK_TITLE}
 - tapOn: ${TASK_TITLE}
 
-# Completing is not offered before the work starts
+# The worker walks the lifecycle: a task is never in progress on assignment.
 - assertNotVisible:
     id: 'action-complete'
+- assertNotVisible:
+    id: 'action-start'
+
+- tapOn:
+    id: 'action-accept'
+- assertVisible: 'Accepted'
+- tapOn:
+    id: 'action-depart'
+- assertVisible: 'Going to location'
+- tapOn:
+    id: 'action-arrive'
+- assertVisible: 'Reached location'
+
+# Only now, having confirmed arrival, can the work itself begin.
 - tapOn:
     id: 'action-start'
 - assertVisible: 'In progress'

@@ -57,6 +57,15 @@ export const tasks = pgTable(
       .references(() => users.id, { onDelete: 'restrict' }),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
+    /**
+     * When the worker passed each step. Cleared on reassign and reopen, because
+     * the next worker starts the journey over. `started_at` is when work began
+     * on site, which is what "time on site" is measured from.
+     */
+    acceptedAt: ts('accepted_at'),
+    departedAt: ts('departed_at'),
+    arrivedAt: ts('arrived_at'),
+    startedAt: ts('started_at'),
     completedAt: ts('completed_at'),
   },
   (t) => [

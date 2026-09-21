@@ -25,8 +25,8 @@ There is one organisation. There is no self-registration: accounts are created b
 | See **all** tasks in the organisation | [D] |
 | Create a task and assign it to exactly one worker | [C] / [D] |
 | Edit a task's title, description and location (not when COMPLETED or CANCELLED) | [D] |
-| Reassign a task to a different worker (ASSIGNED, IN_PROGRESS, REJECTED) | [D] |
-| Cancel a task (ASSIGNED, IN_PROGRESS, REJECTED) | [D] |
+| Reassign a task to a different worker (any live status) | [D] |
+| Cancel a task (any live status) | [D] |
 | Reopen a COMPLETED task (back to ASSIGNED) | [D] |
 | Complete an IN_PROGRESS task on a worker's behalf (needs at least 1 photo) | [D] |
 | View task details, evidence and notes (view-only review) | [C] / [D] |
@@ -72,11 +72,17 @@ The worker **cannot** create, edit, assign, reassign, transfer, cancel or reopen
 ### 4.1 Statuses
 | Status | Meaning |
 |---|---|
-| `ASSIGNED` | Created or reassigned, and waiting for the worker to start |
-| `IN_PROGRESS` | The worker has started the field work |
+| `ASSIGNED` | Created or reassigned, and waiting for the worker to accept |
+| `ACCEPTED` | The worker has taken the job, but has not set off |
+| `GOING_TO_LOCATION` | The worker is travelling to the site |
+| `REACHED_LOCATION` | The worker has confirmed arrival, but has not begun |
+| `IN_PROGRESS` | The worker has started the field work **on site** |
 | `COMPLETED` | Finished, with at least 1 photo |
 | `REJECTED` | The worker declined; waiting for the manager to reassign or cancel |
 | `CANCELLED` | Cancelled by a manager. **Final.** |
+
+A task is **never** `IN_PROGRESS` because it was assigned or accepted. Only the
+worker confirming that work has begun on site moves it there [D].
 
 ### 4.2 Transitions
 ```
@@ -85,28 +91,54 @@ The worker **cannot** create, edit, assign, reassign, transfer, cancel or reopen
                   ▼
    ┌────────── ASSIGNED ◄──────────── reassign (Manager) ◄─── REJECTED
    │              │  ▲                                           ▲
-   │   start      │  │ reassign (Manager)                        │
+   │   accept     │  │ reassign / reopen (Manager)               │
    │  (Worker)    ▼  │                                           │
-   │          IN_PROGRESS ─────────────────────── reject ────────┘ (from ASSIGNED only)
+   │           ACCEPTED ──────────────────────── reject ─────────┤
+   │              │  ▲                                           │
+   │   depart     ▼  │ step back (Worker)                        │
+   │      GOING_TO_LOCATION ───────────────────  reject ─────────┤
+   │              │  ▲                                           │
+   │   arrive     ▼  │ step back (Worker)                        │
+   │      REACHED_LOCATION ────────────────────  reject ─────────┘
+   │              │
+   │   start      ▼  (Worker; the ONLY way in)
+   │          IN_PROGRESS
    │              │
    │   complete   │  (Worker or Manager; ≥1 photo)
    │              ▼
    │          COMPLETED ──── reopen (Manager) ───► ASSIGNED
    │
-   └─ cancel (Manager) from ASSIGNED / IN_PROGRESS / REJECTED ──► CANCELLED (final)
+   └─ cancel (Manager) from any live status ──────► CANCELLED (final)
 ```
 
 | # | From | Action | To | Actor | Guard |
 |---|---|---|---|---|---|
 | T1 | — | Create | ASSIGNED | Manager | Title, description, address and worker are all valid |
-| T2 | ASSIGNED | Start | IN_PROGRESS | Assigned worker | — |
-| T3 | ASSIGNED | Reject | REJECTED | Assigned worker | Reason isn't empty |
-| T4 | ASSIGNED, IN_PROGRESS, REJECTED | Reassign | ASSIGNED | Manager | The new worker is an existing FIELD_WORKER; in ASSIGNED or IN_PROGRESS they must differ from the current worker |
+| T2a | ASSIGNED | Accept | ACCEPTED | Assigned worker | — |
+| T2b | ACCEPTED | Set off | GOING_TO_LOCATION | Assigned worker | — |
+| T2c | GOING_TO_LOCATION | Arrive | REACHED_LOCATION | Assigned worker | — |
+| T2d | REACHED_LOCATION | Start work | IN_PROGRESS | Assigned worker | — |
+| T2e | ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION | Step back | The previous status | Assigned worker | Never once work has started |
+| T3 | ASSIGNED, ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION | Reject | REJECTED | Assigned worker | Reason isn't empty |
+| T4 | Any live status | Reassign | ASSIGNED | Manager | The new worker is an existing FIELD_WORKER; unless the task is REJECTED they must differ from the current worker |
 | T5 | IN_PROGRESS | Complete | COMPLETED | Assigned worker or Manager | The task has ≥1 photo |
-| T6 | ASSIGNED, IN_PROGRESS, REJECTED | Cancel | CANCELLED | Manager | — |
+| T6 | Any live status | Cancel | CANCELLED | Manager | — |
 | T7 | COMPLETED | Reopen | ASSIGNED | Manager | Same worker as before |
 
+"Any live status" means ASSIGNED, ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION,
+IN_PROGRESS or REJECTED.
+
 Any other status change is refused with a **409 Conflict** error.
+
+**Step back** exists because each step is one large button pressed one-handed,
+often in a vehicle: a mistap must be recoverable without calling the manager [D].
+It undoes exactly one step and clears the timestamp that step recorded.
+
+**Timestamps.** The API records when each step happened — `acceptedAt`,
+`departedAt`, `arrivedAt` and `startedAt` — stamped on the database clock so
+they can only run forwards [T]. Reassigning or reopening clears all four,
+because the next worker walks the journey themselves. `startedAt` is what
+"time on site" is measured from.
 
 ### 4.3 Numbered business rules
 | ID | Rule | Source |
@@ -120,7 +152,7 @@ Any other status change is refused with a **409 Conflict** error.
 | BR-007 | Completing a task needs status IN_PROGRESS and at least 1 photo. The assigned worker or a manager can complete it. | C / D |
 | BR-008 | A worker can only reject while the task is ASSIGNED, and must give a reason. | D |
 | BR-009 | A manager can edit title, description and location unless the task is COMPLETED or CANCELLED. | D |
-| BR-010 | A manager can cancel from ASSIGNED, IN_PROGRESS or REJECTED. CANCELLED is final. | D |
+| BR-010 | A manager can cancel from any live status. CANCELLED is final. | D |
 | BR-011 | A manager can reopen a COMPLETED task. It goes back to ASSIGNED with the same worker, who has to start it again. | D |
 | BR-012 | Only the person who uploaded a photo can delete it, and only while the task is IN_PROGRESS. | D |
 | BR-013 | Location is only a reference. The app never checks where the worker actually is. | D |
@@ -129,7 +161,7 @@ Any other status change is refused with a **409 Conflict** error.
 
 ### 4.4 Consequences of the rules
 - **Reassignment:** the previous worker immediately loses access to the task and it leaves their My Tasks list. The task's existing photos and notes stay on it. The previous worker's photos can no longer be deleted by anyone.
-- **Reassigning an IN_PROGRESS task:** the status goes back to ASSIGNED, so the new worker has to start it.
+- **Reassigning a live task:** the status goes back to ASSIGNED and the previous worker's step timestamps are cleared, so the new worker walks the lifecycle themselves.
 - **Reopen:** existing photos and notes are kept. Once the worker starts the task again, they can add more photos, and delete their own.
 - **Rejection history:** the rejecting worker's reason is kept with that assignment and shown to managers on Task Details.
 - **Pushes that aren't sent:** reject, cancel and reopen don't send pushes, because they weren't chosen as triggers. Managers see rejected tasks in the dashboard's "Needs attention" list.
@@ -191,11 +223,11 @@ Actions (only those allowed in the task's current status are shown):
 
 | Action | Shown when | UI |
 |---|---|---|
-| Edit | ASSIGNED, IN_PROGRESS, REJECTED | Opens S-004 in edit mode |
-| Reassign | ASSIGNED, IN_PROGRESS, REJECTED | Bottom sheet with the worker picker, then a confirmation |
+| Edit | Any live status | Opens S-004 in edit mode |
+| Reassign | Any live status | Bottom sheet with the worker picker, then a confirmation |
 | Complete | IN_PROGRESS | Confirmation dialog; disabled with "At least 1 photo is required" when there are no photos |
 | Reopen | COMPLETED | Confirmation dialog |
-| Cancel task | ASSIGNED, IN_PROGRESS, REJECTED | Destructive confirmation dialog: "This can't be undone" |
+| Cancel task | Any live status | Destructive confirmation dialog: "This can't be undone" |
 
 ### S-006 Worker Dashboard
 - Header: the user's name and a **Log out** action.
@@ -221,7 +253,10 @@ Actions by status:
 
 | Status | Actions |
 |---|---|
-| ASSIGNED | **Start task** (primary) · **Reject** (bottom sheet with a required reason, then a confirmation) |
+| ASSIGNED | **Accept task** (primary) · **Reject** (bottom sheet with a required reason, then a confirmation) |
+| ACCEPTED | **I'm on my way** (primary) · Undo last step · Reject |
+| GOING_TO_LOCATION | **I've arrived** (primary) · Undo last step · Reject |
+| REACHED_LOCATION | **Start work** (primary) · Undo last step · Reject |
 | IN_PROGRESS | **Add photo** (opens S-009) · Add note · Delete own photo (with confirmation) · **Complete task** (opens S-010; disabled until there's at least 1 photo) |
 | COMPLETED | Read only |
 

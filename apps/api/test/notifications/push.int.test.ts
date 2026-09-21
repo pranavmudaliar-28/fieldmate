@@ -194,7 +194,11 @@ describe('push triggers', () => {
 
   it('notifies every other manager when a worker completes a task', async () => {
     const taskId = await createTask();
-    await request(app).post(`/api/v1/tasks/${taskId}/start`).auth(worker.token, { type: 'bearer' });
+    for (const step of ['accept', 'depart', 'arrive', 'start']) {
+      await request(app)
+        .post(`/api/v1/tasks/${taskId}/${step}`)
+        .auth(worker.token, { type: 'bearer' });
+    }
     await request(app)
       .post(`/api/v1/tasks/${taskId}/evidence`)
       .auth(worker.token, { type: 'bearer' })

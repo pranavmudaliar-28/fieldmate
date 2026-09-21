@@ -59,6 +59,12 @@ export async function toTaskDetail(
       assignedAt: task.assignedAt.toISOString(),
       rejection: rejection(task.rejectionReason, task.rejectedAt),
     },
+    progress: {
+      acceptedAt: task.acceptedAt?.toISOString() ?? null,
+      departedAt: task.departedAt?.toISOString() ?? null,
+      arrivedAt: task.arrivedAt?.toISOString() ?? null,
+      startedAt: task.startedAt?.toISOString() ?? null,
+    },
     evidence,
     notes: rows.notes.map((note) => ({
       id: note.id,

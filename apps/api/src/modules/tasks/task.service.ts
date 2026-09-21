@@ -1,13 +1,17 @@
 import {
   WORKER_VISIBLE_STATUSES,
   hasRequiredEvidence,
+  nextStatus,
+  previousStatus,
   type CreateTaskInput,
   type ListTasksQuery,
   type Paginated,
   type TaskDetail,
   type TaskListItem,
+  type TaskStatus,
   type UpdateTaskInput,
   type UserSummary,
+  type WorkerStep,
 } from '@fieldmate/shared';
 import type { Logger } from '../../config/logger.js';
 import {
@@ -21,9 +25,29 @@ import { AppError } from '../../utils/app-error.js';
 import { encodeCursor, type TaskCursor } from '../../utils/cursor.js';
 import { toTaskDetail, toTaskListItem } from './task.mapper.js';
 import { assertCanPerform, assertCanViewTask, type Actor } from './task.policy.js';
-import type { TaskRepository } from './task.repository.js';
+import {
+  ALL_PROGRESS_COLUMNS,
+  type TaskProgressColumn,
+  type TaskRepository,
+} from './task.repository.js';
 
 const taskNotFound = () => new AppError('TASK_NOT_FOUND', 'Task was not found.');
+
+/** The stamp each forward step writes. */
+const STEP_STAMPS = {
+  accept: 'acceptedAt',
+  depart: 'departedAt',
+  arrive: 'arrivedAt',
+  start: 'startedAt',
+} as const satisfies Record<WorkerStep, TaskProgressColumn>;
+
+/** The stamp that put a task into each status, so undoing can clear it. */
+const STATUS_STAMPS = {
+  ACCEPTED: 'acceptedAt',
+  GOING_TO_LOCATION: 'departedAt',
+  REACHED_LOCATION: 'arrivedAt',
+  IN_PROGRESS: 'startedAt',
+} as const satisfies Partial<Record<TaskStatus, TaskProgressColumn>>;
 
 export function createTaskService(deps: {
   repository: TaskRepository;
@@ -208,6 +232,8 @@ export function createTaskService(deps: {
 
         await repository.reassign(tx, taskId, task.assignmentId, workerId);
         await repository.setStatus(tx, taskId, 'ASSIGNED', null);
+        // The next worker walks the journey themselves.
+        await repository.clearProgress(tx, taskId, ALL_PROGRESS_COLUMNS);
         return true;
       });
 
@@ -218,10 +244,42 @@ export function createTaskService(deps: {
       return task;
     },
 
-    async start(actor: Actor, taskId: string): Promise<TaskDetail> {
+    /**
+     * One forward step of the worker's lifecycle. A task only reaches
+     * IN_PROGRESS through `start`, which the worker can only reach after
+     * arriving — never on assignment or acceptance (docs/02 §4.2).
+     */
+    async advance(actor: Actor, taskId: string, step: WorkerStep): Promise<TaskDetail> {
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
-        assertCanPerform('start', actor, { status: task.status, currentWorkerId: task.workerId });
-        await repository.setStatus(tx, taskId, 'IN_PROGRESS', null);
+        assertCanPerform(step, actor, { status: task.status, currentWorkerId: task.workerId });
+        const status = nextStatus(step);
+        if (!status) throw new AppError('INVALID_STATUS_TRANSITION', 'That step is not available.');
+        await repository.advance(tx, taskId, status, STEP_STAMPS[step]);
+        return true;
+      });
+
+      if (result === undefined) throw taskNotFound();
+
+      const task = await detail(taskId);
+      // The manager follows the journey, so each step is worth a push.
+      notify([task.assignment.worker.id], pushMessages.taskUpdated(taskId, task.title));
+      return task;
+    },
+
+    /** Undoes one mistapped step, clearing the stamp it set. */
+    async stepBack(actor: Actor, taskId: string): Promise<TaskDetail> {
+      const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        assertCanPerform('stepBack', actor, {
+          status: task.status,
+          currentWorkerId: task.workerId,
+        });
+        const previous = previousStatus(task.status);
+        const stamp = STATUS_STAMPS[task.status as keyof typeof STATUS_STAMPS];
+        if (!previous || !stamp) {
+          throw new AppError('INVALID_STATUS_TRANSITION', 'There is no step to undo.');
+        }
+        await repository.setStatus(tx, taskId, previous, null);
+        await repository.clearProgress(tx, taskId, [stamp]);
         return true;
       });
 
@@ -256,6 +314,7 @@ export function createTaskService(deps: {
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
         assertCanPerform('reopen', actor, { status: task.status, currentWorkerId: task.workerId });
         await repository.setStatus(tx, taskId, 'ASSIGNED', null);
+        await repository.clearProgress(tx, taskId, ALL_PROGRESS_COLUMNS);
         return true;
       });
 

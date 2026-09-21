@@ -72,6 +72,7 @@ function detail(overrides: Partial<TaskDetail> = {}): TaskDetail {
       assignedAt: '2026-09-16T09:12:00.000Z',
       rejection: null,
     },
+    progress: { acceptedAt: null, departedAt: null, arrivedAt: null, startedAt: null },
     evidence: [],
     notes: [],
     createdAt: '2026-09-16T09:12:00.000Z',
@@ -122,9 +123,10 @@ describe('Worker dashboard (S-006)', () => {
 
     await waitFor(() => expect(screen.getByText('Started task')).toBeTruthy());
     expect(screen.getByRole('header', { name: 'Hello, Priya' })).toBeTruthy();
-    // The live job is raised out of the list into its own card.
+    // The live job is raised out of the list into its own card, labelled with
+    // whichever step it has reached.
     expect(screen.getByTestId('current-job-t1')).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'On site now' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'In progress' })).toBeTruthy();
     expect(screen.getByRole('header', { name: 'New assignments' })).toBeTruthy();
   });
 

@@ -1,8 +1,9 @@
-import { allowedActions, type Evidence } from '@fieldmate/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { allowedActions, nextWorkerStep, type Evidence, type WorkerStep } from '@fieldmate/shared';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionBar } from '../../../../src/components/ActionBar';
+import { AppHeader } from '../../../../src/components/AppHeader';
 import { BottomSheet } from '../../../../src/components/BottomSheet';
 import { Button } from '../../../../src/components/Button';
 import { ConfirmationDialog } from '../../../../src/components/ConfirmationDialog';
@@ -17,20 +18,35 @@ import {
   spacing,
   toneColors,
   typography,
+  type IconName,
 } from '../../../../src/constants/theme';
 import { useAuth } from '../../../../src/features/auth/auth-context';
 import { TaskDetailView } from '../../../../src/features/tasks/TaskDetailView';
+import { WorkerJourney } from '../../../../src/features/tasks/WorkerJourney';
 import { useTask } from '../../../../src/features/tasks/hooks';
 import {
   useAddNote,
+  useAdvanceTask,
   useDeleteEvidence,
   useRejectTask,
-  useStartTask,
+  useStepBack,
 } from '../../../../src/features/tasks/worker-hooks';
 import { ApiError } from '../../../../src/services/http';
 import { formatDateTime } from '../../../../src/utils/format';
 
 const EVIDENCE_HINT = 'At least 1 photo is required to complete this task.';
+
+/**
+ * The worker's forward steps. A task only becomes "In progress" through
+ * `start`, which is offered once they have confirmed arrival — never on
+ * assignment and never on acceptance.
+ */
+const STEPS: Record<WorkerStep, { label: string; icon: IconName; done: string }> = {
+  accept: { label: 'Accept task', icon: 'thumbs-up-outline', done: 'Task accepted' },
+  depart: { label: "I'm on my way", icon: 'car-outline', done: 'On your way' },
+  arrive: { label: "I've arrived", icon: 'location-outline', done: 'Arrival confirmed' },
+  start: { label: 'Start work', icon: 'construct-outline', done: 'Work started' },
+};
 
 /** S-008 Worker Task Details: start, reject, photos, notes and completion. */
 export default function WorkerTaskDetails() {
@@ -40,7 +56,8 @@ export default function WorkerTaskDetails() {
   const { showToast } = useToast();
   const task = useTask(taskId);
 
-  const start = useStartTask(taskId);
+  const advance = useAdvanceTask(taskId);
+  const stepBack = useStepBack(taskId);
   const reject = useRejectTask(taskId);
   const addNote = useAddNote(taskId);
   const deleteEvidence = useDeleteEvidence(taskId);
@@ -64,9 +81,11 @@ export default function WorkerTaskDetails() {
 
   if (task.isPending) {
     return (
-      <View style={styles.padded}>
-        <Stack.Screen options={{ headerShown: true, title: 'Task details' }} />
-        <LoadingState variant="detail" />
+      <View style={styles.screen}>
+        <AppHeader title="Task details" onBack={() => router.back()} />
+        <View style={styles.padded}>
+          <LoadingState variant="detail" />
+        </View>
       </View>
     );
   }
@@ -74,8 +93,8 @@ export default function WorkerTaskDetails() {
   if (task.isError) {
     const gone = task.error instanceof ApiError && [403, 404].includes(task.error.status ?? 0);
     return (
-      <>
-        <Stack.Screen options={{ headerShown: true, title: 'Task details' }} />
+      <View style={styles.screen}>
+        <AppHeader title="Task details" onBack={() => router.back()} />
         {gone ? (
           <EmptyState
             title="This task is no longer available"
@@ -85,7 +104,7 @@ export default function WorkerTaskDetails() {
         ) : (
           <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
         )}
-      </>
+      </View>
     );
   }
 
@@ -93,11 +112,18 @@ export default function WorkerTaskDetails() {
   const actions = allowedActions(detail.status, 'FIELD_WORKER');
   const inProgress = detail.status === 'IN_PROGRESS';
   const hasEvidence = detail.evidence.length > 0;
-  const busy = start.isPending || reject.isPending || addNote.isPending || deleteEvidence.isPending;
+  const step = nextWorkerStep(detail.status);
+  const canStepBack = actions.includes('stepBack');
+  const busy =
+    advance.isPending ||
+    stepBack.isPending ||
+    reject.isPending ||
+    addNote.isPending ||
+    deleteEvidence.isPending;
 
   return (
     <View style={styles.screen}>
-      <Stack.Screen options={{ headerShown: true, title: 'Task details' }} />
+      <AppHeader title="Task details" onBack={() => router.back()} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -107,6 +133,29 @@ export default function WorkerTaskDetails() {
         }
       >
         <TaskDetailView task={detail} showAssignment={false} showEvidence={false} />
+
+        <WorkerJourney progress={detail.progress} />
+
+        {canStepBack ? (
+          <Button
+            label="Undo last step"
+            variant="ghost"
+            size="md"
+            icon="arrow-undo-outline"
+            testID="action-step-back"
+            disabled={busy}
+            loading={stepBack.isPending}
+            onPress={() =>
+              stepBack.mutate(undefined, {
+                onSuccess: () => {
+                  setError(null);
+                  showToast('Step undone');
+                },
+                onError: fail,
+              })
+            }
+          />
+        ) : null}
 
         <View style={styles.section}>
           <Text
@@ -188,17 +237,18 @@ export default function WorkerTaskDetails() {
             />
           ) : null}
 
-          {actions.includes('start') ? (
+          {step ? (
             <Button
-              label="Start task"
-              testID="action-start"
-              loading={start.isPending}
+              label={STEPS[step].label}
+              icon={STEPS[step].icon}
+              testID={`action-${step}`}
+              loading={advance.isPending}
               disabled={busy}
               onPress={() =>
-                start.mutate(undefined, {
+                advance.mutate(step, {
                   onSuccess: () => {
                     setError(null);
-                    showToast('Task started');
+                    showToast(STEPS[step].done);
                   },
                   onError: fail,
                 })

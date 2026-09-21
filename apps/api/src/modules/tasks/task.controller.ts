@@ -4,6 +4,7 @@ import type {
   ReassignTaskInput,
   RejectTaskInput,
   UpdateTaskInput,
+  WorkerStep,
 } from '@fieldmate/shared';
 import type { Request, RequestHandler } from 'express';
 import { validated } from '../../middleware/validate.js';
@@ -63,8 +64,15 @@ export function createTaskController(service: TaskService) {
     res.json(await service.complete(actor(req), taskId(req)));
   };
 
-  const start: RequestHandler = async (req, res) => {
-    res.json(await service.start(actor(req), taskId(req)));
+  /** One handler per forward step; the step itself decides the new status. */
+  const step = (name: WorkerStep): RequestHandler => {
+    return async (req, res) => {
+      res.json(await service.advance(actor(req), taskId(req), name));
+    };
+  };
+
+  const stepBack: RequestHandler = async (req, res) => {
+    res.json(await service.stepBack(actor(req), taskId(req)));
   };
 
   const reject: RequestHandler = async (req, res) => {
@@ -74,5 +82,20 @@ export function createTaskController(service: TaskService) {
     res.status(204).end();
   };
 
-  return { list, create, get, update, assign, cancel, reopen, complete, start, reject };
+  return {
+    list,
+    create,
+    get,
+    update,
+    assign,
+    cancel,
+    reopen,
+    complete,
+    accept: step('accept'),
+    depart: step('depart'),
+    arrive: step('arrive'),
+    start: step('start'),
+    stepBack,
+    reject,
+  };
 }

@@ -6,7 +6,7 @@ import {
   rejectTaskSchema,
   updateTaskSchema,
 } from '@fieldmate/shared';
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type { AppConfig } from '../../config/env.js';
 import type { Logger } from '../../config/logger.js';
@@ -84,7 +84,16 @@ export function createTaskRouter(deps: {
   );
   router.post('/:taskId/complete', withTaskId, controller.complete);
 
-  router.post('/:taskId/start', requireRole('FIELD_WORKER'), withTaskId, controller.start);
+  // The worker's lifecycle, one endpoint per step. A task only becomes
+  // IN_PROGRESS through /start, which needs the worker to have arrived first.
+  const workerStep = (path: string, handler: RequestHandler) =>
+    router.post(path, requireRole('FIELD_WORKER'), withTaskId, handler);
+
+  workerStep('/:taskId/accept', controller.accept);
+  workerStep('/:taskId/depart', controller.depart);
+  workerStep('/:taskId/arrive', controller.arrive);
+  workerStep('/:taskId/start', controller.start);
+  workerStep('/:taskId/step-back', controller.stepBack);
   router.post(
     '/:taskId/reject',
     requireRole('FIELD_WORKER'),

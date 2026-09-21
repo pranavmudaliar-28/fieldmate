@@ -34,6 +34,13 @@ export function formatDateTime(isoDate: string): string {
   })}`;
 }
 
+/** Clock time alone, for steps that all happened on the same job. */
+export function formatTime(isoDate: string): string {
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
 /** The eyebrow above a dashboard greeting, e.g. "Wed 16 September". */
 export function formatDayHeading(date: Date = new Date()): string {
   if (Number.isNaN(date.getTime())) return '';

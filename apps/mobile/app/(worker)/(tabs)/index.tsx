@@ -1,4 +1,4 @@
-import type { TaskListItem } from '@fieldmate/shared';
+import { WORKER_PROGRESS_STATUSES, type TaskListItem, type TaskStatus } from '@fieldmate/shared';
 import { useRouter } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '../../../src/components/AppHeader';
@@ -20,6 +20,7 @@ import {
   layout,
   radius,
   spacing,
+  statusAppearance,
   typography,
 } from '../../../src/constants/theme';
 import { useAuth } from '../../../src/features/auth/auth-context';
@@ -29,18 +30,36 @@ import { formatDayHeading, formatRelativeTime } from '../../../src/utils/format'
 
 const SECTION_LIMIT = 10;
 
+/**
+ * Everything the worker has taken on but not finished. Without this a task
+ * would vanish from the dashboard the moment it was accepted, because it is
+ * no longer ASSIGNED and not yet IN_PROGRESS.
+ */
+const UNDER_WAY = WORKER_PROGRESS_STATUSES.filter(
+  (status) => status !== 'ASSIGNED',
+) as TaskStatus[];
+
+/** The job furthest along is the one to raise. */
+function mostAdvanced(tasks: TaskListItem[]): TaskListItem | undefined {
+  return [...tasks].sort(
+    (a, b) =>
+      WORKER_PROGRESS_STATUSES.indexOf(b.status as never) -
+      WORKER_PROGRESS_STATUSES.indexOf(a.status as never),
+  )[0];
+}
+
 /** S-006 Worker Dashboard: the live job first, then what is waiting. */
 export default function WorkerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
   const tabBarSpacing = useTabBarSpacing();
 
-  const inProgress = useTaskList(['IN_PROGRESS'], SECTION_LIMIT);
+  const inProgress = useTaskList(UNDER_WAY, SECTION_LIMIT);
   const assigned = useTaskList(['ASSIGNED'], SECTION_LIMIT);
 
   const inProgressTasks = inProgress.data?.pages[0]?.items ?? [];
   const assignedTasks = assigned.data?.pages[0]?.items ?? [];
-  const current = inProgressTasks[0];
+  const current = mostAdvanced(inProgressTasks);
 
   const loading = inProgress.isPending || assigned.isPending;
   const failed = inProgress.isError || assigned.isError;
@@ -100,13 +119,15 @@ export default function WorkerDashboard() {
           </View>
         ) : null}
 
-        {inProgressTasks.slice(1).map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onPress={() => router.push(`/(worker)/tasks/${task.id}`)}
-          />
-        ))}
+        {inProgressTasks
+          .filter((task) => task.id !== current?.id)
+          .map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onPress={() => router.push(`/(worker)/tasks/${task.id}`)}
+            />
+          ))}
       </ScrollView>
     </View>
   );
@@ -126,7 +147,7 @@ function CurrentJobCard({ task }: { task: TaskListItem }) {
           style={styles.heroLabel}
           accessibilityRole="header"
         >
-          On site now
+          {statusAppearance[task.status].label}
         </Text>
         <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.heroUpdated}>
           {formatRelativeTime(task.updatedAt)}

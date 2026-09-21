@@ -30,9 +30,29 @@ async function createTask(assignee: TestActor = worker): Promise<string> {
   return res.body.id as string;
 }
 
+/** Walks the worker's lifecycle: accept → depart → arrive → start. */
+async function walk(taskId: string, assignee: TestActor, ...steps: string[]): Promise<void> {
+  for (const step of steps) {
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/${step}`)
+      .auth(assignee.token, { type: 'bearer' });
+  }
+}
+
+/** A task the worker has accepted, travelled to and begun working on. */
 async function startedTask(assignee: TestActor = worker): Promise<string> {
   const taskId = await createTask(assignee);
-  await request(app).post(`/api/v1/tasks/${taskId}/start`).auth(assignee.token, { type: 'bearer' });
+  await walk(taskId, assignee, 'accept', 'depart', 'arrive', 'start');
+  return taskId;
+}
+
+/** A task parked at the given status, for testing one step at a time. */
+async function taskAt(status: string, assignee: TestActor = worker): Promise<string> {
+  const taskId = await createTask(assignee);
+  const steps = ['accept', 'depart', 'arrive', 'start'];
+  const upTo = { ACCEPTED: 1, GOING_TO_LOCATION: 2, REACHED_LOCATION: 3, IN_PROGRESS: 4 }[status];
+  if (upTo === undefined) throw new Error('Unsupported status: ' + status);
+  await walk(taskId, assignee, ...steps.slice(0, upTo));
   return taskId;
 }
 
@@ -52,15 +72,71 @@ beforeEach(async () => {
 
 afterAll(closeTestDb);
 
-describe('POST /tasks/:id/start', () => {
-  it('moves an assigned task to in progress', async () => {
+describe('the worker lifecycle', () => {
+  it('walks assigned → accepted → going → reached → in progress', async () => {
     const taskId = await createTask();
+    const post = (step: string) =>
+      request(app).post(`/api/v1/tasks/${taskId}/${step}`).auth(worker.token, { type: 'bearer' });
+
+    expect((await post('accept')).body.status).toBe('ACCEPTED');
+    expect((await post('depart')).body.status).toBe('GOING_TO_LOCATION');
+    expect((await post('arrive')).body.status).toBe('REACHED_LOCATION');
+
+    const started = await post('start');
+    expect(started.status).toBe(200);
+    expect(started.body.status).toBe('IN_PROGRESS');
+  });
+
+  /** The rule this lifecycle exists to enforce. */
+  it.each(['ASSIGNED', 'ACCEPTED', 'GOING_TO_LOCATION'])(
+    'refuses to start work from %s',
+    async (status) => {
+      const taskId = status === 'ASSIGNED' ? await createTask() : await taskAt(status);
+      const res = await request(app)
+        .post(`/api/v1/tasks/${taskId}/start`)
+        .auth(worker.token, { type: 'bearer' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('INVALID_STATUS_TRANSITION');
+    },
+  );
+
+  it('records when each step happened', async () => {
+    const taskId = await taskAt('IN_PROGRESS');
     const res = await request(app)
-      .post(`/api/v1/tasks/${taskId}/start`)
+      .get(`/api/v1/tasks/${taskId}`)
+      .auth(worker.token, { type: 'bearer' });
+
+    const { acceptedAt, departedAt, arrivedAt, startedAt } = res.body.progress;
+    for (const stamp of [acceptedAt, departedAt, arrivedAt, startedAt]) {
+      expect(typeof stamp).toBe('string');
+    }
+    // The database clock stamps them, so they can only run forwards.
+    expect(new Date(departedAt).getTime()).toBeGreaterThanOrEqual(new Date(acceptedAt).getTime());
+    expect(new Date(arrivedAt).getTime()).toBeGreaterThanOrEqual(new Date(departedAt).getTime());
+    expect(new Date(startedAt).getTime()).toBeGreaterThanOrEqual(new Date(arrivedAt).getTime());
+  });
+
+  it('undoes one step and clears the stamp it set', async () => {
+    const taskId = await taskAt('REACHED_LOCATION');
+    const res = await request(app)
+      .post(`/api/v1/tasks/${taskId}/step-back`)
       .auth(worker.token, { type: 'bearer' });
 
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe('IN_PROGRESS');
+    expect(res.body.status).toBe('GOING_TO_LOCATION');
+    expect(res.body.progress.arrivedAt).toBeNull();
+    expect(res.body.progress.departedAt).not.toBeNull();
+  });
+
+  it('cannot undo once the work has started', async () => {
+    const taskId = await taskAt('IN_PROGRESS');
+    const res = await request(app)
+      .post(`/api/v1/tasks/${taskId}/step-back`)
+      .auth(worker.token, { type: 'bearer' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('INVALID_STATUS_TRANSITION');
   });
 
   it('cannot start twice', async () => {
@@ -74,7 +150,7 @@ describe('POST /tasks/:id/start', () => {
   });
 
   it('forbids managers and hides the task from other workers', async () => {
-    const taskId = await createTask();
+    const taskId = await taskAt('REACHED_LOCATION');
 
     const asManager = await request(app)
       .post(`/api/v1/tasks/${taskId}/start`)
@@ -256,9 +332,7 @@ describe('DELETE /tasks/:id/evidence/:evidenceId', () => {
       .post(`/api/v1/tasks/${taskId}/assignment`)
       .auth(manager.token, { type: 'bearer' })
       .send({ workerId: otherWorker.id });
-    await request(app)
-      .post(`/api/v1/tasks/${taskId}/start`)
-      .auth(otherWorker.token, { type: 'bearer' });
+    await walk(taskId, otherWorker, 'accept', 'depart', 'arrive', 'start');
 
     const res = await request(app)
       .delete(`/api/v1/tasks/${taskId}/evidence/${photo.id}`)
@@ -385,8 +459,9 @@ describe('POST /tasks/:id/notes', () => {
 });
 
 describe('worker completion flow end to end', () => {
-  it('start → photo → note → complete', async () => {
+  it('accept → travel → start → photo → note → complete', async () => {
     const taskId = await createTask();
+    await walk(taskId, worker, 'accept', 'depart', 'arrive');
 
     expect(
       (
@@ -425,16 +500,26 @@ describe('worker completion flow end to end', () => {
     expect(list.body.items).toHaveLength(1);
   });
 
-  it('a reopened task can be started again and keeps its photos', async () => {
+  it('a reopened task starts the journey over and keeps its photos', async () => {
     const taskId = await startedTask();
     await uploadPhoto(worker, taskId);
     await request(app)
       .post(`/api/v1/tasks/${taskId}/complete`)
       .auth(worker.token, { type: 'bearer' });
-    await request(app)
+    const reopened = await request(app)
       .post(`/api/v1/tasks/${taskId}/reopen`)
       .auth(manager.token, { type: 'bearer' });
 
+    // The worker walks the lifecycle again, so the old stamps are cleared.
+    expect(reopened.body.status).toBe('ASSIGNED');
+    expect(reopened.body.progress).toEqual({
+      acceptedAt: null,
+      departedAt: null,
+      arrivedAt: null,
+      startedAt: null,
+    });
+
+    await walk(taskId, worker, 'accept', 'depart', 'arrive');
     const restarted = await request(app)
       .post(`/api/v1/tasks/${taskId}/start`)
       .auth(worker.token, { type: 'bearer' });
@@ -442,6 +527,20 @@ describe('worker completion flow end to end', () => {
     expect(restarted.status).toBe(200);
     expect(restarted.body.status).toBe('IN_PROGRESS');
     expect(restarted.body.evidence).toHaveLength(1);
+  });
+
+  it('reassigning clears the previous worker progress', async () => {
+    const taskId = await createTask();
+    await walk(taskId, worker, 'accept', 'depart');
+
+    const reassigned = await request(app)
+      .post(`/api/v1/tasks/${taskId}/assignment`)
+      .auth(manager.token, { type: 'bearer' })
+      .send({ workerId: otherWorker.id });
+
+    expect(reassigned.body.status).toBe('ASSIGNED');
+    expect(reassigned.body.progress.acceptedAt).toBeNull();
+    expect(reassigned.body.progress.departedAt).toBeNull();
   });
 
   it('a cancelled task refuses every worker action', async () => {

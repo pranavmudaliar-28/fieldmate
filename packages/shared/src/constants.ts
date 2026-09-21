@@ -8,8 +8,16 @@ export function managesTasks(role: Role): boolean {
   return (TASK_MANAGING_ROLES as readonly Role[]).includes(role);
 }
 
+/**
+ * Listed in lifecycle order. A task is only IN_PROGRESS once the worker
+ * confirms they have started working at the site — never on assignment and
+ * never on acceptance (docs/02 §4.2).
+ */
 export const TASK_STATUSES = [
   'ASSIGNED',
+  'ACCEPTED',
+  'GOING_TO_LOCATION',
+  'REACHED_LOCATION',
   'IN_PROGRESS',
   'COMPLETED',
   'REJECTED',
@@ -17,10 +25,18 @@ export const TASK_STATUSES = [
 ] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+/** The steps a worker walks through, in order, before the work itself. */
+export const WORKER_PROGRESS_STATUSES = [
+  'ASSIGNED',
+  'ACCEPTED',
+  'GOING_TO_LOCATION',
+  'REACHED_LOCATION',
+  'IN_PROGRESS',
+] as const satisfies readonly TaskStatus[];
+
 /** Statuses a field worker can see for tasks currently assigned to them. */
 export const WORKER_VISIBLE_STATUSES = [
-  'ASSIGNED',
-  'IN_PROGRESS',
+  ...WORKER_PROGRESS_STATUSES,
   'COMPLETED',
 ] as const satisfies readonly TaskStatus[];
 

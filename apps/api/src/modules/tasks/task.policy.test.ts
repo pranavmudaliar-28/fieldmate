@@ -82,9 +82,34 @@ describe('manager actions', () => {
 });
 
 describe('worker actions', () => {
-  it('allows the assigned worker to start and reject an assigned task', () => {
-    expect(() => assertCanPerform('start', WORKER, task('ASSIGNED'))).not.toThrow();
+  it('allows the assigned worker to accept or reject an assigned task', () => {
+    expect(() => assertCanPerform('accept', WORKER, task('ASSIGNED'))).not.toThrow();
     expect(() => assertCanPerform('reject', WORKER, task('ASSIGNED'))).not.toThrow();
+  });
+
+  /** Assigning must never be enough to put a task into progress. */
+  it('refuses to start a task the worker has not arrived at', () => {
+    for (const status of ['ASSIGNED', 'ACCEPTED', 'GOING_TO_LOCATION'] as const) {
+      expect(errorFrom(() => assertCanPerform('start', WORKER, task(status))).code).toBe(
+        'INVALID_STATUS_TRANSITION',
+      );
+    }
+    expect(() => assertCanPerform('start', WORKER, task('REACHED_LOCATION'))).not.toThrow();
+  });
+
+  it('walks the worker through the lifecycle one step at a time', () => {
+    expect(() => assertCanPerform('depart', WORKER, task('ACCEPTED'))).not.toThrow();
+    expect(() => assertCanPerform('arrive', WORKER, task('GOING_TO_LOCATION'))).not.toThrow();
+    expect(errorFrom(() => assertCanPerform('arrive', WORKER, task('ACCEPTED'))).code).toBe(
+      'INVALID_STATUS_TRANSITION',
+    );
+  });
+
+  it('lets a worker undo a step, but not once the work has started', () => {
+    expect(() => assertCanPerform('stepBack', WORKER, task('REACHED_LOCATION'))).not.toThrow();
+    expect(errorFrom(() => assertCanPerform('stepBack', WORKER, task('IN_PROGRESS'))).code).toBe(
+      'INVALID_STATUS_TRANSITION',
+    );
   });
 
   it('allows evidence, notes and completion while in progress', () => {
