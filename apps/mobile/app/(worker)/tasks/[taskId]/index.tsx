@@ -80,7 +80,7 @@ export default function WorkerTaskDetails() {
           <EmptyState
             title="This task is no longer available"
             message="It may have been reassigned or cancelled."
-            action={{ label: 'Go to dashboard', onPress: () => router.replace('/(worker)') }}
+            action={{ label: 'Go to dashboard', onPress: () => router.replace('/(worker)/(tabs)') }}
           />
         ) : (
           <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
@@ -266,7 +266,7 @@ export default function WorkerTaskDetails() {
             onSuccess: () => {
               setConfirmReject(false);
               showToast('Task rejected');
-              router.replace('/(worker)');
+              router.replace('/(worker)/(tabs)');
             },
             onError: (rejectError) => {
               setConfirmReject(false);

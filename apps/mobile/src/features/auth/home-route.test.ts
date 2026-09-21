@@ -2,9 +2,9 @@ import { canEnterRouteGroup, homeRouteFor } from './home-route';
 
 describe('homeRouteFor', () => {
   it.each([
-    ['ADMIN', '/(admin)'],
-    ['MANAGER', '/(manager)'],
-    ['FIELD_WORKER', '/(worker)'],
+    ['ADMIN', '/(admin)/(tabs)'],
+    ['MANAGER', '/(manager)/(tabs)'],
+    ['FIELD_WORKER', '/(worker)/(tabs)'],
   ] as const)('sends %s to %s', (role, route) => {
     expect(homeRouteFor(role)).toBe(route);
   });

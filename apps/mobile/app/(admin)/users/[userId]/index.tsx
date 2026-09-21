@@ -75,7 +75,7 @@ export default function UserDetailsScreen() {
           <EmptyState
             title="This user no longer exists"
             message="They may have been deleted."
-            action={{ label: 'Back to users', onPress: () => router.replace('/(admin)') }}
+            action={{ label: 'Back to users', onPress: () => router.replace('/(admin)/(tabs)') }}
           />
         ) : (
           <ErrorState message="Couldn't load this user." onRetry={() => void user.refetch()} />
@@ -311,7 +311,7 @@ export default function UserDetailsScreen() {
             onSuccess: () => {
               setPending(null);
               showToast('User deleted');
-              router.replace('/(admin)');
+              router.replace('/(admin)/(tabs)');
             },
             onError: fail,
           })

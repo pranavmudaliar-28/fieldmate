@@ -1,7 +1,14 @@
 import type { Paginated, TaskListItem, TaskStatus } from '@fieldmate/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
-import ManagerTaskList from '../../app/(manager)/tasks/index';
+import {
+  fireEvent,
+  render,
+  screen,
+  userEvent,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
+import ManagerTaskList from '../../app/(manager)/(tabs)/tasks';
 import * as tasksApi from '../features/tasks/api';
 
 jest.mock('../features/tasks/api');
@@ -115,7 +122,9 @@ describe('Manager task list (S-003)', () => {
     await renderList();
 
     await waitFor(() => expect(screen.getByText('No tasks yet')).toBeTruthy());
-    await userEvent.setup().press(screen.getByRole('button', { name: 'Create task' }));
+    // The header offers the same action, so target the empty state's own button.
+    const emptyState = within(screen.getByTestId('empty-state'));
+    await userEvent.setup().press(emptyState.getByRole('button', { name: 'Create task' }));
     expect(mockRouter.push).toHaveBeenCalledWith('/(manager)/tasks/new');
   });
 
@@ -125,7 +134,9 @@ describe('Manager task list (S-003)', () => {
     await renderList();
 
     await waitFor(() => expect(screen.getByText('No tasks with this status')).toBeTruthy());
-    expect(screen.queryByRole('button', { name: 'Create task' })).toBeNull();
+    // A filtered empty list offers no shortcut to create; the header still does.
+    const emptyState = within(screen.getByTestId('empty-state'));
+    expect(emptyState.queryByRole('button', { name: 'Create task' })).toBeNull();
   });
 
   it('shows a retry when the list cannot be loaded', async () => {

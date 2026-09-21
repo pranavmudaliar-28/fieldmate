@@ -11,11 +11,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button } from '../../src/components/Button';
-import { Card } from '../../src/components/Card';
-import { DashboardHeader } from '../../src/components/DashboardHeader';
-import { Input } from '../../src/components/Input';
-import { EmptyState, ErrorState, LoadingState } from '../../src/components/States';
+import { Button } from '../../../src/components/Button';
+import { Card } from '../../../src/components/Card';
+import { DashboardHeader } from '../../../src/components/DashboardHeader';
+import { Input } from '../../../src/components/Input';
+import { EmptyState, ErrorState, LoadingState } from '../../../src/components/States';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
@@ -25,9 +25,9 @@ import {
   spacing,
   toneColors,
   typography,
-} from '../../src/constants/theme';
-import { ROLE_LABELS } from '../../src/features/admin/UserForm';
-import { useUserList } from '../../src/features/admin/hooks';
+} from '../../../src/constants/theme';
+import { ROLE_LABELS } from '../../../src/features/admin/UserForm';
+import { useUserList } from '../../../src/features/admin/hooks';
 
 const FILTERS: { label: string; value: Role | null }[] = [
   { label: 'All', value: null },
@@ -101,7 +101,7 @@ export default function UsersScreen() {
             label="Tasks"
             variant="secondary"
             testID="go-to-tasks"
-            onPress={() => router.push('/(manager)')}
+            onPress={() => router.push('/(manager)/(tabs)')}
             style={styles.action}
           />
         </View>

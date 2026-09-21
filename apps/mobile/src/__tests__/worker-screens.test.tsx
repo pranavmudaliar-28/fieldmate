@@ -1,8 +1,8 @@
 import type { Paginated, TaskDetail, TaskListItem, TaskStatus } from '@fieldmate/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
-import WorkerDashboard from '../../app/(worker)/index';
-import MyTasks from '../../app/(worker)/tasks/index';
+import WorkerDashboard from '../../app/(worker)/(tabs)/index';
+import MyTasks from '../../app/(worker)/(tabs)/tasks';
 import CompleteTaskScreen from '../../app/(worker)/tasks/[taskId]/complete';
 import { ToastProvider } from '../components/Toast';
 import { useAuth } from '../features/auth/auth-context';
@@ -122,7 +122,9 @@ describe('Worker dashboard (S-006)', () => {
 
     await waitFor(() => expect(screen.getByText('Started task')).toBeTruthy());
     expect(screen.getByRole('header', { name: 'Hello, Priya' })).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'In progress' })).toBeTruthy();
+    // The live job is raised out of the list into its own card.
+    expect(screen.getByTestId('current-job-t1')).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'On site now' })).toBeTruthy();
     expect(screen.getByRole('header', { name: 'New assignments' })).toBeTruthy();
   });
 

@@ -1,16 +1,20 @@
 import type { Role } from '@fieldmate/shared';
 
-export type HomeRoute = '/(admin)' | '/(manager)' | '/(worker)';
+/**
+ * Each role's home is the first tab of its group. The `(tabs)` segment is a
+ * route group, so it never shows in a URL — it is here because the group's
+ * index now lives inside it.
+ */
+export type HomeRoute = '/(admin)/(tabs)' | '/(manager)/(tabs)' | '/(worker)/(tabs)';
 
-/** Where each role lands after signing in (docs/07 §2). */
 export function homeRouteFor(role: Role): HomeRoute {
   switch (role) {
     case 'ADMIN':
-      return '/(admin)';
+      return '/(admin)/(tabs)';
     case 'MANAGER':
-      return '/(manager)';
+      return '/(manager)/(tabs)';
     case 'FIELD_WORKER':
-      return '/(worker)';
+      return '/(worker)/(tabs)';
   }
 }
 

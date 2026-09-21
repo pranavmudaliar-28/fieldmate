@@ -1,7 +1,7 @@
 import type { ManagedUser, Paginated, Role } from '@fieldmate/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
-import UsersScreen from '../../app/(admin)/index';
+import UsersScreen from '../../app/(admin)/(tabs)/index';
 import UserDetailsScreen from '../../app/(admin)/users/[userId]/index';
 import { ToastProvider } from '../components/Toast';
 import * as adminApi from '../features/admin/api';
@@ -123,7 +123,7 @@ describe('Users screen (S-011)', () => {
   it('offers a shortcut to the task screens', async () => {
     await renderScreen(<UsersScreen />);
     await userEvent.setup().press(screen.getByTestId('go-to-tasks'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/(manager)');
+    expect(mockRouter.push).toHaveBeenCalledWith('/(manager)/(tabs)');
   });
 });
 

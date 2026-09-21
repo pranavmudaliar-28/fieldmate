@@ -1,8 +1,9 @@
 import type { TaskListItem } from '@fieldmate/shared';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { EmptyState, ErrorState, LoadingState } from '../../../src/components/States';
+import { useTabBarSpacing } from '../../../src/components/TabBar';
 import { TaskCard } from '../../../src/components/TaskCard';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
@@ -13,9 +14,12 @@ import {
 } from '../../../src/constants/theme';
 import { useTaskList } from '../../../src/features/tasks/hooks';
 
+type Section = { title: string; data: TaskListItem[]; emptyMessage: string };
+
 /** S-007 My Tasks: Active (in progress first) and Completed history. */
 export default function MyTasks() {
   const router = useRouter();
+  const tabBarSpacing = useTabBarSpacing();
   const active = useTaskList(['IN_PROGRESS', 'ASSIGNED']);
   const completed = useTaskList(['COMPLETED']);
 
@@ -24,13 +28,9 @@ export default function MyTasks() {
   );
   const completedTasks = completed.data?.pages.flatMap((page) => page.items) ?? [];
 
-  const sections: { title: string; data: TaskListItem[]; emptyMessage: string }[] = [
+  const sections: Section[] = [
     { title: 'Active', data: activeTasks, emptyMessage: 'No active tasks.' },
-    {
-      title: 'Completed',
-      data: completedTasks,
-      emptyMessage: 'Completed tasks will appear here.',
-    },
+    { title: 'Completed', data: completedTasks, emptyMessage: 'Completed tasks will appear here.' },
   ];
 
   const refresh = () => {
@@ -40,32 +40,35 @@ export default function MyTasks() {
 
   if (active.isPending && completed.isPending) {
     return (
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <Stack.Screen options={{ headerShown: true, title: 'My tasks' }} />
+      <View style={styles.screen}>
+        <AppHeader size="large" title="My tasks" />
         <View style={styles.padded}>
           <LoadingState variant="list" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (active.isError && completed.isError) {
     return (
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <Stack.Screen options={{ headerShown: true, title: 'My tasks' }} />
-        <ErrorState message="Couldn't load your tasks." onRetry={refresh} />
-      </SafeAreaView>
+      <View style={styles.screen}>
+        <AppHeader size="large" title="My tasks" />
+        <View style={styles.padded}>
+          <ErrorState message="Couldn't load your tasks." onRetry={refresh} />
+        </View>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <Stack.Screen options={{ headerShown: true, title: 'My tasks' }} />
+    <View style={styles.screen}>
+      <AppHeader size="large" title="My tasks" />
       <SectionList
         sections={sections}
         keyExtractor={(task) => task.id}
-        contentContainerStyle={styles.list}
-        stickySectionHeadersEnabled={false}
+        contentContainerStyle={[styles.list, { paddingBottom: tabBarSpacing }]}
+        // Sticky headers keep the section visible while a long history scrolls.
+        stickySectionHeadersEnabled
         refreshControl={
           <RefreshControl
             refreshing={active.isRefetching || completed.isRefetching}
@@ -73,13 +76,19 @@ export default function MyTasks() {
           />
         }
         renderSectionHeader={({ section }) => (
-          <Text
-            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-            style={styles.sectionTitle}
-            accessibilityRole="header"
-          >
-            {section.title}
-          </Text>
+          <View style={styles.sectionHeader}>
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.sectionTitle}
+              accessibilityRole="header"
+            >
+              {section.title}
+            </Text>
+            <View style={styles.rule} />
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sectionCount}>
+              {section.data.length}
+            </Text>
+          </View>
         )}
         renderSectionFooter={({ section }) =>
           section.data.length === 0 ? (
@@ -103,19 +112,24 @@ export default function MyTasks() {
           <EmptyState title="No tasks yet" message="Tasks assigned to you will appear here." />
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  list: { padding: layout.screenPadding, gap: spacing.sm, paddingBottom: spacing.xl },
-  sectionTitle: {
-    ...typography.sectionTitle,
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
+  list: { paddingHorizontal: layout.screenPadding, gap: spacing.smPlus },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
+    backgroundColor: colors.background,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  empty: { ...typography.secondary, color: colors.textSecondary },
+  sectionTitle: { ...typography.label, color: colors.textSecondary },
+  rule: { flex: 1, height: 1, backgroundColor: colors.border },
+  sectionCount: { ...typography.label, color: colors.textDisabled },
+  empty: { ...typography.secondary, color: colors.textSecondary, paddingVertical: spacing.sm },
   padded: { padding: layout.screenPadding },
 });

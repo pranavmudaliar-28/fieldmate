@@ -73,7 +73,10 @@ export default function ManagerTaskDetails() {
           <EmptyState
             title="This task is no longer available"
             message="It may have been removed or reassigned."
-            action={{ label: 'Go to dashboard', onPress: () => router.replace('/(manager)') }}
+            action={{
+              label: 'Go to dashboard',
+              onPress: () => router.replace('/(manager)/(tabs)'),
+            }}
           />
         ) : (
           <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />

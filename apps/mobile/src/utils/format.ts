@@ -34,6 +34,12 @@ export function formatDateTime(isoDate: string): string {
   })}`;
 }
 
+/** The eyebrow above a dashboard greeting, e.g. "Wed 16 September". */
+export function formatDayHeading(date: Date = new Date()): string {
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long' });
+}
+
 export function formatCoordinates(
   latitude: number | null,
   longitude: number | null,
