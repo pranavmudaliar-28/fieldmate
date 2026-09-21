@@ -1,6 +1,16 @@
-import { Modal, StyleSheet, Text, View } from 'react-native';
-import { MAX_FONT_SIZE_MULTIPLIER, colors, radius, spacing, typography } from '../constants/theme';
+import { useEffect, useRef } from 'react';
+import { AccessibilityInfo, findNodeHandle, Modal, StyleSheet, Text, View } from 'react-native';
+import {
+  MAX_FONT_SIZE_MULTIPLIER,
+  colors,
+  elevation,
+  radius,
+  spacing,
+  toneColors,
+  typography,
+} from '../constants/theme';
 import { Button } from './Button';
+import { Icon } from './Icon';
 
 export type ConfirmationDialogProps = {
   visible: boolean;
@@ -25,6 +35,15 @@ export function ConfirmationDialog({
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
+  const titleRef = useRef<Text>(null);
+
+  // Opening a dialog moves screen-reader focus to its title (docs/04 §8).
+  useEffect(() => {
+    if (!visible) return;
+    const handle = findNodeHandle(titleRef.current);
+    if (handle !== null) AccessibilityInfo.setAccessibilityFocus(handle);
+  }, [visible]);
+
   return (
     <Modal
       visible={visible}
@@ -35,7 +54,15 @@ export function ConfirmationDialog({
     >
       <View style={styles.overlay}>
         <View style={styles.dialog} accessibilityViewIsModal accessibilityRole="alert">
+          <View style={[styles.emblem, destructive ? styles.emblemDanger : styles.emblemNeutral]}>
+            <Icon
+              name={destructive ? 'warning-outline' : 'help-circle-outline'}
+              size={22}
+              color={destructive ? toneColors.error.text : colors.textPrimary}
+            />
+          </View>
           <Text
+            ref={titleRef}
             maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
             style={styles.title}
             accessibilityRole="header"
@@ -52,7 +79,6 @@ export function ConfirmationDialog({
               size="md"
               onPress={onCancel}
               disabled={loading}
-              fullWidth={false}
               style={styles.action}
             />
             <Button
@@ -61,7 +87,6 @@ export function ConfirmationDialog({
               size="md"
               onPress={onConfirm}
               loading={loading}
-              fullWidth={false}
               style={styles.action}
             />
           </View>
@@ -83,17 +108,23 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     backgroundColor: colors.surface,
-    borderRadius: radius.card,
+    borderRadius: radius.sheet,
     padding: spacing.lg,
     gap: spacing.sm,
+    ...elevation.overlay,
   },
-  title: { ...typography.sectionTitle, color: colors.textPrimary },
+  emblem: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  emblemDanger: { backgroundColor: toneColors.error.tint },
+  emblemNeutral: { backgroundColor: colors.surfaceMuted },
+  title: { ...typography.display, color: colors.textPrimary },
   message: { ...typography.body, color: colors.textSecondary },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  action: { minWidth: 120 },
+  actions: { flexDirection: 'row', gap: spacing.smPlus, marginTop: spacing.smPlus },
+  action: { flex: 1 },
 });

@@ -42,6 +42,10 @@ export const colors = {
   /** Solid destructive fill: dark enough to carry white text at AA. */
   error: '#CE2E48',
   overlay: 'rgba(14, 17, 22, 0.55)',
+  /** True black behind a photo or the camera, so nothing tints the image. */
+  mediaBackdrop: '#000000',
+  /** Controls floating over a photo or a map. */
+  scrim: 'rgba(14, 17, 22, 0.55)',
 
   // Accessible text-on-tint pairs (docs/04 §2.1 A1).
   successText: '#0B6B44',

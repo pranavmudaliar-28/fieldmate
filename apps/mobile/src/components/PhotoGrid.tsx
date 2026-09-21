@@ -13,6 +13,7 @@ import {
 } from '../constants/theme';
 import { formatDateTime } from '../utils/format';
 import { Button } from './Button';
+import { Icon } from './Icon';
 
 export type PhotoGridProps = {
   photos: Evidence[];
@@ -60,12 +61,10 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
                   accessibilityRole="button"
                   accessibilityLabel="Delete photo by you"
                   testID={`delete-photo-${photo.id}`}
-                  hitSlop={8}
+                  hitSlop={12}
                   style={styles.delete}
                 >
-                  <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.deleteLabel}>
-                    Delete
-                  </Text>
+                  <Icon name="trash-outline" size={16} color={colors.onPrimary} />
                 </Pressable>
               ) : null}
             </View>
@@ -92,16 +91,32 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
   );
 }
 
+const THUMBNAIL = 98;
+
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  cell: { gap: spacing.xs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.smPlus },
+  cell: { width: THUMBNAIL, height: THUMBNAIL },
   thumbnailWrapper: { borderRadius: radius.card, overflow: 'hidden' },
-  thumbnail: { width: 96, height: 96, backgroundColor: colors.surfaceMuted },
-  delete: { minHeight: layout.minTouchTarget, justifyContent: 'center', alignItems: 'center' },
-  deleteLabel: { ...typography.caption, color: colors.errorText },
-  empty: { ...typography.caption, color: colors.textSecondary },
-  viewer: { flex: 1, backgroundColor: '#000000' },
+  thumbnail: { width: THUMBNAIL, height: THUMBNAIL, backgroundColor: colors.surfaceMuted },
+  /** Sits on the photo: a caption row under every tile made the grid unreadable. */
+  delete: {
+    position: 'absolute',
+    top: spacing.xs + 2,
+    right: spacing.xs + 2,
+    width: 32,
+    height: 32,
+    borderRadius: radius.pill,
+    backgroundColor: colors.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: { ...typography.secondary, color: colors.textSecondary },
+  viewer: { flex: 1, backgroundColor: colors.mediaBackdrop },
   fullImage: { flex: 1 },
-  viewerBar: { padding: layout.screenPadding, gap: spacing.sm, backgroundColor: colors.surface },
+  viewerBar: {
+    padding: layout.screenPadding,
+    gap: spacing.smPlus,
+    backgroundColor: colors.surface,
+  },
   viewerCaption: { ...typography.secondary, color: colors.textSecondary },
 });

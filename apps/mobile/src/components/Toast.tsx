@@ -1,13 +1,27 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, StyleSheet, Text, View } from 'react-native';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  elevation,
+  layout,
+  motion,
   radius,
   spacing,
-  toneColors,
   typography,
 } from '../constants/theme';
+import { useReduceMotion } from '../hooks/use-reduce-motion';
+import { Icon } from './Icon';
 
 type Toast = { message: string; tone: 'success' | 'error' };
 
@@ -22,6 +36,9 @@ const VISIBLE_MS = 3000;
 /** Short confirmations; anything needing a decision uses a dialog instead. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
+  const insets = useSafeAreaInsets();
+  const reduceMotion = useReduceMotion();
+  const enter = useRef(new Animated.Value(0)).current;
 
   const showToast = useCallback((message: string, tone: Toast['tone'] = 'success') => {
     setToast({ message, tone });
@@ -29,25 +46,52 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToast(null), VISIBLE_MS);
   }, []);
 
+  useEffect(() => {
+    enter.setValue(toast ? 0 : 0);
+    if (!toast) return;
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: motion.base,
+      useNativeDriver: true,
+    }).start();
+  }, [toast, enter]);
+
   const value = useMemo(() => ({ showToast }), [showToast]);
+  const palette = toast?.tone === 'error' ? colors.errorText : colors.accent;
 
   return (
     <ToastContext.Provider value={value}>
       {children}
       {toast ? (
-        <View
-          style={[styles.toast, { backgroundColor: toneColors[toast.tone].tint }]}
+        <Animated.View
+          style={[
+            styles.toast,
+            // Docks above whatever owns the bottom of the screen — the floating
+            // tab bar or the action bar — instead of a fixed offset that used
+            // to sit on top of them.
+            { bottom: insets.bottom + layout.tabBarHeight + spacing.smPlus },
+            {
+              opacity: enter,
+              transform: reduceMotion
+                ? []
+                : [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+            },
+          ]}
           accessibilityLiveRegion="polite"
           testID="toast"
           pointerEvents="none"
         >
-          <Text
-            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-            style={[styles.message, { color: toneColors[toast.tone].text }]}
-          >
+          <View style={[styles.emblem, { backgroundColor: palette }]}>
+            <Icon
+              name={toast.tone === 'error' ? 'close' : 'checkmark'}
+              size={14}
+              color={toast.tone === 'error' ? colors.onPrimary : colors.onAccent}
+            />
+          </View>
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.message}>
             {toast.message}
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
     </ToastContext.Provider>
   );
@@ -62,13 +106,23 @@ export function useToast(): ToastContextValue {
 const styles = StyleSheet.create({
   toast: {
     position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
-    bottom: spacing.xl,
-    padding: spacing.md,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.border,
+    left: layout.screenPadding,
+    right: layout.screenPadding,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
+    paddingVertical: spacing.smPlus,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceInverse,
+    ...elevation.overlay,
   },
-  message: { ...typography.body, textAlign: 'center' },
+  emblem: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  message: { ...typography.secondaryStrong, color: colors.textOnInverse, flex: 1 },
 });
