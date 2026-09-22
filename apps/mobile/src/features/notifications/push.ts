@@ -16,9 +16,15 @@ export function isExpoGo(): boolean {
   return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 }
 
-/** Pushes need a real device and a development or production build. */
+/**
+ * Pushes need a real device and a development or production build.
+ *
+ * A browser counts as a real device to expo-device, so web is excluded
+ * explicitly: Expo's push service is native-only, and loading
+ * expo-notifications there would fail at import.
+ */
 export function isPushSupported(): boolean {
-  return Device.isDevice && !isExpoGo();
+  return Platform.OS !== 'web' && Device.isDevice && !isExpoGo();
 }
 
 // Type-only import: erased at build time, so the module is never loaded here.

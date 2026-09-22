@@ -42,15 +42,50 @@ That one command points the `.env` files at this machine's LAN address, starts
 PostgreSQL and MinIO, then runs the API and the Expo dev server together with
 `[api]` and `[app]` prefixed output. Stop both with Ctrl+C.
 
-Open **Expo Go** on a phone on the same Wi-Fi and scan the QR code, or enter the
-`exp://<your-lan-ip>:8081` address it prints.
+### Opening it on a device
 
-| Command           | What it does                                            |
-| ----------------- | ------------------------------------------------------- |
-| `npm run dev`     | Everything: services, API and Expo                      |
-| `npm run dev:api` | The API alone, on :3000                                 |
-| `npm run dev:app` | The Expo dev server alone, on :8081                     |
-| `npm run dev:ip`  | Re-point the `.env` files at this machine's LAN address |
+With `npm run dev` running, the Expo terminal takes single keypresses:
+
+| Press | Opens on                                                  |
+| ----- | --------------------------------------------------------- |
+| `w`   | **Web browser** — http://localhost:8081                   |
+| `a`   | **Android** — emulator, or a USB device with debugging on |
+| `i`   | **iOS** — simulator (macOS only)                          |
+| `r`   | Reload · `j` debugger · `m` dev menu · `?` all keys       |
+
+For a **phone over Wi-Fi**, open Expo Go and scan the QR code, or type the
+`exp://<your-lan-ip>:8081` address it prints. The phone must be on the same
+network as this machine.
+
+To open straight onto one platform instead, use the variants below. They expect
+the API and the services to be up already — start those with `npm run dev:api`
+in another terminal, or just use `npm run dev` and press a key.
+
+| Command               | What it does                                            |
+| --------------------- | ------------------------------------------------------- |
+| `npm run dev`         | Everything: services, API and Expo                      |
+| `npm run dev:web`     | Expo, opening a browser tab                             |
+| `npm run dev:android` | Expo, opening the Android emulator or device            |
+| `npm run dev:ios`     | Expo, opening the iOS simulator (macOS only)            |
+| `npm run dev:api`     | The API alone, on :3000                                 |
+| `npm run dev:app`     | The Expo dev server alone, on :8081                     |
+| `npm run dev:ip`      | Re-point the `.env` files at this machine's LAN address |
+
+### What differs in a browser
+
+The web build runs the same code, with three substitutions where the browser has
+no equivalent of a device capability:
+
+- **Session token** — there is no keychain, so it is held in `sessionStorage`
+  and cleared when the tab closes. A refresh keeps you signed in; a new tab does
+  not. See `src/features/auth/token-storage.web.ts`.
+- **Push notifications** — unavailable; the app does not offer them.
+- **Map picker** — the same Leaflet map in an `iframe` rather than a web view.
+
+The API only answers a browser from an origin it has been told to trust, so
+`CORS_ORIGINS` in `apps/api/.env` must list the dev server. `npm run dev:ip`
+maintains it along with the LAN address; if a browser call fails with a CORS
+error, run it and restart the API.
 
 ### If the phone loads the app but cannot log in
 

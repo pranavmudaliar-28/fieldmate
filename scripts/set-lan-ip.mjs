@@ -45,14 +45,30 @@ if (!found) {
 
 const IPV4 = /\b\d{1,3}(?:\.\d{1,3}){3}\b/g;
 
-/** Rewrites only the host part of URLs, leaving ports and paths alone. */
+/** The Expo dev server's port, which the browser build is served from. */
+const WEB_PORT = 8081;
+
+/**
+ * A browser sends an Origin header and the API refuses anything not listed, so
+ * running on web needs the dev origins allowed. A phone never sends one, which
+ * is why this only started mattering once there was a web build.
+ */
+function webOrigins(ip) {
+  return [`http://localhost:${WEB_PORT}`, `http://${ip}:${WEB_PORT}`].join(',');
+}
+
 const files = [
+  // `keys` have their host swapped; `set` entries are rewritten wholesale.
   { path: join(root, 'apps/mobile/.env'), keys: ['EXPO_PUBLIC_API_BASE_URL'] },
-  { path: join(root, 'apps/api/.env'), keys: ['FILE_STORAGE_ENDPOINT'] },
+  {
+    path: join(root, 'apps/api/.env'),
+    keys: ['FILE_STORAGE_ENDPOINT'],
+    set: { CORS_ORIGINS: webOrigins },
+  },
 ];
 
 let changed = 0;
-for (const { path, keys } of files) {
+for (const { path, keys, set = {} } of files) {
   if (!existsSync(path)) {
     console.warn(`skipped ${path} (not found — copy it from .env.example first)`);
     continue;
@@ -63,7 +79,9 @@ for (const { path, keys } of files) {
     .split('\n')
     .map((line) => {
       const key = line.split('=')[0]?.trim();
-      if (!key || !keys.includes(key)) return line;
+      if (!key) return line;
+      if (set[key]) return `${key}=${set[key](found.ip)}`;
+      if (!keys.includes(key)) return line;
       return line.replace(IPV4, found.ip);
     })
     .join('\n');
@@ -72,13 +90,14 @@ for (const { path, keys } of files) {
     writeFileSync(path, after);
     changed += 1;
   }
-  for (const key of keys) {
+  for (const key of [...keys, ...Object.keys(set)]) {
     const value = after.split('\n').find((l) => l.startsWith(`${key}=`));
     if (value) console.log(`  ${value}`);
   }
 }
 
-console.log(`\nUsing ${found.ip} (${found.name}).`);
+console.log(`
+Using ${found.ip} (${found.name}).`);
 if (changed > 0) {
   console.log('Restart the API and Metro: EXPO_PUBLIC_* values are baked into the bundle.');
 } else {

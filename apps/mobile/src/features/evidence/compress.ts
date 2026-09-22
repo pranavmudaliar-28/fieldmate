@@ -1,5 +1,5 @@
-import { File } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { photoByteSize } from './photo-size';
 
 export const MAX_LONG_EDGE = 2048;
 export const JPEG_QUALITY = 0.7;
@@ -24,6 +24,6 @@ export async function preparePhoto(uri: string, width: number): Promise<Prepared
   return {
     uri: result.uri,
     mimeType: 'image/jpeg',
-    size: new File(result.uri).size ?? 0,
+    size: await photoByteSize(result.uri),
   };
 }

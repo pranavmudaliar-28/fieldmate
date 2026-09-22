@@ -1,8 +1,10 @@
 import { MAX_EVIDENCE_BYTES, type Evidence } from '@fieldmate/shared';
 import { env } from '../../lib/env';
 import { ApiError, NETWORK_ERROR_MESSAGE, getAuthToken } from '../../services/http';
+import { photoFormData } from './photo-body';
 
 export const PHOTO_TOO_LARGE_MESSAGE = 'This photo is too large. Take it again.';
+export const PHOTO_UNREADABLE_MESSAGE = "Couldn't read that photo. Take it again.";
 
 export type UploadProgress = (fraction: number) => void;
 
@@ -20,13 +22,6 @@ export function uploadEvidence(
   }
 
   return new Promise<Evidence>((resolve, reject) => {
-    const form = new FormData();
-    form.append('photo', {
-      uri: photo.uri,
-      name: photo.mimeType === 'image/png' ? 'photo.png' : 'photo.jpg',
-      type: photo.mimeType,
-    } as unknown as Blob);
-
     const request = new XMLHttpRequest();
     request.open('POST', `${env.apiBaseUrl}/tasks/${taskId}/evidence`);
     const token = getAuthToken();
@@ -64,6 +59,15 @@ export function uploadEvidence(
     request.onerror = () => reject(new ApiError('NETWORK_ERROR', NETWORK_ERROR_MESSAGE));
     request.onabort = () => reject(new ApiError('NETWORK_ERROR', NETWORK_ERROR_MESSAGE));
 
-    request.send(form);
+    // The body is platform-specific and the browser has to read the photo
+    // back before it can be sent, so it is built after the request is wired up.
+    void photoFormData({
+      uri: photo.uri,
+      mimeType: photo.mimeType,
+      name: photo.mimeType === 'image/png' ? 'photo.png' : 'photo.jpg',
+    }).then(
+      (form) => request.send(form),
+      () => reject(new ApiError('INVALID_FILE', PHOTO_UNREADABLE_MESSAGE)),
+    );
   });
 }

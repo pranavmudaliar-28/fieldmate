@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
 import { Button } from '../../components/Button';
 import { Icon } from '../../components/Icon';
-import { interactiveMapHtml, staticMapHtml } from './map-html';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
@@ -15,21 +12,21 @@ import {
   tabularNumbers,
   typography,
 } from '../../constants/theme';
+import { interactiveMapHtml, staticMapHtml } from './map-html';
 
 export type Point = { latitude: number; longitude: number };
 
 /**
- * Leaflet with OpenStreetMap tiles inside a web view: free, no API key, and it
- * runs in Expo Go. The OSM tile policy requires the attribution Leaflet shows,
- * and forbids bulk or offline tile fetching, which this never does.
+ * The browser build of the map picker.
  *
- * The pin is fixed to the centre and the map moves underneath it. Dragging a
- * marker meant aiming at a 25x41px icon inside a web view nested in the form's
- * scroll view, so the form scrolled instead of the pin moving. Panning a
- * full-screen map is a whole-screen target and cannot be stolen by a parent.
+ * `react-native-webview` has no web implementation — it renders "React Native
+ * WebView does not support this platform" — so the same Leaflet document is
+ * embedded in an iframe instead, and the map talks back with `postMessage`
+ * rather than the web view bridge. The behaviour is identical: the pin is fixed
+ * to the centre and the map moves underneath it.
  */
 
-/** A still map for the form: every gesture belongs to the form, not the map. */
+/** A still map for the form. `pointer-events: none` keeps scrolling with the page. */
 export function MapPreview({
   latitude,
   longitude,
@@ -43,8 +40,6 @@ export function MapPreview({
   height?: number;
   testID?: string;
 }) {
-  const html = staticMapHtml(latitude, longitude);
-
   return (
     <Pressable
       onPress={onPress}
@@ -53,22 +48,20 @@ export function MapPreview({
       testID={testID}
       style={[styles.preview, { height }]}
     >
-      {/* The map takes no touches at all, so a drag here scrolls the form. */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <WebView
+        <iframe
           key={`${latitude},${longitude}`}
-          originWhitelist={['*']}
-          source={{ html }}
-          style={styles.web}
-          javaScriptEnabled
-          scrollEnabled={false}
+          title="Map preview"
+          srcDoc={staticMapHtml(latitude, longitude)}
+          style={IFRAME_STYLE}
+          scrolling="no"
         />
       </View>
 
       <View style={styles.previewBadge} pointerEvents="none">
         <Icon name="move-outline" size={15} color={colors.textOnInverse} />
         <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.previewBadgeText}>
-          Tap to adjust
+          Click to adjust
         </Text>
       </View>
     </Pressable>
@@ -93,37 +86,45 @@ export function MapPickerModal({
 }) {
   const [draft, setDraft] = useState<Point>({ latitude, longitude });
 
-  // Reopening starts from wherever the pin actually is now.
   useEffect(() => {
     if (visible) setDraft({ latitude, longitude });
   }, [visible, latitude, longitude]);
 
+  // The iframe reports its centre as it moves.
+  useEffect(() => {
+    if (!visible) return;
+
+    const onMessage = (event: MessageEvent) => {
+      // Only same-origin frames: the map is inlined, so it has our origin.
+      if (event.origin !== 'null' && event.origin !== globalThis.location?.origin) return;
+      try {
+        const point = JSON.parse(String(event.data)) as Partial<Point>;
+        if (typeof point.latitude === 'number' && typeof point.longitude === 'number') {
+          setDraft({
+            latitude: Number(point.latitude.toFixed(6)),
+            longitude: Number(point.longitude.toFixed(6)),
+          });
+        }
+      } catch {
+        // Ignore anything that is not a point.
+      }
+    };
+
+    globalThis.addEventListener('message', onMessage);
+    return () => globalThis.removeEventListener('message', onMessage);
+  }, [visible]);
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent={false}>
       <View style={styles.modal} testID={testID}>
-        <WebView
-          // A fresh map each time it opens, centred on the current pin.
+        <iframe
           key={visible ? `${latitude},${longitude}` : 'closed'}
-          originWhitelist={['*']}
-          source={{ html: interactiveMapHtml(latitude, longitude) }}
-          style={styles.web}
-          javaScriptEnabled
-          onMessage={(event) => {
-            try {
-              const point = JSON.parse(event.nativeEvent.data) as Partial<Point>;
-              if (typeof point.latitude === 'number' && typeof point.longitude === 'number') {
-                setDraft({
-                  latitude: Number(point.latitude.toFixed(6)),
-                  longitude: Number(point.longitude.toFixed(6)),
-                });
-              }
-            } catch {
-              // Ignore anything that is not a point.
-            }
-          }}
+          title="Choose a location"
+          srcDoc={interactiveMapHtml(latitude, longitude)}
+          style={IFRAME_STYLE}
         />
 
-        <SafeAreaView edges={['top']} style={styles.modalHeader} pointerEvents="box-none">
+        <View style={styles.modalHeader} pointerEvents="box-none">
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
@@ -135,12 +136,12 @@ export function MapPickerModal({
           </Pressable>
           <View style={styles.hint} pointerEvents="none">
             <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.hintText}>
-              Move the map to place the pin
+              Drag the map to place the pin
             </Text>
           </View>
-        </SafeAreaView>
+        </View>
 
-        <SafeAreaView edges={['bottom']} style={styles.modalFooter}>
+        <View style={styles.modalFooter}>
           <View style={styles.coordinates}>
             <Icon name="location" size={16} color={colors.textSecondary} />
             <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.coordinatesText}>
@@ -153,11 +154,13 @@ export function MapPickerModal({
             testID="map-confirm"
             onPress={() => onConfirm(draft)}
           />
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
 }
+
+const IFRAME_STYLE = { width: '100%', height: '100%', border: 'none' } as const;
 
 const styles = StyleSheet.create({
   preview: {
@@ -168,7 +171,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: spacing.sm,
   },
-  web: { flex: 1, backgroundColor: colors.surfaceMuted },
   previewBadge: {
     flexDirection: 'row',
     alignItems: 'center',

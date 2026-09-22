@@ -55,6 +55,12 @@ const config: ExpoConfig = {
     'expo-secure-store',
     'expo-splash-screen',
   ],
+  web: {
+    bundler: 'metro',
+    // A router-driven app: every route is served by one document.
+    output: 'single',
+    favicon: './assets/favicon.png',
+  },
   experiments: {
     typedRoutes: true,
   },
