@@ -19,23 +19,53 @@ A native mobile app for managing field tasks. Managers create tasks and assign e
 
 ## Getting started
 
+First time only:
+
 ```sh
-npm install                 # installs all workspaces
-npm run build:shared        # builds packages/shared (the API and app import its output)
+npm install                              # installs all workspaces
 
-# Local services (PostgreSQL + MinIO)
-docker compose up -d
-
-# API
 cp apps/api/.env.example apps/api/.env   # then set AUTH_SECRET
+cp apps/mobile/.env.example apps/mobile/.env
+
+docker compose up -d                     # PostgreSQL + MinIO
 npm run db:migrate -w @fieldmate/api     # create the schema
 npm run db:seed -w @fieldmate/api        # development demo accounts
-npm run dev -w @fieldmate/api            # http://localhost:3000/health
-
-# Mobile
-cp apps/mobile/.env.example apps/mobile/.env
-npm run start -w @fieldmate/mobile
 ```
+
+## Running the app
+
+```sh
+npm run dev
+```
+
+That one command points the `.env` files at this machine's LAN address, starts
+PostgreSQL and MinIO, then runs the API and the Expo dev server together with
+`[api]` and `[app]` prefixed output. Stop both with Ctrl+C.
+
+Open **Expo Go** on a phone on the same Wi-Fi and scan the QR code, or enter the
+`exp://<your-lan-ip>:8081` address it prints.
+
+| Command           | What it does                                            |
+| ----------------- | ------------------------------------------------------- |
+| `npm run dev`     | Everything: services, API and Expo                      |
+| `npm run dev:api` | The API alone, on :3000                                 |
+| `npm run dev:app` | The Expo dev server alone, on :8081                     |
+| `npm run dev:ip`  | Re-point the `.env` files at this machine's LAN address |
+
+### If the phone loads the app but cannot log in
+
+The phone reaches the API over Wi-Fi, so it needs a real LAN address rather than
+`localhost` — and that address changes whenever the machine joins a different
+network. `npm run dev` refreshes it on every start; run `npm run dev:ip` on its
+own to refresh it without restarting, or pass one explicitly:
+
+```sh
+npm run dev:ip -- 10.0.0.5
+```
+
+Restart afterwards: `EXPO_PUBLIC_*` values are baked into the bundle, so Metro
+has to rebuild before the phone sees the change. Windows may also prompt for a
+firewall exception the first time — allow it for **private** networks.
 
 ## Quality checks
 
