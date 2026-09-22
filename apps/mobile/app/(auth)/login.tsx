@@ -160,6 +160,12 @@ export default function LoginScreen() {
   );
 }
 
+const centred = {
+  width: '100%',
+  maxWidth: layout.maxFormWidth,
+  alignSelf: 'center',
+} as const;
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   content: {
@@ -168,10 +174,12 @@ const styles = StyleSheet.create({
     padding: layout.screenPadding,
     gap: spacing.xl,
   },
-  header: { alignItems: 'center', gap: spacing.xs },
+  // A form field stops being easier to read long before a list does, so both
+  // blocks stop well short of the column on a wide window.
+  header: { ...centred, alignItems: 'center', gap: spacing.xs },
   title: { ...typography.display, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary },
-  form: { gap: spacing.md },
+  form: { ...centred, gap: spacing.md },
   formError: { ...typography.secondary, color: colors.errorText },
   offlineHint: { ...typography.secondary, color: colors.textSecondary },
 });

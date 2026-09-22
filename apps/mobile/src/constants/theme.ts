@@ -24,6 +24,12 @@ export const colors = {
   onAccent: '#0E1116',
 
   background: '#F5F6F8',
+  /**
+   * Only ever seen in a browser window wider than the app column, behind it.
+   * A shade deeper than `background` so the column reads as the app rather
+   * than as a page that failed to fill the screen.
+   */
+  pageBackdrop: '#DDE1E8',
   surface: '#FFFFFF',
   surfaceMuted: '#EFF1F5',
   surfaceInverse: '#0E1116',
@@ -152,6 +158,14 @@ export const layout = {
   buttonHeightLarge: 60,
   buttonHeightMedium: 48,
   inputHeight: 56,
+  /**
+   * The app is laid out as a single column. On a phone or tablet it is simply
+   * the screen, but a desktop browser is far wider than any screen the design
+   * was drawn for, so the column stops here and centres instead of stretching.
+   */
+  maxContentWidth: 560,
+  /** A form reads badly long before a list does, so it stops sooner. */
+  maxFormWidth: 420,
   /** Floating tab bar, plus the gap it leaves above the safe area. */
   tabBarHeight: 66,
   tabBarInset: spacing.mdPlus,
