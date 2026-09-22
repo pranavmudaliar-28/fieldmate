@@ -9,7 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 import { ToastProvider } from '../src/components/Toast';
 import { interFonts } from '../src/constants/fonts';
-import { colors, layout } from '../src/constants/theme';
+import { colors, elevation, layout } from '../src/constants/theme';
 import { AuthProvider } from '../src/features/auth/auth-context';
 import { createQueryClient } from '../src/lib/query-client';
 
@@ -22,10 +22,9 @@ const styles = StyleSheet.create({
     maxWidth: layout.maxContentWidth,
     alignSelf: 'center',
     backgroundColor: colors.background,
-    // A hairline each side so the column has an edge against the backdrop.
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    // Lifted off the backdrop rather than divided from it by a line: a border
+    // down both sides reads as a seam, a shadow reads as a surface.
+    ...elevation.floating,
   },
   full: { flex: 1 },
   /**

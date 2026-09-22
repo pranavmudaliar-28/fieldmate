@@ -13,11 +13,14 @@ import {
   type TextInput,
 } from 'react-native';
 import { Button } from '../../src/components/Button';
+import { Icon } from '../../src/components/Icon';
 import { Input } from '../../src/components/Input';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  elevation,
   layout,
+  radius,
   spacing,
   typography,
 } from '../../src/constants/theme';
@@ -69,102 +72,101 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
-          <Text
-            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-            style={styles.title}
-            accessibilityRole="header"
-          >
-            FieldMate
-          </Text>
-          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.subtitle}>
-            Welcome back
-          </Text>
-        </View>
-
-        <View style={styles.form}>
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                label="Email"
-                testID="login-email"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                {...(errors.email?.message ? { error: errors.email.message } : {})}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                editable={!isSubmitting}
-              />
-            )}
-          />
-
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                ref={passwordRef}
-                label="Password"
-                testID="login-password"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                {...(errors.password?.message ? { error: errors.password.message } : {})}
-                secure
-                autoCapitalize="none"
-                autoComplete="current-password"
-                textContentType="password"
-                returnKeyType="go"
-                onSubmitEditing={() => void onSubmit()}
-                editable={!isSubmitting}
-              />
-            )}
-          />
-
-          {banner ? (
+        <View style={[styles.panel, Platform.OS === 'web' && styles.panelCard]}>
+          <View style={styles.header}>
+            <View style={styles.mark}>
+              <Icon name="construct" size={26} color={colors.onAccent} />
+            </View>
             <Text
               maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={styles.formError}
-              accessibilityRole="alert"
-              testID="login-error"
+              style={styles.title}
+              accessibilityRole="header"
             >
-              {banner}
+              FieldMate
             </Text>
-          ) : null}
-
-          {!isOnline ? (
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.offlineHint}>
-              {OFFLINE_HINT}
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.subtitle}>
+              Welcome back
             </Text>
-          ) : null}
+          </View>
 
-          <Button
-            label="Login"
-            testID="login-submit"
-            onPress={() => void onSubmit()}
-            loading={isSubmitting}
-            disabled={!isOnline}
-            disabledReason={OFFLINE_HINT}
-          />
+          <View style={styles.form}>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  label="Email"
+                  testID="login-email"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  {...(errors.email?.message ? { error: errors.email.message } : {})}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  editable={!isSubmitting}
+                />
+              )}
+            />
+
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  ref={passwordRef}
+                  label="Password"
+                  testID="login-password"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  {...(errors.password?.message ? { error: errors.password.message } : {})}
+                  secure
+                  autoCapitalize="none"
+                  autoComplete="current-password"
+                  textContentType="password"
+                  returnKeyType="go"
+                  onSubmitEditing={() => void onSubmit()}
+                  editable={!isSubmitting}
+                />
+              )}
+            />
+
+            {banner ? (
+              <Text
+                maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+                style={styles.formError}
+                accessibilityRole="alert"
+                testID="login-error"
+              >
+                {banner}
+              </Text>
+            ) : null}
+
+            {!isOnline ? (
+              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.offlineHint}>
+                {OFFLINE_HINT}
+              </Text>
+            ) : null}
+
+            <Button
+              label="Login"
+              testID="login-submit"
+              onPress={() => void onSubmit()}
+              loading={isSubmitting}
+              disabled={!isOnline}
+              disabledReason={OFFLINE_HINT}
+            />
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const centred = {
-  width: '100%',
-  maxWidth: layout.maxFormWidth,
-  alignSelf: 'center',
-} as const;
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
@@ -174,12 +176,39 @@ const styles = StyleSheet.create({
     padding: layout.screenPadding,
     gap: spacing.xl,
   },
-  // A form field stops being easier to read long before a list does, so both
-  // blocks stop well short of the column on a wide window.
-  header: { ...centred, alignItems: 'center', gap: spacing.xs },
+  /**
+   * A form field stops being easier to use the longer it gets, so the panel
+   * stops well short of the column on a wide window.
+   */
+  panel: {
+    width: '100%',
+    maxWidth: layout.maxFormWidth,
+    alignSelf: 'center',
+    gap: spacing.xl,
+  },
+  /**
+   * On web the panel lifts off the page as a card. A phone screen is already
+   * the card, so adding another one there would just inset the form.
+   */
+  panelCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.sheet,
+    padding: spacing.xl,
+    ...elevation.overlay,
+  },
+  header: { alignItems: 'center', gap: spacing.xs },
+  mark: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.action,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+  },
   title: { ...typography.display, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary },
-  form: { ...centred, gap: spacing.md },
+  form: { gap: spacing.md },
   formError: { ...typography.secondary, color: colors.errorText },
   offlineHint: { ...typography.secondary, color: colors.textSecondary },
 });
