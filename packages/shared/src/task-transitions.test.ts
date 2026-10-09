@@ -32,7 +32,10 @@ describe('task transitions (product spec T1–T7)', () => {
     ['ACCEPTED', ['depart', 'stepBack', 'reject']],
     ['GOING_TO_LOCATION', ['arrive', 'stepBack', 'reject']],
     ['REACHED_LOCATION', ['start', 'stepBack', 'reject']],
-    ['IN_PROGRESS', ['submitForReview', 'addEvidence', 'deleteEvidence', 'addNote']],
+    [
+      'IN_PROGRESS',
+      ['submitForReview', 'addEvidence', 'deleteEvidence', 'addNote', 'editNote', 'deleteNote'],
+    ],
     ['AWAITING_REVIEW', []],
     ['REJECTED', []],
     ['COMPLETED', []],

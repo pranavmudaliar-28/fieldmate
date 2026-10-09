@@ -42,6 +42,7 @@ async function submittable(): Promise<string> {
   await request(app)
     .post(`/api/v1/tasks/${taskId}/evidence`)
     .auth(worker.token, { type: 'bearer' })
+    .field('source', 'CAMERA')
     .attach('photo', JPEG, 'photo.jpg');
   return taskId;
 }
@@ -158,6 +159,7 @@ describe('manager review (F-008)', () => {
     const photo = await request(app)
       .post(`/api/v1/tasks/${taskId}/evidence`)
       .auth(worker.token, { type: 'bearer' })
+      .field('source', 'CAMERA')
       .attach('photo', JPEG, 'photo.jpg');
     expect(photo.status).toBe(409);
     expect((await post(worker, taskId, 'complete')).status).toBe(409);

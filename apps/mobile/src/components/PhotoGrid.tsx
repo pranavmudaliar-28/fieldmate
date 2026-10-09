@@ -38,7 +38,12 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
       <View style={styles.grid}>
         {photos.map((photo) => {
           const mine = currentUserId !== undefined && photo.uploadedBy.id === currentUserId;
-          const caption = `Photo by ${mine ? 'you' : photo.uploadedBy.name}, ${formatDateTime(photo.createdAt)}`;
+          const picked = photo.source === 'GALLERY';
+          // Said in the label, not only shown as a corner mark: whether a
+          // photo was taken at the job is the point of the record.
+          const caption = `${picked ? 'Photo from the gallery' : 'Photo'} by ${
+            mine ? 'you' : photo.uploadedBy.name
+          }, ${formatDateTime(photo.createdAt)}`;
           return (
             <View key={photo.id} style={styles.cell}>
               <Pressable
@@ -55,6 +60,11 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
                   transition={100}
                 />
               </Pressable>
+              {picked ? (
+                <View style={styles.sourceMark} pointerEvents="none" testID={`gallery-${photo.id}`}>
+                  <Icon name="images" size={12} color={colors.textOnInverse} />
+                </View>
+              ) : null}
               {onDelete && mine ? (
                 <Pressable
                   onPress={() => onDelete(photo)}
@@ -99,6 +109,18 @@ const styles = StyleSheet.create({
   thumbnailWrapper: { borderRadius: radius.card, overflow: 'hidden' },
   thumbnail: { width: THUMBNAIL, height: THUMBNAIL, backgroundColor: colors.surfaceMuted },
   /** Sits on the photo: a caption row under every tile made the grid unreadable. */
+  /** Marks a photo that was picked rather than taken (docs/02 F-006). */
+  sourceMark: {
+    position: 'absolute',
+    bottom: spacing.xs,
+    left: spacing.xs,
+    width: 22,
+    height: 22,
+    borderRadius: radius.pill,
+    backgroundColor: colors.scrim,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   delete: {
     position: 'absolute',
     top: spacing.xs + 2,

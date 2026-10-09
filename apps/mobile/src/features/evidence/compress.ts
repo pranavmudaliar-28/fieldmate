@@ -1,3 +1,4 @@
+import type { EvidenceSource } from '@fieldmate/shared';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { photoByteSize } from './photo-size';
 
@@ -8,13 +9,19 @@ export type PreparedPhoto = {
   uri: string;
   mimeType: 'image/jpeg';
   size: number;
+  /** Carried from where it was picked, so the upload can state it. */
+  source: EvidenceSource;
 };
 
 /**
  * Resizes and re-encodes a captured photo before upload (docs/03 §2.3).
  * Re-encoding also drops EXIF data, including the GPS position.
  */
-export async function preparePhoto(uri: string, width: number): Promise<PreparedPhoto> {
+export async function preparePhoto(
+  uri: string,
+  width: number,
+  source: EvidenceSource,
+): Promise<PreparedPhoto> {
   const context = ImageManipulator.manipulate(uri);
   if (width > MAX_LONG_EDGE) context.resize({ width: MAX_LONG_EDGE });
 
@@ -25,5 +32,6 @@ export async function preparePhoto(uri: string, width: number): Promise<Prepared
     uri: result.uri,
     mimeType: 'image/jpeg',
     size: await photoByteSize(result.uri),
+    source,
   };
 }

@@ -87,6 +87,7 @@ const photo = {
   id: 'photo-1',
   url: 'https://storage.test/p.jpg',
   fileType: 'image/jpeg' as const,
+  source: 'CAMERA' as const,
   uploadedBy: { id: WORKER.id, name: WORKER.name },
   createdAt: '2026-09-16T10:40:00.000Z',
 };
@@ -191,6 +192,7 @@ describe('Task completion (S-010)', () => {
             content: 'Done',
             createdBy: { id: WORKER.id, name: WORKER.name },
             createdAt: '2026-09-16T11:00:00.000Z',
+            updatedAt: null,
           },
         ],
       }),

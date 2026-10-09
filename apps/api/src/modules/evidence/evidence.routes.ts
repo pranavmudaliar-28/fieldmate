@@ -1,3 +1,8 @@
+import {
+  evidenceSourceSchema,
+  type EvidenceSource,
+  type EvidenceSourceInput,
+} from '@fieldmate/shared';
 import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import type { Logger } from '../../config/logger.js';
@@ -23,7 +28,14 @@ export function createEvidenceRouter(deps: {
   const service = createEvidenceService(deps);
 
   const upload: RequestHandler = async (req, res) => {
-    const evidence = await service.upload(actor(req), taskIdOf(req), req.file);
+    // Multipart, so the field arrives as a string alongside the file.
+    const { source } = validated<EvidenceSourceInput>(req);
+    const evidence = await service.upload(
+      actor(req),
+      taskIdOf(req),
+      req.file,
+      source as EvidenceSource,
+    );
     res.status(201).json(evidence);
   };
 
@@ -34,7 +46,15 @@ export function createEvidenceRouter(deps: {
   };
 
   const router = Router({ mergeParams: true });
-  router.post('/', requireRole('FIELD_WORKER'), uploadPhoto, uploadErrorHandler, upload);
+  // Validation runs after multer, which is what parses the text fields.
+  router.post(
+    '/',
+    requireRole('FIELD_WORKER'),
+    uploadPhoto,
+    uploadErrorHandler,
+    validate(evidenceSourceSchema),
+    upload,
+  );
   router.delete(
     '/:evidenceId',
     requireRole('FIELD_WORKER'),

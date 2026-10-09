@@ -1,4 +1,4 @@
-import { WORKER_VISIBLE_STATUSES, type TaskStatus } from '@fieldmate/shared';
+import { WORKER_VISIBLE_STATUSES, type EvidenceSource, type TaskStatus } from '@fieldmate/shared';
 import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { Database } from '../../db/client.js';
@@ -84,6 +84,7 @@ export type TaskDetailRows = {
     id: string;
     fileKey: string;
     fileType: string;
+    source: EvidenceSource;
     createdAt: Date;
     uploadedById: string;
     uploadedByName: string;
@@ -94,6 +95,7 @@ export type TaskDetailRows = {
     createdAt: Date;
     createdById: string;
     createdByName: string;
+    updatedAt: Date | null;
   }[];
 };
 
@@ -240,6 +242,7 @@ export function createTaskRepository(db: Database) {
         id: taskEvidence.id,
         fileKey: taskEvidence.fileKey,
         fileType: taskEvidence.fileType,
+        source: taskEvidence.source,
         createdAt: taskEvidence.createdAt,
         uploadedById: users.id,
         uploadedByName: users.name,
@@ -256,6 +259,7 @@ export function createTaskRepository(db: Database) {
         createdAt: taskNotes.createdAt,
         createdById: users.id,
         createdByName: users.name,
+        updatedAt: taskNotes.updatedAt,
       })
       .from(taskNotes)
       .innerJoin(users, eq(users.id, taskNotes.createdBy))

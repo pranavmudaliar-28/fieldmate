@@ -202,6 +202,7 @@ describe('push triggers', () => {
     await request(app)
       .post(`/api/v1/tasks/${taskId}/evidence`)
       .auth(worker.token, { type: 'bearer' })
+      .field('source', 'CAMERA')
       .attach('photo', JPEG, 'photo.jpg');
     testPush.reset();
 
@@ -226,6 +227,7 @@ describe('push triggers', () => {
     await request(app)
       .post(`/api/v1/tasks/${taskId}/evidence`)
       .auth(worker.token, { type: 'bearer' })
+      .field('source', 'CAMERA')
       .attach('photo', JPEG, 'photo.jpg')
       .catch(() => undefined);
     testPush.reset();

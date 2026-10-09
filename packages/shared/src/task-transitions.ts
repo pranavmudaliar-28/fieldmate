@@ -63,6 +63,9 @@ export const TASK_ACTIONS = {
   addEvidence: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
   deleteEvidence: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
   addNote: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
+  /** Only the author's own note, which the service checks separately. */
+  editNote: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
+  deleteNote: { from: ['IN_PROGRESS'], to: null, roles: ['FIELD_WORKER'] },
 } as const satisfies Record<string, ActionRule>;
 
 export type TaskAction = keyof typeof TASK_ACTIONS;

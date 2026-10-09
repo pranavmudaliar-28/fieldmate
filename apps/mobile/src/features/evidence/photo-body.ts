@@ -3,6 +3,8 @@ export type PhotoBody = {
   uri: string;
   mimeType: 'image/jpeg' | 'image/png';
   name: string;
+  /** Camera or gallery; the server will not accept a photo without it. */
+  source: string;
 };
 
 /**
@@ -12,6 +14,7 @@ export type PhotoBody = {
  */
 export async function photoFormData(photo: PhotoBody): Promise<FormData> {
   const form = new FormData();
+  form.append('source', photo.source);
   form.append('photo', {
     uri: photo.uri,
     name: photo.name,

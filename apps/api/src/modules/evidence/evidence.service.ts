@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Evidence } from '@fieldmate/shared';
+import type { Evidence, EvidenceSource } from '@fieldmate/shared';
 import { and, eq } from 'drizzle-orm';
 import { taskEvidence } from '../../db/schema.js';
 import { evidenceKey, type StorageService } from '../../services/storage/storage.service.js';
@@ -27,6 +27,7 @@ export function createEvidenceService(deps: {
       actor: Actor,
       taskId: string,
       file: { buffer: Buffer; size: number } | undefined,
+      source: EvidenceSource,
     ): Promise<Evidence> {
       if (!file || file.size === 0) {
         throw new AppError('INVALID_FILE', 'Attach a photo to upload.');
@@ -57,6 +58,7 @@ export function createEvidenceService(deps: {
               uploadedBy: actor.id,
               fileKey: key,
               fileType,
+              source,
             })
             .returning({ id: taskEvidence.id, createdAt: taskEvidence.createdAt });
           if (!row) throw new Error('Failed to record evidence');
@@ -79,6 +81,7 @@ export function createEvidenceService(deps: {
         id: created.id,
         url: await storage.getSignedUrl(key),
         fileType,
+        source,
         uploadedBy: { id: actor.id, name: actor.name },
         createdAt: created.createdAt.toISOString(),
       };

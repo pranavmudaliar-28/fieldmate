@@ -1,4 +1,10 @@
-import { allowedActions, nextWorkerStep, type Evidence, type WorkerStep } from '@fieldmate/shared';
+import {
+  allowedActions,
+  nextWorkerStep,
+  type Evidence,
+  type Note,
+  type WorkerStep,
+} from '@fieldmate/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -27,6 +33,8 @@ import { WorkerJourney } from '../../../../src/features/tasks/WorkerJourney';
 import { useTask } from '../../../../src/features/tasks/hooks';
 import {
   useAddNote,
+  useDeleteNote,
+  useUpdateNote,
   useAdvanceTask,
   useDeleteEvidence,
   useRejectTask,
@@ -61,12 +69,17 @@ export default function WorkerTaskDetails() {
   const stepBack = useStepBack(taskId);
   const reject = useRejectTask(taskId);
   const addNote = useAddNote(taskId);
+  const updateNote = useUpdateNote(taskId);
+  const deleteNote = useDeleteNote(taskId);
   const deleteEvidence = useDeleteEvidence(taskId);
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [confirmReject, setConfirmReject] = useState(false);
   const [note, setNote] = useState('');
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [editDraft, setEditDraft] = useState('');
+  const [deletingNote, setDeletingNote] = useState<Note | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<Evidence | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,6 +124,8 @@ export default function WorkerTaskDetails() {
 
   const detail = task.data;
   const actions = allowedActions(detail.status, 'FIELD_WORKER');
+  // Only the author's own notes, and only while the task is still theirs to work on.
+  const canEditNotes = actions.includes('editNote');
   const inProgress = detail.status === 'IN_PROGRESS';
   const hasEvidence = detail.evidence.length > 0;
   const step = nextWorkerStep(detail.status);
@@ -133,7 +148,20 @@ export default function WorkerTaskDetails() {
           <RefreshControl refreshing={task.isRefetching} onRefresh={() => void task.refetch()} />
         }
       >
-        <TaskDetailView task={detail} showAssignment={false} showEvidence={false} />
+        <TaskDetailView
+          task={detail}
+          showAssignment={false}
+          showEvidence={false}
+          {...(canEditNotes
+            ? {
+                onEditNote: (target: Note) => {
+                  setEditDraft(target.content);
+                  setEditingNote(target);
+                },
+                onDeleteNote: setDeletingNote,
+              }
+            : {})}
+        />
 
         <WorkerJourney progress={detail.progress} />
 
@@ -280,6 +308,77 @@ export default function WorkerTaskDetails() {
           ) : null}
         </ActionBar>
       ) : null}
+
+      <BottomSheet
+        visible={editingNote !== null}
+        title="Edit note"
+        onClose={() => setEditingNote(null)}
+        testID="edit-note-sheet"
+      >
+        <View style={styles.sheetContent}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetBody}>
+            Your manager will see that this note was edited.
+          </Text>
+          <Input
+            label="Note"
+            required
+            testID="edit-note-input"
+            value={editDraft}
+            onChangeText={setEditDraft}
+            multiline
+            numberOfLines={3}
+            style={styles.noteInput}
+          />
+          <Button
+            label="Save note"
+            testID="save-note"
+            loading={updateNote.isPending}
+            disabled={editDraft.trim().length === 0}
+            onPress={() => {
+              const target = editingNote;
+              if (!target) return;
+              updateNote.mutate(
+                { noteId: target.id, content: editDraft.trim() },
+                {
+                  onSuccess: () => {
+                    setEditingNote(null);
+                    showToast('Note updated');
+                  },
+                  onError: () => {
+                    setEditingNote(null);
+                    showToast("Couldn't update that note.", 'error');
+                  },
+                },
+              );
+            }}
+          />
+        </View>
+      </BottomSheet>
+
+      <ConfirmationDialog
+        visible={deletingNote !== null}
+        title="Delete note"
+        message="Delete this note? This can't be undone."
+        confirmLabel="Delete"
+        cancelLabel="Keep note"
+        destructive
+        loading={deleteNote.isPending}
+        onConfirm={() => {
+          const target = deletingNote;
+          if (!target) return;
+          deleteNote.mutate(target.id, {
+            onSuccess: () => {
+              setDeletingNote(null);
+              showToast('Note deleted');
+            },
+            onError: () => {
+              setDeletingNote(null);
+              showToast("Couldn't delete that note.", 'error');
+            },
+          });
+        }}
+        onCancel={() => setDeletingNote(null)}
+      />
 
       <BottomSheet
         visible={rejectOpen}

@@ -27,6 +27,17 @@ function addNote(taskId: string, content: string): Promise<Note> {
   return apiRequest<Note>(`/tasks/${taskId}/notes`, { method: 'POST', body: { content } });
 }
 
+function updateNote(taskId: string, noteId: string, content: string): Promise<Note> {
+  return apiRequest<Note>(`/tasks/${taskId}/notes/${noteId}`, {
+    method: 'PATCH',
+    body: { content },
+  });
+}
+
+function deleteNote(taskId: string, noteId: string): Promise<void> {
+  return apiRequest<void>(`/tasks/${taskId}/notes/${noteId}`, { method: 'DELETE' });
+}
+
 function deleteEvidence(taskId: string, evidenceId: string): Promise<void> {
   return apiRequest<void>(`/tasks/${taskId}/evidence/${evidenceId}`, { method: 'DELETE' });
 }
@@ -71,6 +82,28 @@ export function useAddNote(taskId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (content: string) => addNote(taskId, content),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+    },
+  });
+}
+
+/** The author's own note, while the task is in progress (docs/02 F-007). */
+export function useUpdateNote(taskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ noteId, content }: { noteId: string; content: string }) =>
+      updateNote(taskId, noteId, content),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+    },
+  });
+}
+
+export function useDeleteNote(taskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (noteId: string) => deleteNote(taskId, noteId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
     },

@@ -60,8 +60,8 @@ The worker **cannot** create, edit, assign, reassign, transfer, cancel or reopen
 | F-003 | Task Assignment | One worker per task, assigned when the task is created; reassign before completion. |
 | F-004 | Assigned Tasks | The worker's list of tasks assigned to them; start; reject with a reason. |
 | F-005 | Customer Location | The **customer's** site: address search with suggestions, a draggable map pin, and a separate field for flat/floor/gate and landmark. The address may also be typed by hand, and coordinates stay optional. A reference only, never verified; "Open in Maps" hands off to the device's native Maps app. Revised in docs/07 §1. |
-| F-006 | Photo / Field Evidence | Native camera only; preview, then retake or use; JPEG/PNG, compressed on the device, 10 MB maximum; several photos per task; the uploader can delete their own photos while the task is IN_PROGRESS. |
-| F-007 | Notes | Several per task; append-only; the worker adds them while the task is IN_PROGRESS. |
+| F-006 | Photo / Field Evidence | Camera or an existing photo from the gallery, and the record stores which — a camera shot was taken at the job, a gallery pick could be from anywhere. Managers see the difference on the thumbnail. The upload must state its source; it is never defaulted. [9C] Preview, then retake or use; preview, then retake or use; JPEG/PNG, compressed on the device, 10 MB maximum; several photos per task; the uploader can delete their own photos while the task is IN_PROGRESS. |
+| F-007 | Notes | Several per task; the worker adds them while the task is IN_PROGRESS, and may edit or delete their own while it stays IN_PROGRESS. An edited note carries an `updated_at` and is shown as edited, so a change is never silent. [9C] |
 | F-008 | Task Completion and Review | The task must be IN_PROGRESS and have at least 1 photo. A worker hands the work over and it becomes AWAITING_REVIEW; a manager then approves it (COMPLETED) or requests changes with a note, which sends it back to IN_PROGRESS. A manager completing the work themselves goes straight to COMPLETED — there is nobody to review it. The note is shown to the worker and cleared when they resubmit. [9B] |
 | F-009 | Notifications | Push through the Expo Push Service, and an in-app inbox holding the same events so one is not lost when a push is. Reached from a bell in each role’s header, with an unread badge. Tapping either opens the task. [9A] |
 
@@ -390,7 +390,7 @@ Text is trimmed before checking, so a value that's only spaces counts as empty [
 - Registration, password reset, email verification, token refresh, account deletion.
 - Multiple workers per task; workers transferring tasks.
 - Manager notes or photos.
-- Editing or deleting notes; photos from the gallery; file types other than photos.
+- File types other than photos.
 - GPS verification of where the worker is, paid map SDKs, route directions inside the app. (Address search and a map pin for picking the customer's location are in scope — docs/07 §1.)
 - Offline queue or sync.
 - Analytics, dashboards with metrics, reports, exports.

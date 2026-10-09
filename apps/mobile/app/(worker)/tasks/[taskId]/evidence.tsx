@@ -1,10 +1,12 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../../../src/components/Button';
+import { Icon } from '../../../../src/components/Icon';
 import { ConfirmationDialog } from '../../../../src/components/ConfirmationDialog';
 import { useToast } from '../../../../src/components/Toast';
 import {
@@ -61,11 +63,36 @@ export default function FieldEvidenceScreen() {
     try {
       const shot = await camera.current?.takePictureAsync({ skipProcessing: true });
       if (!shot) throw new Error('No photo');
-      setPhoto(await preparePhoto(shot.uri, shot.width));
+      setPhoto(await preparePhoto(shot.uri, shot.width, 'CAMERA'));
     } catch {
       setError("Couldn't take the photo. Try again.");
     } finally {
       setCapturing(false);
+    }
+  };
+
+  /**
+   * A photo the worker already has. Recorded as GALLERY, because a picked
+   * image could be from anywhere and at any time — the record has to say so
+   * (docs/02 F-006).
+   */
+  const pickFromGallery = async () => {
+    setError(null);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        // The upload resizes and re-encodes anyway, so cropping here would
+        // only throw away pixels the manager may want.
+        allowsEditing: false,
+        quality: 1,
+      });
+      if (result.canceled) return;
+
+      const picked = result.assets[0];
+      if (!picked) return;
+      setPhoto(await preparePhoto(picked.uri, picked.width, 'GALLERY'));
+    } catch {
+      setError("Couldn't open your photos. Try again.");
     }
   };
 
@@ -252,17 +279,33 @@ export default function FieldEvidenceScreen() {
             {error}
           </Text>
         ) : null}
-        <Pressable
-          onPress={() => void capture()}
-          disabled={capturing}
-          accessibilityRole="button"
-          accessibilityLabel="Take photo"
-          accessibilityState={{ busy: capturing }}
-          testID="shutter"
-          style={styles.shutter}
-        >
-          {capturing ? <ActivityIndicator color={colors.textPrimary} /> : null}
-        </Pressable>
+        <View style={styles.shutterRow}>
+          <Pressable
+            onPress={() => void pickFromGallery()}
+            disabled={capturing}
+            accessibilityRole="button"
+            accessibilityLabel="Choose from your photos"
+            testID="pick-from-gallery"
+            style={styles.galleryButton}
+          >
+            <Icon name="images-outline" size={24} color={colors.textOnInverse} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => void capture()}
+            disabled={capturing}
+            accessibilityRole="button"
+            accessibilityLabel="Take photo"
+            accessibilityState={{ busy: capturing }}
+            testID="shutter"
+            style={styles.shutter}
+          >
+            {capturing ? <ActivityIndicator color={colors.textPrimary} /> : null}
+          </Pressable>
+
+          {/* Balances the row so the shutter stays centred. */}
+          <View style={styles.galleryButton} pointerEvents="none" />
+        </View>
         <Button label="Close" variant="ghost" onPress={close} testID="close-camera" />
       </SafeAreaView>
     </View>
@@ -283,6 +326,21 @@ const styles = StyleSheet.create({
   cameraScreen: { flex: 1, backgroundColor: '#000000' },
   camera: { flex: 1 },
   cameraActions: { alignItems: 'center', gap: spacing.md, padding: layout.screenPadding },
+  shutterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    paddingHorizontal: spacing.lg,
+  },
+  galleryButton: {
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceInverseRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   shutter: {
     width: 72,
     height: 72,

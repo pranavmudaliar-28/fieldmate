@@ -1,4 +1,4 @@
-import { NOTIFICATION_TYPES, ROLES, TASK_STATUSES } from '@fieldmate/shared';
+import { EVIDENCE_SOURCES, NOTIFICATION_TYPES, ROLES, TASK_STATUSES } from '@fieldmate/shared';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -23,6 +23,7 @@ const pk = () => uuid('id').primaryKey().defaultRandom();
 export const userRole = pgEnum('user_role', ROLES);
 export const taskStatus = pgEnum('task_status', TASK_STATUSES);
 export const notificationType = pgEnum('notification_type', NOTIFICATION_TYPES);
+export const evidenceSource = pgEnum('evidence_source', EVIDENCE_SOURCES);
 
 export const users = pgTable(
   'users',
@@ -162,6 +163,11 @@ export const taskEvidence = pgTable(
     /** Object key in the private bucket, not a public URL (docs/05 §1, B2). */
     fileKey: varchar('file_key', { length: 300 }).notNull().unique(),
     fileType: varchar('file_type', { length: 50 }).notNull(),
+    /**
+     * Camera or gallery. The difference between evidence and an image, now
+     * that the app allows both (docs/02 F-006).
+     */
+    source: evidenceSource('source').notNull(),
     createdAt: ts('created_at').notNull().defaultNow(),
   },
   (t) => [
@@ -182,6 +188,8 @@ export const taskNotes = pgTable(
       .references(() => users.id, { onDelete: 'restrict' }),
     content: varchar('content', { length: 5000 }).notNull(),
     createdAt: ts('created_at').notNull().defaultNow(),
+    /** Null until the author edits it, so a change is never silent. */
+    updatedAt: ts('updated_at'),
   },
   (t) => [
     index('task_notes_task_id_idx').on(t.taskId),

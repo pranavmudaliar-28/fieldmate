@@ -1,4 +1,4 @@
-import { MAX_EVIDENCE_BYTES, type Evidence } from '@fieldmate/shared';
+import { MAX_EVIDENCE_BYTES, type Evidence, type EvidenceSource } from '@fieldmate/shared';
 import { env } from '../../lib/env';
 import { ApiError, NETWORK_ERROR_MESSAGE, getAuthToken } from '../../services/http';
 import { photoFormData } from './photo-body';
@@ -14,7 +14,12 @@ export type UploadProgress = (fraction: number) => void;
  */
 export function uploadEvidence(
   taskId: string,
-  photo: { uri: string; mimeType: 'image/jpeg' | 'image/png'; size: number },
+  photo: {
+    uri: string;
+    mimeType: 'image/jpeg' | 'image/png';
+    size: number;
+    source: EvidenceSource;
+  },
   onProgress?: UploadProgress,
 ): Promise<Evidence> {
   if (photo.size > MAX_EVIDENCE_BYTES) {
@@ -65,6 +70,7 @@ export function uploadEvidence(
       uri: photo.uri,
       mimeType: photo.mimeType,
       name: photo.mimeType === 'image/png' ? 'photo.png' : 'photo.jpg',
+      source: photo.source,
     }).then(
       (form) => request.send(form),
       () => reject(new ApiError('INVALID_FILE', PHOTO_UNREADABLE_MESSAGE)),

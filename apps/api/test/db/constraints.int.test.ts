@@ -275,6 +275,7 @@ describe('task_evidence and task_notes constraints', () => {
           uploadedBy: workerId,
           fileKey: `tasks/${task.id}/evidence/a.gif`,
           fileType: 'image/gif',
+          source: 'CAMERA',
         }),
       ),
     ).resolves.toMatch(/task_evidence_file_type/);
@@ -283,14 +284,22 @@ describe('task_evidence and task_notes constraints', () => {
   it('rejects a duplicate file key', async () => {
     const { task, workerId } = await insertTask();
     const fileKey = `tasks/${task.id}/evidence/a.jpg`;
-    await db
-      .insert(taskEvidence)
-      .values({ taskId: task.id, uploadedBy: workerId, fileKey, fileType: 'image/jpeg' });
+    await db.insert(taskEvidence).values({
+      taskId: task.id,
+      uploadedBy: workerId,
+      fileKey,
+      fileType: 'image/jpeg',
+      source: 'CAMERA' as const,
+    });
     await expect(
       dbErrorMessage(
-        db
-          .insert(taskEvidence)
-          .values({ taskId: task.id, uploadedBy: workerId, fileKey, fileType: 'image/jpeg' }),
+        db.insert(taskEvidence).values({
+          taskId: task.id,
+          uploadedBy: workerId,
+          fileKey,
+          fileType: 'image/jpeg',
+          source: 'CAMERA' as const,
+        }),
       ),
     ).resolves.toMatch(/duplicate key|unique/i);
   });
@@ -368,6 +377,7 @@ describe('full task graph', () => {
       uploadedBy: workerId,
       fileKey: `tasks/${task.id}/evidence/1.jpg`,
       fileType: 'image/jpeg',
+      source: 'CAMERA',
     });
     await db
       .insert(taskNotes)

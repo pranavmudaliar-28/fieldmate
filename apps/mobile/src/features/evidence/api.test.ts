@@ -47,7 +47,12 @@ class FakeXhr implements Handlers {
   }
 }
 
-const photo = { uri: 'file:///tmp/photo.jpg', mimeType: 'image/jpeg' as const, size: 1024 };
+const photo = {
+  uri: 'file:///tmp/photo.jpg',
+  mimeType: 'image/jpeg' as const,
+  size: 1024,
+  source: 'CAMERA' as const,
+};
 
 beforeEach(() => {
   FakeXhr.instances = [];

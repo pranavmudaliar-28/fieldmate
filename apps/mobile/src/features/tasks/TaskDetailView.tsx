@@ -1,6 +1,6 @@
-import type { TaskDetail } from '@fieldmate/shared';
+import type { Note, TaskDetail } from '@fieldmate/shared';
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -23,6 +23,8 @@ export function TaskDetailView({
   task,
   showAssignment = true,
   showEvidence = true,
+  onEditNote,
+  onDeleteNote,
   children,
 }: {
   task: TaskDetail;
@@ -30,6 +32,12 @@ export function TaskDetailView({
   showAssignment?: boolean;
   /** Off where the screen renders its own grid with per-photo delete. */
   showEvidence?: boolean;
+  /**
+   * Passed only by the author's own screen, and only while the note can still
+   * be changed; the controls are absent everywhere else (docs/02 F-007).
+   */
+  onEditNote?: (note: Note) => void;
+  onDeleteNote?: (note: Note) => void;
   children?: ReactNode;
 }) {
   const coordinates = formatCoordinates(task.location.latitude, task.location.longitude);
@@ -158,12 +166,37 @@ export function TaskDetailView({
           </Text>
         ) : (
           task.notes.map((note) => (
-            <Card key={note.id} style={styles.note}>
+            <Card key={note.id} style={styles.note} testID={`note-${note.id}`}>
               <View style={styles.noteHeader}>
                 <Avatar name={note.createdBy.name} size="sm" variant="muted" />
                 <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.caption}>
                   {note.createdBy.name} · {formatDateTime(note.createdAt)}
+                  {/* An edit is never silent: notes were append-only for this. */}
+                  {note.updatedAt ? ' · edited' : ''}
                 </Text>
+
+                {onEditNote ? (
+                  <Pressable
+                    onPress={() => onEditNote(note)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit your note"
+                    testID={`edit-note-${note.id}`}
+                    hitSlop={10}
+                  >
+                    <Icon name="create-outline" size={18} color={colors.textSecondary} />
+                  </Pressable>
+                ) : null}
+                {onDeleteNote ? (
+                  <Pressable
+                    onPress={() => onDeleteNote(note)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Delete your note"
+                    testID={`delete-note-${note.id}`}
+                    hitSlop={10}
+                  >
+                    <Icon name="trash-outline" size={18} color={colors.errorText} />
+                  </Pressable>
+                ) : null}
               </View>
               <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.body}>
                 {note.content}

@@ -14,7 +14,7 @@ Tags: **[C]** confirmed in the original spec · **[D]** product-owner decision �
 |---|---|---|---|
 | 1 | `tasks.location_id` removed; `task_locations.task_id` is **UNIQUE** | Removes the circular reference (C-1) | D (Phase 1) |
 | 2 | `tasks.status` is an enum of `ASSIGNED, ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION, IN_PROGRESS, AWAITING_REVIEW, COMPLETED, REJECTED, CANCELLED`, in lifecycle order | Approved lifecycle, extended in 8I and 9B | D |
-| 3 | `task_notes.updated_at` removed | Notes can't be edited | D |
+| 3 | `task_notes.updated_at` removed | Notes can't be edited (reversed in 9C: restored, null until edited) | D |
 | 4 | `task_assignments.rejection_reason`, `rejected_at` added | Reject with a required reason | D |
 | 5 | `task_assignments.ended_at` added, with a partial unique index "one open assignment per task" | Marks the *current* assignment and lets the **database** enforce one worker per task | B1 |
 | 6 | `users.token_version` added | Logout and admin can revoke tokens (Q1) | D |
@@ -702,6 +702,8 @@ Holding the lock during the upload stops the task being completed or cancelled h
 | POST | /api/v1/tasks/:taskId/evidence | ✗ | ✓ own |
 | DELETE | /api/v1/tasks/:taskId/evidence/:evidenceId | ✗ | ✓ own + uploader |
 | POST | /api/v1/tasks/:taskId/notes | ✗ | ✓ own |
+| PATCH | /api/v1/tasks/:taskId/notes/:noteId | ✗ | ✓ own + author |
+| DELETE | /api/v1/tasks/:taskId/notes/:noteId | ✗ | ✓ own + author |
 
 The spec's 10 endpoints, the 7 approved in Phases 1 and 3, logout, and health. Nothing else.
 

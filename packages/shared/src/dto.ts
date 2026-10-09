@@ -1,4 +1,10 @@
-import type { EvidenceMimeType, NotificationType, Role, TaskStatus } from './constants.js';
+import type {
+  EvidenceMimeType,
+  EvidenceSource,
+  NotificationType,
+  Role,
+  TaskStatus,
+} from './constants.js';
 
 export type UserSummary = { id: string; name: string };
 
@@ -44,6 +50,8 @@ export type Evidence = {
   /** Presigned GET URL, valid for a short time. */
   url: string;
   fileType: EvidenceMimeType;
+  /** Camera or gallery — see EVIDENCE_SOURCES. */
+  source: EvidenceSource;
   uploadedBy: UserSummary;
   createdAt: string;
 };
@@ -53,6 +61,8 @@ export type Note = {
   content: string;
   createdBy: UserSummary;
   createdAt: string;
+  /** Null until the author edits it; set so a change is never silent. */
+  updatedAt: string | null;
 };
 
 export type TaskDetail = {

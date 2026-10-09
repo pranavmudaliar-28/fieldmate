@@ -56,10 +56,18 @@ async function taskAt(status: string, assignee: TestActor = worker): Promise<str
   return taskId;
 }
 
-const uploadPhoto = (actor: TestActor, taskId: string, photo = JPEG, filename = 'photo.jpg') =>
+const uploadPhoto = (
+  actor: TestActor,
+  taskId: string,
+  photo = JPEG,
+  filename = 'photo.jpg',
+  source: 'CAMERA' | 'GALLERY' = 'CAMERA',
+) =>
   request(app)
     .post(`/api/v1/tasks/${taskId}/evidence`)
     .auth(actor.token, { type: 'bearer' })
+    // Required: the upload has to say where the photo came from (docs/02 F-006).
+    .field('source', source)
     .attach('photo', photo, filename);
 
 beforeEach(async () => {
@@ -272,10 +280,44 @@ describe('POST /tasks/:id/evidence', () => {
     const res = await request(app)
       .post(`/api/v1/tasks/${taskId}/evidence`)
       .auth(worker.token, { type: 'bearer' })
-      .field('note', 'no photo here');
+      .field('source', 'CAMERA');
 
     expect(res.status).toBe(422);
     expect(res.body.error.code).toBe('INVALID_FILE');
+  });
+
+  it('refuses a photo that will not say where it came from', async () => {
+    const taskId = await startedTask();
+
+    // Not defaulted to CAMERA: recording a provenance nobody checked is the
+    // one thing the field exists to prevent (docs/02 F-006).
+    const missing = await request(app)
+      .post(`/api/v1/tasks/${taskId}/evidence`)
+      .auth(worker.token, { type: 'bearer' })
+      .attach('photo', JPEG, 'photo.jpg');
+    expect(missing.status).toBe(422);
+    expect(missing.body.error.code).toBe('VALIDATION_ERROR');
+
+    const nonsense = await request(app)
+      .post(`/api/v1/tasks/${taskId}/evidence`)
+      .auth(worker.token, { type: 'bearer' })
+      .field('source', 'SOMEWHERE_ELSE')
+      .attach('photo', JPEG, 'photo.jpg');
+    expect(nonsense.status).toBe(422);
+  });
+
+  it('records a gallery photo as a gallery photo', async () => {
+    const taskId = await startedTask();
+
+    const res = await uploadPhoto(worker, taskId, JPEG, 'photo.jpg', 'GALLERY');
+    expect(res.status).toBe(201);
+    expect(res.body.source).toBe('GALLERY');
+
+    const detail = await request(app)
+      .get(`/api/v1/tasks/${taskId}`)
+      .auth(manager.token, { type: 'bearer' });
+    // The manager can tell first-hand evidence from an image that was picked.
+    expect(detail.body.evidence[0].source).toBe('GALLERY');
   });
 
   it('rejects a photo larger than 10 MB', async () => {

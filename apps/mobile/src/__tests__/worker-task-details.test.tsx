@@ -1,4 +1,4 @@
-import type { TaskDetail } from '@fieldmate/shared';
+import type { TaskDetail, TaskStatus } from '@fieldmate/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import WorkerTaskDetails from '../../app/(worker)/tasks/[taskId]/index';
@@ -62,6 +62,7 @@ const photo = {
   id: 'photo-1',
   url: 'https://storage.test/photo.jpg',
   fileType: 'image/jpeg' as const,
+  source: 'CAMERA' as const,
   uploadedBy: { id: WORKER.id, name: WORKER.name },
   createdAt: '2026-09-16T10:40:00.000Z',
 };
@@ -272,5 +273,60 @@ describe('Worker task details (S-008)', () => {
     expect(screen.queryByTestId('note-input')).toBeNull();
     expect(screen.queryByTestId(`delete-photo-${photo.id}`)).toBeNull();
     expect(screen.queryByTestId('action-complete')).toBeNull();
+  });
+});
+
+describe('managing your own notes (F-007)', () => {
+  const noteOn = (status: TaskStatus = 'IN_PROGRESS', updatedAt: string | null = null) =>
+    buildTask({
+      status,
+      notes: [
+        {
+          id: 'note-1',
+          content: 'Meter replced.',
+          createdBy: { id: WORKER.id, name: WORKER.name },
+          createdAt: '2026-09-16T11:00:00.000Z',
+          updatedAt,
+        },
+      ],
+    });
+
+  it('offers edit and delete while the task is in progress', async () => {
+    await renderDetails(noteOn());
+
+    expect(screen.getByTestId('edit-note-note-1')).toBeTruthy();
+    expect(screen.getByTestId('delete-note-note-1')).toBeTruthy();
+  });
+
+  it('withdraws them once the work is handed over', async () => {
+    await renderDetails(noteOn('AWAITING_REVIEW'));
+
+    expect(screen.queryByTestId('edit-note-note-1')).toBeNull();
+    expect(screen.queryByTestId('delete-note-note-1')).toBeNull();
+  });
+
+  it('says when a note has been edited', async () => {
+    await renderDetails(noteOn('IN_PROGRESS', '2026-09-16T12:00:00.000Z'));
+
+    // Notes were append-only so the record could not be quietly rewritten.
+    expect(screen.getByText(/edited/)).toBeTruthy();
+  });
+
+  it('saves an edit', async () => {
+    await renderDetails(noteOn());
+    const user = userEvent.setup();
+
+    await user.press(screen.getByTestId('edit-note-note-1'));
+    await waitFor(() => expect(screen.getByTestId('edit-note-input')).toBeTruthy());
+    // The sheet opens with what is already there, not empty.
+    expect(screen.getByTestId('edit-note-input')).toHaveDisplayValue('Meter replced.');
+  });
+
+  it('asks before deleting', async () => {
+    await renderDetails(noteOn());
+
+    await userEvent.setup().press(screen.getByTestId('delete-note-note-1'));
+
+    await waitFor(() => expect(screen.getByText(/This can't be undone/)).toBeTruthy());
   });
 });

@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { FIELD_LIMITS, PAGINATION, PUSH_PLATFORMS, ROLES, TASK_STATUSES } from './constants.js';
+import {
+  EVIDENCE_SOURCES,
+  FIELD_LIMITS,
+  PAGINATION,
+  PUSH_PLATFORMS,
+  ROLES,
+  TASK_STATUSES,
+} from './constants.js';
 
 const requiredText = (max: number, label: string) =>
   z
@@ -98,6 +105,20 @@ export const createNoteSchema = z.strictObject({
   content: requiredText(FIELD_LIMITS.note, 'Note'),
 });
 export type CreateNoteInput = z.input<typeof createNoteSchema>;
+
+/** Same shape as writing one: an edit replaces the whole note. */
+export const updateNoteSchema = createNoteSchema;
+export type UpdateNoteInput = z.input<typeof updateNoteSchema>;
+
+/**
+ * The upload says where the photo came from. Required rather than defaulted:
+ * guessing "camera" for a client that does not say would record a provenance
+ * nobody checked, which is the one thing this field exists to prevent.
+ */
+export const evidenceSourceSchema = z.strictObject({
+  source: z.enum(EVIDENCE_SOURCES, 'Say whether this photo came from the camera or the gallery.'),
+});
+export type EvidenceSourceInput = z.input<typeof evidenceSourceSchema>;
 
 export const registerPushTokenSchema = z.strictObject({
   token: z

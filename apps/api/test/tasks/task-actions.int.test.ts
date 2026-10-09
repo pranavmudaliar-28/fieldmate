@@ -39,6 +39,7 @@ async function makeCompletable(taskId: string): Promise<void> {
     uploadedBy: worker.id,
     fileKey: `tasks/${taskId}/evidence/${crypto.randomUUID()}.jpg`,
     fileType: 'image/jpeg',
+    source: 'CAMERA',
   });
 }
 

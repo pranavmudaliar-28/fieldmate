@@ -51,6 +51,15 @@ export const WORKER_VISIBLE_STATUSES = [
   'COMPLETED',
 ] as const satisfies readonly TaskStatus[];
 
+/**
+ * Where a photo came from. Recorded because it is the difference between
+ * evidence and an image: a camera shot was taken at the job, a gallery pick
+ * could be from anywhere, at any time. The app no longer forbids the second,
+ * so the record has to say which it was (docs/02 F-006).
+ */
+export const EVIDENCE_SOURCES = ['CAMERA', 'GALLERY'] as const;
+export type EvidenceSource = (typeof EVIDENCE_SOURCES)[number];
+
 export const EVIDENCE_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
 export type EvidenceMimeType = (typeof EVIDENCE_MIME_TYPES)[number];
 export const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;

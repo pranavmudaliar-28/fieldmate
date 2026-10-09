@@ -97,7 +97,8 @@ describe('Manager task details (S-005)', () => {
         {
           id: 'e1',
           url: 'https://storage.test/photo.jpg',
-          fileType: 'image/jpeg',
+          fileType: 'image/jpeg' as const,
+          source: 'CAMERA' as const,
           uploadedBy: WORKER,
           createdAt: '2026-09-16T10:40:00.000Z',
         },
