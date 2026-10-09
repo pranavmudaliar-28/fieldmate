@@ -13,7 +13,7 @@ Tags: **[C]** confirmed in the original spec · **[D]** product-owner decision �
 | # | Change | Reason | Source |
 |---|---|---|---|
 | 1 | `tasks.location_id` removed; `task_locations.task_id` is **UNIQUE** | Removes the circular reference (C-1) | D (Phase 1) |
-| 2 | `tasks.status` is an enum of `ASSIGNED, IN_PROGRESS, COMPLETED, REJECTED, CANCELLED` | Approved lifecycle | D |
+| 2 | `tasks.status` is an enum of `ASSIGNED, ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION, IN_PROGRESS, AWAITING_REVIEW, COMPLETED, REJECTED, CANCELLED`, in lifecycle order | Approved lifecycle, extended in 8I and 9B | D |
 | 3 | `task_notes.updated_at` removed | Notes can't be edited | D |
 | 4 | `task_assignments.rejection_reason`, `rejected_at` added | Reject with a required reason | D |
 | 5 | `task_assignments.ended_at` added, with a partial unique index "one open assignment per task" | Marks the *current* assignment and lets the **database** enforce one worker per task | B1 |
@@ -521,7 +521,7 @@ Upsert on `token` → `user_id = me`. **204.** **Errors:** 401 · 422.
 | Role | Rows |
 |---|---|
 | M | All tasks; filtered by `status` if given |
-| W | `current assignment.worker_id = me` **AND** `status ∈ {ASSIGNED, IN_PROGRESS, COMPLETED}`; a `status` filter can only narrow this set (e.g. `status=CANCELLED` → empty list, not an error) |
+| W | `current assignment.worker_id = me` **AND** `status ∈ WORKER_VISIBLE_STATUSES` (every step up to AWAITING_REVIEW, plus COMPLETED — never REJECTED, see §7.13); a `status` filter can only narrow this set (e.g. `status=CANCELLED` → empty list, not an error) |
 
 **200** `Paginated<TaskListItem>`.
 **Errors:** 400 (bad cursor) · 401 · 422.
@@ -618,10 +618,27 @@ task back, but not once the work itself has started.
 **200** `TaskDetail`. **Errors:** 400 · 401 · 403 · 404 · 409.
 
 ### 7.16 `POST /api/v1/tasks/:taskId/complete` — Auth M, W
+**Needs** at least 1 photo, and status IN_PROGRESS.
+**A worker** is handing the work over: status becomes **AWAITING_REVIEW**, `submitted_at = now()`, and any note from a previous review is cleared.
+**A manager** has done the work themselves and has nobody to review it: status becomes **COMPLETED**.
+**After commit:** push `TASK_AWAITING_REVIEW` (worker) or `TASK_COMPLETED` (manager) to the other managers.
 **Guard:** W must be the current assignee (otherwise 404); status = IN_PROGRESS (otherwise 409 INVALID_STATUS_TRANSITION); `COUNT(task_evidence) ≥ 1` checked under the row lock (otherwise 409 EVIDENCE_REQUIRED).
 **Transaction:** `status = COMPLETED`, `completed_at = now()`, `updated_at = now()`.
 **After commit:** push `TASK_COMPLETED` to **all managers except the person who completed it**.
 **200** `TaskDetail`. **Errors:** 400 · 401 · 404 · 409.
+
+### 7.16a `POST /api/v1/tasks/:taskId/approve` — Auth M
+**Guard:** status is AWAITING_REVIEW.
+**Transaction:** `status = COMPLETED`, `completed_at = now()`, `reviewed_at = now()`, `reviewed_by = me`, `review_note = NULL`.
+**After commit:** push `TASK_COMPLETED` to the worker.
+**200** `TaskDetail`. **Errors:** 400 · 401 · 403 · 404 · 409.
+
+### 7.16b `POST /api/v1/tasks/:taskId/request-changes` — Auth M
+**Request** `{ "note": "The serial number is not readable" }`
+**Guard:** status is AWAITING_REVIEW.
+**Transaction:** `status = IN_PROGRESS`, `completed_at = NULL`, `reviewed_at = now()`, `reviewed_by = me`, `review_note = note`. The note is shown to the worker until they resubmit.
+**After commit:** push `TASK_CHANGES_REQUESTED` to the worker.
+**200** `TaskDetail`. **Errors:** 400 · 401 · 403 · 404 · 409 · 422.
 
 ### 7.17 `POST /api/v1/tasks/:taskId/evidence` — Auth W
 **Request:** `multipart/form-data` with exactly one file field named **`photo`**. No other fields.
@@ -676,6 +693,12 @@ Holding the lock during the upload stops the task being completed or cancelled h
 | POST | /api/v1/tasks/:taskId/cancel | ✓ | ✗ |
 | POST | /api/v1/tasks/:taskId/reopen | ✓ | ✗ |
 | POST | /api/v1/tasks/:taskId/complete | ✓ | ✓ own |
+| POST | /api/v1/tasks/:taskId/approve | ✓ | ✗ |
+| POST | /api/v1/tasks/:taskId/request-changes | ✓ | ✗ |
+| GET | /api/v1/notifications | ✓ own | ✓ own |
+| GET | /api/v1/notifications/unread-count | ✓ own | ✓ own |
+| POST | /api/v1/notifications/:notificationId/read | ✓ own | ✓ own |
+| POST | /api/v1/notifications/read-all | ✓ own | ✓ own |
 | POST | /api/v1/tasks/:taskId/evidence | ✗ | ✓ own |
 | DELETE | /api/v1/tasks/:taskId/evidence/:evidenceId | ✗ | ✓ own + uploader |
 | POST | /api/v1/tasks/:taskId/notes | ✗ | ✓ own |

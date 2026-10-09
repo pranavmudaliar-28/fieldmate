@@ -62,8 +62,8 @@ The worker **cannot** create, edit, assign, reassign, transfer, cancel or reopen
 | F-005 | Customer Location | The **customer's** site: address search with suggestions, a draggable map pin, and a separate field for flat/floor/gate and landmark. The address may also be typed by hand, and coordinates stay optional. A reference only, never verified; "Open in Maps" hands off to the device's native Maps app. Revised in docs/07 §1. |
 | F-006 | Photo / Field Evidence | Native camera only; preview, then retake or use; JPEG/PNG, compressed on the device, 10 MB maximum; several photos per task; the uploader can delete their own photos while the task is IN_PROGRESS. |
 | F-007 | Notes | Several per task; append-only; the worker adds them while the task is IN_PROGRESS. |
-| F-008 | Task Completion | Worker or manager; the task must be IN_PROGRESS and have at least 1 photo; completion is confirmed on S-010 or in a dialog. |
-| F-009 | Notifications | Push through the Expo Push Service for the three triggers in §6.3. Tapping a push opens the task. No in-app notification inbox. |
+| F-008 | Task Completion and Review | The task must be IN_PROGRESS and have at least 1 photo. A worker hands the work over and it becomes AWAITING_REVIEW; a manager then approves it (COMPLETED) or requests changes with a note, which sends it back to IN_PROGRESS. A manager completing the work themselves goes straight to COMPLETED — there is nobody to review it. The note is shown to the worker and cleared when they resubmit. [9B] |
+| F-009 | Notifications | Push through the Expo Push Service, and an in-app inbox holding the same events so one is not lost when a push is. Reached from a bell in each role’s header, with an unread badge. Tapping either opens the task. [9A] |
 
 ---
 
@@ -387,12 +387,12 @@ Text is trimmed before checking, so a value that's only spaces counts as empty [
 ---
 
 ## 10. Out of scope for this release
-- Registration, password reset, email verification, token refresh, account deletion, user management screens.
+- Registration, password reset, email verification, token refresh, account deletion.
 - Multiple workers per task; workers transferring tasks.
-- Manager approve/reject review; manager notes or photos.
+- Manager notes or photos.
 - Editing or deleting notes; photos from the gallery; file types other than photos.
 - GPS verification of where the worker is, paid map SDKs, route directions inside the app. (Address search and a map pin for picking the customer's location are in scope — docs/07 §1.)
-- Offline queue or sync; in-app notification inbox; pushes for reject, cancel or reopen.
+- Offline queue or sync.
 - Analytics, dashboards with metrics, reports, exports.
 - Chat, payments, marketplace, CRM, AI, general project management.
 - Languages other than English.
@@ -403,7 +403,7 @@ Text is trimmed before checking, so a value that's only spaces counts as empty [
 
 | # | Decision | Phase |
 |---|---|---|
-| D-01 | Statuses are ASSIGNED, IN_PROGRESS, COMPLETED, REJECTED, CANCELLED; a task is assigned when it's created | 1 |
+| D-01 | Statuses are ASSIGNED, IN_PROGRESS, COMPLETED, REJECTED, CANCELLED; a task is assigned when it's created (revised in 8I: ACCEPTED, GOING_TO_LOCATION, REACHED_LOCATION added before IN_PROGRESS; revised in 9B: AWAITING_REVIEW added before COMPLETED) | 1 |
 | D-02 | A worker starts a task explicitly with "Start task" | 1 |
 | D-03 | One worker per task; managers can reassign before completion; workers can't transfer | 1 |
 | D-04 | One organisation; managers see all tasks | 1 |
