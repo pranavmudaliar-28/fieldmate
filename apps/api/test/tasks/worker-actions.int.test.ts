@@ -175,11 +175,13 @@ describe('POST /tasks/:id/reject', () => {
     expect(res.status).toBe(204);
     expect(res.body).toEqual({});
 
+    // Rejecting leaves the assignment row open so the manager can see who
+    // refused it, which once left the task readable by id even though the
+    // worker had handed it back (docs/05 §7.13 B6).
     const forWorker = await request(app)
       .get(`/api/v1/tasks/${taskId}`)
       .auth(worker.token, { type: 'bearer' });
-    expect(forWorker.status).toBe(200); // still the current assignee
-    expect(forWorker.body.status).toBe('REJECTED');
+    expect(forWorker.status).toBe(404);
 
     const list = await request(app).get('/api/v1/tasks').auth(worker.token, { type: 'bearer' });
     expect(list.body.items).toHaveLength(0);

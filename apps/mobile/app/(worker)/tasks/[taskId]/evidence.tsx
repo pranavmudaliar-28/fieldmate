@@ -16,6 +16,11 @@ import {
   typography,
 } from '../../../../src/constants/theme';
 import { uploadEvidence } from '../../../../src/features/evidence/api';
+import {
+  deniedHelp,
+  openPermissionSettings,
+  unavailableReason,
+} from '../../../../src/features/evidence/camera-access';
 import { preparePhoto, type PreparedPhoto } from '../../../../src/features/evidence/compress';
 import { taskKeys } from '../../../../src/features/tasks/hooks';
 import { useIsOnline } from '../../../../src/hooks/use-network-status';
@@ -96,8 +101,31 @@ export default function FieldEvidenceScreen() {
     );
   }
 
+  // Somewhere the camera cannot be reached at all, whatever the permission says.
+  const unavailable = unavailableReason();
+  if (unavailable) {
+    return (
+      <SafeAreaView style={styles.centered} testID="camera-unavailable">
+        {header}
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={styles.permissionTitle}
+          accessibilityRole="header"
+        >
+          Camera not available here
+        </Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.permissionBody}>
+          {unavailable}
+        </Text>
+        <Button label="Back to task" variant="secondary" onPress={() => router.back()} />
+      </SafeAreaView>
+    );
+  }
+
   if (!permission.granted) {
     const denied = !permission.canAskAgain;
+    // Only offered where there is somewhere to send them; see camera-access.
+    const settingsLabel = denied ? deniedHelp.action : 'Allow';
     return (
       <SafeAreaView style={styles.centered} testID="camera-permission-prompt">
         {header}
@@ -110,20 +138,22 @@ export default function FieldEvidenceScreen() {
         </Text>
         <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.permissionBody}>
           {denied
-            ? 'Camera access is off. Turn it on in Settings to add photos.'
+            ? deniedHelp.body
             : 'FieldMate uses the camera to capture photo evidence for this task.'}
         </Text>
-        <Button
-          label={denied ? 'Open Settings' : 'Allow'}
-          testID="camera-permission-action"
-          onPress={() => {
-            if (denied) {
-              void import('react-native').then(({ Linking }) => void Linking.openSettings());
-              return;
-            }
-            void requestPermission();
-          }}
-        />
+        {settingsLabel ? (
+          <Button
+            label={settingsLabel}
+            testID="camera-permission-action"
+            onPress={() => {
+              if (denied) {
+                openPermissionSettings();
+                return;
+              }
+              void requestPermission();
+            }}
+          />
+        ) : null}
         <Button label="Back to task" variant="secondary" onPress={() => router.back()} />
       </SafeAreaView>
     );

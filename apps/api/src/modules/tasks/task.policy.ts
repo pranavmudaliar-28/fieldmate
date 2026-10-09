@@ -21,9 +21,19 @@ const taskNotFound = () => new AppError('TASK_NOT_FOUND', 'Task was not found.')
 const forbidden = () =>
   new AppError('FORBIDDEN', 'You do not have permission to perform this action.');
 
-/** Managers and admins see every task; a worker sees only their current one. */
+/**
+ * Managers and admins see every task; a worker sees only their current one,
+ * and not once they have handed it back.
+ *
+ * Rejecting leaves the assignment row open on purpose, so the history shows
+ * who refused it and why (docs/05 §5). That makes the worker still the current
+ * assignee, which would have kept the task readable by id — so REJECTED is
+ * excluded explicitly rather than inferred from the assignment (docs/05 §7.13,
+ * B6). The task comes back into view if a manager reassigns it to them.
+ */
 export function canViewTask(actor: Actor, task: TaskContext): boolean {
-  return managesTasks(actor.role) || task.currentWorkerId === actor.id;
+  if (managesTasks(actor.role)) return true;
+  return task.currentWorkerId === actor.id && task.status !== 'REJECTED';
 }
 
 /**

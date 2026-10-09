@@ -302,7 +302,7 @@ Notes:
 |---|---|
 | Base | `/api/v1` [C]; plus `GET /health` outside the version prefix [D] |
 | Format | JSON, UTF-8; `camelCase` field names; the exception is `POST /tasks/:id/evidence` (`multipart/form-data`) |
-| IDs | UUID strings; a path parameter that isn't a valid UUID → **400 INVALID_REQUEST** |
+| IDs | UUID strings; a path parameter that isn't a valid UUID → **422 VALIDATION_ERROR**, reported as "not found" so a malformed id can't be told apart from someone else's |
 | Timestamps | ISO 8601 UTC strings, e.g. `"2026-09-16T09:12:00.000Z"` |
 | Coordinates | JSON numbers or `null` |
 | Auth | `Authorization: Bearer <jwt>` on every endpoint except `POST /auth/login` and `GET /health` [C] |
@@ -315,7 +315,7 @@ Notes:
 ### 5.1 Error codes
 | HTTP | Code | When |
 |---|---|---|
-| 400 | `INVALID_REQUEST` | Malformed JSON, invalid UUID in the path, invalid cursor, wrong content type |
+| 400 | `INVALID_REQUEST` | Malformed JSON, invalid cursor, wrong content type |
 | 401 | `UNAUTHENTICATED` | Missing, invalid, expired or revoked token; the user no longer exists |
 | 401 | `INVALID_CREDENTIALS` | Login failed |
 | 403 | `FORBIDDEN` | The role isn't allowed this endpoint; a worker deleting a photo they didn't upload |

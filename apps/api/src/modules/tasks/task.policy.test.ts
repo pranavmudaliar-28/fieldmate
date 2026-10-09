@@ -29,6 +29,15 @@ describe('task visibility', () => {
     expect(canViewTask(WORKER, task('ASSIGNED'))).toBe(true);
   });
 
+  it('hides a task the worker has rejected, though they still hold the assignment', () => {
+    expect(canViewTask(WORKER, task('REJECTED'))).toBe(false);
+    expect(errorFrom(() => assertCanViewTask(WORKER, task('REJECTED'))).code).toBe(
+      'TASK_NOT_FOUND',
+    );
+    // The manager still needs it, to read the reason and reassign it.
+    expect(canViewTask(MANAGER, task('REJECTED'))).toBe(true);
+  });
+
   it('hides a task from a worker who does not hold it', () => {
     expect(canViewTask(OTHER_WORKER, task('ASSIGNED'))).toBe(false);
     expect(errorFrom(() => assertCanViewTask(OTHER_WORKER, task('ASSIGNED'))).code).toBe(
