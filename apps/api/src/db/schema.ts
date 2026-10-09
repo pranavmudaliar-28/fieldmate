@@ -68,6 +68,15 @@ export const tasks = pgTable(
     arrivedAt: ts('arrived_at'),
     startedAt: ts('started_at'),
     completedAt: ts('completed_at'),
+    /**
+     * The manager's look at finished work (docs/02 F-008). `reviewNote` is why
+     * the last review handed it back, and outlives that review so the worker
+     * can still read what was asked while they put it right.
+     */
+    submittedAt: ts('submitted_at'),
+    reviewedAt: ts('reviewed_at'),
+    reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'restrict' }),
+    reviewNote: varchar('review_note', { length: 1000 }),
   },
   (t) => [
     index('tasks_created_by_idx').on(t.createdBy),
@@ -75,6 +84,7 @@ export const tasks = pgTable(
     index('tasks_updated_at_id_idx').on(t.updatedAt.desc(), t.id.desc()),
     check('tasks_title_not_blank', sql`length(trim(${t.title})) > 0`),
     check('tasks_description_not_blank', sql`length(trim(${t.description})) > 0`),
+    check('tasks_reviewed_together', sql`(${t.reviewedAt} IS NULL) = (${t.reviewedBy} IS NULL)`),
     check(
       'tasks_completed_at_matches_status',
       sql`(${t.status} = 'COMPLETED') = (${t.completedAt} IS NOT NULL)`,

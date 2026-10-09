@@ -192,7 +192,7 @@ describe('push triggers', () => {
     expect(testPush.sent).toHaveLength(0);
   });
 
-  it('notifies every other manager when a worker completes a task', async () => {
+  it('tells every other manager when a worker hands work over for review', async () => {
     const taskId = await createTask();
     for (const step of ['accept', 'depart', 'arrive', 'start']) {
       await request(app)
@@ -214,8 +214,8 @@ describe('push triggers', () => {
     const sent = testPush.sent[0]!;
     expect(sent.userIds.sort()).toEqual([manager.id, otherManager.id].sort());
     expect(sent.message).toMatchObject({
-      type: 'TASK_COMPLETED',
-      title: 'Task completed',
+      type: 'TASK_AWAITING_REVIEW',
+      title: 'Ready for review',
       body: 'Replace water meter · by Priya Nair',
     });
   });

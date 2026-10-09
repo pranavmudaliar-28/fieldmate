@@ -1,4 +1,4 @@
-import { WORKER_PROGRESS_STATUSES, type TaskListItem, type TaskStatus } from '@fieldmate/shared';
+import { WORKER_ACTIVE_STATUSES, type TaskListItem, type TaskStatus } from '@fieldmate/shared';
 import { useRouter } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '../../../src/components/AppHeader';
@@ -36,16 +36,14 @@ const SECTION_LIMIT = 10;
  * would vanish from the dashboard the moment it was accepted, because it is
  * no longer ASSIGNED and not yet IN_PROGRESS.
  */
-const UNDER_WAY = WORKER_PROGRESS_STATUSES.filter(
-  (status) => status !== 'ASSIGNED',
-) as TaskStatus[];
+const UNDER_WAY = WORKER_ACTIVE_STATUSES.filter((status) => status !== 'ASSIGNED') as TaskStatus[];
 
 /** The job furthest along is the one to raise. */
 function mostAdvanced(tasks: TaskListItem[]): TaskListItem | undefined {
   return [...tasks].sort(
     (a, b) =>
-      WORKER_PROGRESS_STATUSES.indexOf(b.status as never) -
-      WORKER_PROGRESS_STATUSES.indexOf(a.status as never),
+      WORKER_ACTIVE_STATUSES.indexOf(b.status as never) -
+      WORKER_ACTIVE_STATUSES.indexOf(a.status as never),
   )[0];
 }
 

@@ -71,7 +71,7 @@ export function useUpdateTask(taskId: string) {
 /** Status changes are never applied optimistically: the server may refuse them. */
 export function useTaskAction(
   taskId: string,
-  action: 'reassign' | 'cancel' | 'reopen' | 'complete',
+  action: 'reassign' | 'cancel' | 'reopen' | 'complete' | 'approve',
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -85,8 +85,19 @@ export function useTaskAction(
           return api.reopenTask(taskId);
         case 'complete':
           return api.completeTask(taskId);
+        case 'approve':
+          return api.approveTask(taskId);
       }
     },
+    onSuccess: (task) => applyTaskUpdate(queryClient, task),
+  });
+}
+
+/** Handing work back carries a note, so it has its own hook. */
+export function useRequestChanges(taskId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (note: string) => api.requestChanges(taskId, note),
     onSuccess: (task) => applyTaskUpdate(queryClient, task),
   });
 }

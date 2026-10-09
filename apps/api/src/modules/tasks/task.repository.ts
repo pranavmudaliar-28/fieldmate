@@ -1,5 +1,6 @@
 import { WORKER_VISIBLE_STATUSES, type TaskStatus } from '@fieldmate/shared';
 import { and, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Database } from '../../db/client.js';
 import {
   taskAssignments,
@@ -11,14 +12,30 @@ import {
 } from '../../db/schema.js';
 import type { TaskCursor } from '../../utils/cursor.js';
 
-/** The `tasks` columns that record when a lifecycle step happened. */
-export type TaskProgressColumn = 'acceptedAt' | 'departedAt' | 'arrivedAt' | 'startedAt';
+/**
+ * The `tasks` columns that record how far a task got. Reassigning or reopening
+ * clears all of them: the next worker starts the journey over, and a review of
+ * the previous attempt says nothing about the new one.
+ */
+export type TaskProgressColumn =
+  | 'acceptedAt'
+  | 'departedAt'
+  | 'arrivedAt'
+  | 'startedAt'
+  | 'submittedAt'
+  | 'reviewedAt'
+  | 'reviewedBy'
+  | 'reviewNote';
 
 export const ALL_PROGRESS_COLUMNS = [
   'acceptedAt',
   'departedAt',
   'arrivedAt',
   'startedAt',
+  'submittedAt',
+  'reviewedAt',
+  'reviewedBy',
+  'reviewNote',
 ] as const satisfies readonly TaskProgressColumn[];
 
 export type TaskListRow = {
@@ -48,6 +65,11 @@ export type TaskDetailRows = {
     arrivedAt: Date | null;
     startedAt: Date | null;
     completedAt: Date | null;
+    submittedAt: Date | null;
+    reviewedAt: Date | null;
+    reviewNote: string | null;
+    reviewedById: string | null;
+    reviewedByName: string | null;
     address: string;
     addressDetails: string | null;
     latitude: number | null;
@@ -84,6 +106,9 @@ export type ListTasksFilter = {
 };
 
 export type TaskWriter = Database | Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/** The same table as the worker join, under its own name. */
+const reviewers = alias(users, 'reviewers');
 
 const openAssignment = isNull(taskAssignments.endedAt);
 
@@ -184,6 +209,11 @@ export function createTaskRepository(db: Database) {
         arrivedAt: tasks.arrivedAt,
         startedAt: tasks.startedAt,
         completedAt: tasks.completedAt,
+        submittedAt: tasks.submittedAt,
+        reviewedAt: tasks.reviewedAt,
+        reviewNote: tasks.reviewNote,
+        reviewedById: reviewers.id,
+        reviewedByName: reviewers.name,
         address: taskLocations.address,
         addressDetails: taskLocations.addressDetails,
         latitude: taskLocations.latitude,
@@ -198,6 +228,8 @@ export function createTaskRepository(db: Database) {
       .innerJoin(taskAssignments, and(eq(taskAssignments.taskId, tasks.id), openAssignment))
       .innerJoin(users, eq(users.id, taskAssignments.workerId))
       .innerJoin(taskLocations, eq(taskLocations.taskId, tasks.id))
+      // Left: most tasks have never been reviewed.
+      .leftJoin(reviewers, eq(reviewers.id, tasks.reviewedBy))
       .where(eq(tasks.id, taskId))
       .limit(1);
 
@@ -330,6 +362,48 @@ export function createTaskRepository(db: Database) {
       await tx
         .update(tasks)
         .set({ status, completedAt, updatedAt: new Date() })
+        .where(eq(tasks.id, taskId));
+    },
+
+    /** Hands finished work to the manager, clearing the last review's note. */
+    async submitForReview(tx: TaskWriter, taskId: string): Promise<void> {
+      await tx
+        .update(tasks)
+        .set({
+          status: 'AWAITING_REVIEW',
+          submittedAt: sql`now()`,
+          reviewedAt: null,
+          reviewedBy: null,
+          reviewNote: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(tasks.id, taskId));
+    },
+
+    /**
+     * Records the review. `note` is null when the work is accepted and the
+     * reason when it is sent back, which is also the only case the worker reads.
+     */
+    async recordReview(
+      tx: TaskWriter,
+      taskId: string,
+      input: {
+        status: TaskStatus;
+        reviewerId: string;
+        note: string | null;
+        completedAt: Date | null;
+      },
+    ): Promise<void> {
+      await tx
+        .update(tasks)
+        .set({
+          status: input.status,
+          completedAt: input.completedAt,
+          reviewedAt: sql`now()`,
+          reviewedBy: input.reviewerId,
+          reviewNote: input.note,
+          updatedAt: new Date(),
+        })
         .where(eq(tasks.id, taskId));
     },
 

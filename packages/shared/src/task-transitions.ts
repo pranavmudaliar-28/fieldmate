@@ -13,15 +13,16 @@ type ActionRule = {
 const BEFORE_WORK = ['ASSIGNED', 'ACCEPTED', 'GOING_TO_LOCATION', 'REACHED_LOCATION'] as const;
 
 /** Every status in which a task is still live and a manager may intervene. */
-const OPEN = [...BEFORE_WORK, 'IN_PROGRESS', 'REJECTED'] as const;
+const OPEN = [...BEFORE_WORK, 'IN_PROGRESS', 'AWAITING_REVIEW', 'REJECTED'] as const;
 
 /**
  * Single source of truth for the task lifecycle (product spec §4.2, T1–T7).
  * The API enforces it; the mobile app uses it only to decide which actions to show.
  *
  * Assigned → Accepted → Going to location → Reached location → In progress →
- * Completed. A task is never IN_PROGRESS until the worker confirms they have
- * started working on site.
+ * Awaiting review → Completed. A task is never IN_PROGRESS until the worker
+ * confirms they have started working on site, and work a worker finishes is
+ * never COMPLETED until a manager has looked at it (docs/02 F-008).
  */
 export const TASK_ACTIONS = {
   edit: { from: OPEN, to: null, roles: ['ADMIN', 'MANAGER'] },
@@ -43,7 +44,19 @@ export const TASK_ACTIONS = {
   /** Handing the task back, including after travelling and finding a problem. */
   reject: { from: BEFORE_WORK, to: 'REJECTED', roles: ['FIELD_WORKER'] },
 
-  complete: { from: ['IN_PROGRESS'], to: 'COMPLETED', roles: ['ADMIN', 'MANAGER', 'FIELD_WORKER'] },
+  /**
+   * The worker hands finished work over. It is not complete yet — a manager
+   * still has to look at it — which is why this is a separate action from the
+   * manager's own `complete`.
+   */
+  submitForReview: { from: ['IN_PROGRESS'], to: 'AWAITING_REVIEW', roles: ['FIELD_WORKER'] },
+
+  /** A manager finishing the work themselves has nobody to review it. */
+  complete: { from: ['IN_PROGRESS'], to: 'COMPLETED', roles: ['ADMIN', 'MANAGER'] },
+
+  /** The review itself: accept the work, or hand it back with a reason. */
+  approve: { from: ['AWAITING_REVIEW'], to: 'COMPLETED', roles: ['ADMIN', 'MANAGER'] },
+  requestChanges: { from: ['AWAITING_REVIEW'], to: 'IN_PROGRESS', roles: ['ADMIN', 'MANAGER'] },
   cancel: { from: OPEN, to: 'CANCELLED', roles: ['ADMIN', 'MANAGER'] },
   reopen: { from: ['COMPLETED'], to: 'ASSIGNED', roles: ['ADMIN', 'MANAGER'] },
 

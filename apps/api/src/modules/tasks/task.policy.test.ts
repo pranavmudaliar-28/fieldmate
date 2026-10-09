@@ -121,9 +121,26 @@ describe('worker actions', () => {
     );
   });
 
-  it('allows evidence, notes and completion while in progress', () => {
-    for (const action of ['addEvidence', 'deleteEvidence', 'addNote', 'complete'] as TaskAction[]) {
+  it('allows evidence, notes and handing the work over while in progress', () => {
+    const actions = ['addEvidence', 'deleteEvidence', 'addNote', 'submitForReview'];
+    for (const action of actions as TaskAction[]) {
       expect(() => assertCanPerform(action, WORKER, task('IN_PROGRESS'))).not.toThrow();
+    }
+  });
+
+  it('finishes the work by submitting it, never by completing it', () => {
+    // A worker hands work over; only a manager can call it done (docs/02 F-008).
+    expect(errorFrom(() => assertCanPerform('complete', WORKER, task('IN_PROGRESS'))).code).toBe(
+      'FORBIDDEN',
+    );
+  });
+
+  it('cannot touch work it has already submitted', () => {
+    const actions = ['addEvidence', 'addNote', 'submitForReview'];
+    for (const action of actions as TaskAction[]) {
+      expect(errorFrom(() => assertCanPerform(action, WORKER, task('AWAITING_REVIEW'))).code).toBe(
+        'INVALID_STATUS_TRANSITION',
+      );
     }
   });
 
@@ -149,7 +166,7 @@ describe('worker actions', () => {
   });
 
   it('never allows anything once a task is cancelled', () => {
-    for (const action of ['start', 'complete', 'addNote'] as TaskAction[]) {
+    for (const action of ['start', 'submitForReview', 'addNote'] as TaskAction[]) {
       expect(errorFrom(() => assertCanPerform(action, WORKER, task('CANCELLED'))).code).toBe(
         'INVALID_STATUS_TRANSITION',
       );

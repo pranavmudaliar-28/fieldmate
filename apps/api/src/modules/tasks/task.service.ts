@@ -328,12 +328,19 @@ export function createTaskService(deps: {
     },
 
     /**
-     * Completion needs at least one photo. The count is read under the same row
-     * lock as the status change, so a concurrent photo delete cannot slip past it.
+     * Finishing the work. Both roles use this, and they mean different things
+     * by it: a worker is handing the job over for review, a manager has done
+     * the work themselves and has nobody to review it (docs/02 F-008).
+     *
+     * Either way it needs at least one photo. The count is read under the same
+     * row lock as the status change, so a concurrent photo delete cannot slip
+     * past it.
      */
     async complete(actor: Actor, taskId: string): Promise<TaskDetail> {
+      const forReview = actor.role === 'FIELD_WORKER';
+
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
-        assertCanPerform('complete', actor, {
+        assertCanPerform(forReview ? 'submitForReview' : 'complete', actor, {
           status: task.status,
           currentWorkerId: task.workerId,
         });
@@ -346,7 +353,8 @@ export function createTaskService(deps: {
           );
         }
 
-        await repository.setStatus(tx, taskId, 'COMPLETED', new Date());
+        if (forReview) await repository.submitForReview(tx, taskId);
+        else await repository.setStatus(tx, taskId, 'COMPLETED', new Date());
         return true;
       });
 
@@ -355,7 +363,69 @@ export function createTaskService(deps: {
       const task = await detail(taskId);
       // Everyone who manages the work hears about it, except whoever did it.
       const managerIds = (await tokens.listManagerIds()).filter((id) => id !== actor.id);
-      notify(managerIds, taskId, pushMessages.taskCompleted(taskId, task.title, actor.name));
+      notify(
+        managerIds,
+        taskId,
+        forReview
+          ? pushMessages.taskAwaitingReview(taskId, task.title, actor.name)
+          : pushMessages.taskCompleted(taskId, task.title, actor.name),
+      );
+      return task;
+    },
+
+    /** The review accepted the work. */
+    async approve(actor: Actor, taskId: string): Promise<TaskDetail> {
+      const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        assertCanPerform('approve', actor, { status: task.status, currentWorkerId: task.workerId });
+        await repository.recordReview(tx, taskId, {
+          status: 'COMPLETED',
+          reviewerId: actor.id,
+          // Accepting clears the last note: there is nothing left to put right.
+          note: null,
+          completedAt: new Date(),
+        });
+        return true;
+      });
+
+      if (result === undefined) throw taskNotFound();
+
+      const task = await detail(taskId);
+      notify(
+        [task.assignment.worker.id],
+        taskId,
+        pushMessages.taskCompleted(taskId, task.title, actor.name),
+      );
+      return task;
+    },
+
+    /**
+     * The review sent the work back. It returns to IN_PROGRESS rather than to a
+     * status of its own, so the worker picks up exactly where they can act: the
+     * note says what to fix, and photos and notes are open to them again.
+     */
+    async requestChanges(actor: Actor, taskId: string, note: string): Promise<TaskDetail> {
+      const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        assertCanPerform('requestChanges', actor, {
+          status: task.status,
+          currentWorkerId: task.workerId,
+        });
+        await repository.recordReview(tx, taskId, {
+          status: 'IN_PROGRESS',
+          reviewerId: actor.id,
+          note,
+          completedAt: null,
+        });
+        return true;
+      });
+
+      if (result === undefined) throw taskNotFound();
+
+      const task = await detail(taskId);
+      notify(
+        [task.assignment.worker.id],
+        taskId,
+        pushMessages.taskChangesRequested(taskId, task.title, note),
+      );
       return task;
     },
   };

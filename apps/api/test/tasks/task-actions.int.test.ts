@@ -155,15 +155,16 @@ describe('POST /tasks/:id/cancel', () => {
 });
 
 describe('POST /tasks/:id/complete', () => {
-  it('completes an in-progress task that has a photo', async () => {
+  it('sends a worker finished job for review rather than closing it', async () => {
     const taskId = await createTask();
     await forceStatus(taskId, 'IN_PROGRESS');
     await makeCompletable(taskId);
 
     const res = await post(worker, taskId, 'complete');
     expect(res.status).toBe(200);
-    expect(res.body.status).toBe('COMPLETED');
-    expect(res.body.completedAt).not.toBeNull();
+    expect(res.body.status).toBe('AWAITING_REVIEW');
+    expect(res.body.completedAt).toBeNull();
+    expect(res.body.review.submittedAt).not.toBeNull();
   });
 
   it('lets a manager complete on the worker behalf', async () => {

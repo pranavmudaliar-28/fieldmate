@@ -115,16 +115,15 @@ env:
     id: 'add-note'
 - assertVisible: 'Note added'
 
-# Complete the task
+# Hand the finished work to the manager
 - tapOn:
     id: 'action-complete'
 - assertVisible: 'Complete task'
 - tapOn:
     id: 'confirm-complete'
-- assertVisible: 'Task completed'
-- assertVisible: 'Your manager has been notified.'
+- assertVisible: 'Sent for review'
 - tapOn: 'Back to task'
-- assertVisible: 'You completed this task'
+- assertVisible: 'Awaiting review'
 
 - back
 - back
@@ -137,9 +136,24 @@ env:
       EMAIL: ${MANAGER_EMAIL}
       PASSWORD: ${PASSWORD}
 
-- assertVisible: 'Recently completed'
 - tapOn: ${TASK_TITLE}
-- assertVisible: 'Completed'
+- assertVisible: 'Awaiting review'
 - assertVisible: 'Photos (1)'
 - assertVisible: 'Notes (1)'
 - assertVisible: 'Meter replaced; serial visible in the photo.'
+
+# Send it back, then accept it on the second look
+- tapOn:
+    id: 'action-request-changes'
+- inputText: 'The serial number is not readable.'
+- hideKeyboard
+- tapOn:
+    id: 'submit-request-changes'
+- assertVisible: 'Sent back to the worker'
+- assertVisible: 'In progress'
+
+- tapOn:
+    id: 'action-complete'
+- tapOn:
+    id: 'confirm-complete'
+- assertVisible: 'Completed'

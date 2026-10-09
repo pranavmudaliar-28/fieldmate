@@ -88,6 +88,7 @@ export const statusAppearance: Record<TaskStatus, { label: string; tone: Tone; i
   GOING_TO_LOCATION: { label: 'Going to location', tone: 'warning', icon: 'car-outline' },
   REACHED_LOCATION: { label: 'Reached location', tone: 'warning', icon: 'location-outline' },
   IN_PROGRESS: { label: 'In progress', tone: 'warning', icon: 'construct-outline' },
+  AWAITING_REVIEW: { label: 'Awaiting review', tone: 'info', icon: 'hourglass-outline' },
   COMPLETED: { label: 'Completed', tone: 'success', icon: 'checkmark-circle-outline' },
   REJECTED: { label: 'Rejected', tone: 'error', icon: 'close-circle-outline' },
   CANCELLED: { label: 'Cancelled', tone: 'neutral', icon: 'ban-outline' },

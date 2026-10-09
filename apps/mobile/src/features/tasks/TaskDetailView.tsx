@@ -77,6 +77,23 @@ export function TaskDetailView({
         </View>
       ) : null}
 
+      {task.review.note ? (
+        <View style={styles.reviewNote} testID="task-review-note">
+          <Icon name="arrow-undo" size={18} color={toneColors.warning.text} />
+          <View style={styles.rejectionText}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.reviewNoteTitle}>
+              {task.review.reviewedBy
+                ? `Changes requested by ${task.review.reviewedBy.name}`
+                : 'Changes requested'}
+              {task.review.reviewedAt ? ` · ${formatDateTime(task.review.reviewedAt)}` : ''}
+            </Text>
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.reviewNoteBody}>
+              “{task.review.note}”
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       <Card style={styles.location}>
         <View style={styles.locationRow}>
           <View style={styles.locationIcon}>
@@ -198,6 +215,19 @@ const styles = StyleSheet.create({
   rejectionText: { flex: 1, gap: 2 },
   rejectionTitle: { ...typography.caption, color: toneColors.error.text },
   rejectionReason: { ...typography.bodyStrong, color: toneColors.error.text },
+  /**
+   * What the manager asked to be put right. Warning rather than error: the work
+   * was done, it just needs another pass.
+   */
+  reviewNote: {
+    flexDirection: 'row',
+    gap: spacing.smPlus,
+    backgroundColor: toneColors.warning.tint,
+    padding: spacing.md,
+    borderRadius: radius.card,
+  },
+  reviewNoteTitle: { ...typography.caption, color: toneColors.warning.text },
+  reviewNoteBody: { ...typography.bodyStrong, color: toneColors.warning.text },
   location: { gap: spacing.md },
   locationRow: { flexDirection: 'row', gap: spacing.smPlus },
   locationIcon: {

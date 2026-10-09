@@ -27,6 +27,7 @@ function buildTask(overrides: Partial<TaskDetail> = {}): TaskDetail {
     location: { address: '14 Harbour Rd', addressDetails: null, latitude: null, longitude: null },
     assignment: { worker: WORKER, assignedAt: '2026-09-16T09:12:00.000Z', rejection: null },
     progress: { acceptedAt: null, departedAt: null, arrivedAt: null, startedAt: null },
+    review: { submittedAt: null, reviewedAt: null, reviewedBy: null, note: null },
     evidence: [],
     notes: [],
     createdAt: '2026-09-16T09:12:00.000Z',
@@ -200,5 +201,86 @@ describe('Manager task details (S-005)', () => {
 
     await waitFor(() => expect(screen.getByTestId(`worker-option-${WORKER.id}`)).toBeDisabled());
     expect(screen.getByText('Current')).toBeTruthy();
+  });
+  describe('reviewing submitted work (F-008)', () => {
+    const submitted = () =>
+      buildTask({
+        status: 'AWAITING_REVIEW' as TaskStatus,
+        review: {
+          submittedAt: '2026-09-16T11:00:00.000Z',
+          reviewedAt: null,
+          reviewedBy: null,
+          note: null,
+        },
+      });
+
+    it('offers both answers side by side, not one behind a menu', async () => {
+      await renderDetails(submitted());
+
+      expect(screen.getByTestId('action-approve')).toBeTruthy();
+      expect(screen.getByTestId('action-request-changes')).toBeTruthy();
+      // Completing is the worker's submission, not an action left to the manager here.
+      expect(screen.queryByTestId('action-complete')).toBeNull();
+    });
+
+    it('approves the work after confirming', async () => {
+      api.approveTask.mockResolvedValue(buildTask({ status: 'COMPLETED' as TaskStatus }));
+      await renderDetails(submitted());
+      const user = userEvent.setup();
+
+      await user.press(screen.getByTestId('action-approve'));
+      await waitFor(() =>
+        expect(screen.getByText(/The task will be marked complete/)).toBeTruthy(),
+      );
+      const confirm = screen.getAllByRole('button', { name: 'Approve' });
+      await user.press(confirm[confirm.length - 1]!);
+
+      await waitFor(() => expect(api.approveTask).toHaveBeenCalledWith('task-1'));
+    });
+
+    it('will not send work back without saying what to change', async () => {
+      await renderDetails(submitted());
+
+      await userEvent.setup().press(screen.getByTestId('action-request-changes'));
+
+      await waitFor(() => expect(screen.getByTestId('review-note')).toBeTruthy());
+      expect(screen.getByTestId('submit-request-changes')).toBeDisabled();
+    });
+
+    it('sends the work back with the reason', async () => {
+      api.requestChanges.mockResolvedValue(buildTask({ status: 'IN_PROGRESS' as TaskStatus }));
+      await renderDetails(submitted());
+      const user = userEvent.setup();
+
+      await user.press(screen.getByTestId('action-request-changes'));
+      await waitFor(() => expect(screen.getByTestId('review-note')).toBeTruthy());
+      await user.type(screen.getByTestId('review-note'), 'The serial number is not readable.');
+      await user.press(screen.getByTestId('submit-request-changes'));
+
+      await waitFor(() =>
+        expect(api.requestChanges).toHaveBeenCalledWith(
+          'task-1',
+          'The serial number is not readable.',
+        ),
+      );
+    });
+
+    it('shows the worker what the last review asked for', async () => {
+      await renderDetails(
+        buildTask({
+          status: 'IN_PROGRESS' as TaskStatus,
+          review: {
+            submittedAt: '2026-09-16T11:00:00.000Z',
+            reviewedAt: '2026-09-16T12:00:00.000Z',
+            reviewedBy: { id: 'm-1', name: 'Anita Rao' },
+            note: 'The serial number is not readable.',
+          },
+        }),
+      );
+
+      expect(screen.getByTestId('task-review-note')).toBeTruthy();
+      expect(screen.getByText(/Changes requested by Anita Rao/)).toBeTruthy();
+      expect(screen.getByText(/The serial number is not readable./)).toBeTruthy();
+    });
   });
 });

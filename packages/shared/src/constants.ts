@@ -19,6 +19,7 @@ export const TASK_STATUSES = [
   'GOING_TO_LOCATION',
   'REACHED_LOCATION',
   'IN_PROGRESS',
+  'AWAITING_REVIEW',
   'COMPLETED',
   'REJECTED',
   'CANCELLED',
@@ -34,9 +35,19 @@ export const WORKER_PROGRESS_STATUSES = [
   'IN_PROGRESS',
 ] as const satisfies readonly TaskStatus[];
 
+/**
+ * Work the worker has taken on and not yet finished with. Submitted work stays
+ * here: it is out of their hands but not off their list, because a manager can
+ * send it back (docs/02 F-008).
+ */
+export const WORKER_ACTIVE_STATUSES = [
+  ...WORKER_PROGRESS_STATUSES,
+  'AWAITING_REVIEW',
+] as const satisfies readonly TaskStatus[];
+
 /** Statuses a field worker can see for tasks currently assigned to them. */
 export const WORKER_VISIBLE_STATUSES = [
-  ...WORKER_PROGRESS_STATUSES,
+  ...WORKER_ACTIVE_STATUSES,
   'COMPLETED',
 ] as const satisfies readonly TaskStatus[];
 
@@ -59,6 +70,8 @@ export const NOTIFICATION_TYPES = [
   'TASK_REJECTED',
   'TASK_CANCELLED',
   'TASK_REOPENED',
+  'TASK_AWAITING_REVIEW',
+  'TASK_CHANGES_REQUESTED',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -72,6 +85,7 @@ export const FIELD_LIMITS = {
   address: 500,
   addressDetails: 300,
   rejectionReason: 1000,
+  reviewNote: 1000,
   note: 5000,
   pushToken: 255,
   notificationTitle: 100,

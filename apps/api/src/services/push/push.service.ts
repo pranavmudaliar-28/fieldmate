@@ -64,4 +64,20 @@ export const pushMessages = {
     title: 'Task reopened',
     body: shorten(taskTitle),
   }),
+
+  /** To the managers: a worker has handed work over to be looked at. */
+  taskAwaitingReview: (taskId: string, taskTitle: string, submittedBy: string): PushMessage => ({
+    type: 'TASK_AWAITING_REVIEW',
+    taskId,
+    title: 'Ready for review',
+    body: shorten(`${taskTitle} · by ${submittedBy}`),
+  }),
+
+  /** To the worker: what to put right, in the notification itself. */
+  taskChangesRequested: (taskId: string, taskTitle: string, note: string): PushMessage => ({
+    type: 'TASK_CHANGES_REQUESTED',
+    taskId,
+    title: 'Changes requested',
+    body: shorten(`${taskTitle} · ${note}`),
+  }),
 };

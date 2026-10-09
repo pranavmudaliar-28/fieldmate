@@ -485,15 +485,31 @@ describe('worker completion flow end to end', () => {
       .auth(worker.token, { type: 'bearer' })
       .send({ content: 'Meter replaced; serial in the photo.' });
 
-    const completed = await request(app)
+    // The worker hands the work over; it is not done until a manager says so.
+    const submitted = await request(app)
       .post(`/api/v1/tasks/${taskId}/complete`)
       .auth(worker.token, { type: 'bearer' });
 
-    expect(completed.status).toBe(200);
-    expect(completed.body.status).toBe('COMPLETED');
-    expect(completed.body.completedAt).not.toBeNull();
-    expect(completed.body.evidence).toHaveLength(1);
-    expect(completed.body.notes).toHaveLength(1);
+    expect(submitted.status).toBe(200);
+    expect(submitted.body.status).toBe('AWAITING_REVIEW');
+    expect(submitted.body.completedAt).toBeNull();
+    expect(submitted.body.review.submittedAt).not.toBeNull();
+    expect(submitted.body.evidence).toHaveLength(1);
+    expect(submitted.body.notes).toHaveLength(1);
+
+    // Submitted work stays on the worker's list: it can still come back.
+    const waiting = await request(app)
+      .get('/api/v1/tasks?status=AWAITING_REVIEW')
+      .auth(worker.token, { type: 'bearer' });
+    expect(waiting.body.items).toHaveLength(1);
+
+    const approved = await request(app)
+      .post(`/api/v1/tasks/${taskId}/approve`)
+      .auth(manager.token, { type: 'bearer' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe('COMPLETED');
+    expect(approved.body.completedAt).not.toBeNull();
+    expect(approved.body.review.reviewedBy.name).toBe(manager.name);
 
     // The completed task stays visible to its worker.
     const list = await request(app)
@@ -508,6 +524,9 @@ describe('worker completion flow end to end', () => {
     await request(app)
       .post(`/api/v1/tasks/${taskId}/complete`)
       .auth(worker.token, { type: 'bearer' });
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/approve`)
+      .auth(manager.token, { type: 'bearer' });
     const reopened = await request(app)
       .post(`/api/v1/tasks/${taskId}/reopen`)
       .auth(manager.token, { type: 'bearer' });

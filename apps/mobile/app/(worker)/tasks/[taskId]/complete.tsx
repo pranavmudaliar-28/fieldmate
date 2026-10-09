@@ -54,8 +54,8 @@ export default function CompleteTaskScreen() {
       <View style={styles.screen}>
         <Stack.Screen options={{ headerShown: true, title: 'Complete task' }} />
         <EmptyState
-          title="Task completed"
-          message="Your manager has been notified."
+          title="Sent for review"
+          message="Your manager will check the work and either approve it or send it back."
           action={{ label: 'Back to task', onPress: () => router.back() }}
           testID="completion-success"
         />
@@ -105,7 +105,8 @@ export default function CompleteTaskScreen() {
 
         <View style={styles.infoBox}>
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.infoText}>
-            Once completed, you won&apos;t be able to add or delete photos or notes.
+            Once you send this, you won&apos;t be able to add or delete photos or notes until a
+            manager hands it back.
           </Text>
         </View>
 

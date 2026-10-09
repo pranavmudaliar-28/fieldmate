@@ -60,6 +60,22 @@ export function reopenTask(taskId: string): Promise<TaskDetail> {
   return apiRequest<TaskDetail>(`/tasks/${taskId}/reopen`, { method: 'POST' });
 }
 
+/**
+ * One endpoint, two meanings: a worker is handing the job over for review, a
+ * manager is calling it done themselves. The server decides by role, so the
+ * caller only has to know which words to put on the button (docs/02 F-008).
+ */
 export function completeTask(taskId: string): Promise<TaskDetail> {
   return apiRequest<TaskDetail>(`/tasks/${taskId}/complete`, { method: 'POST' });
+}
+
+export function approveTask(taskId: string): Promise<TaskDetail> {
+  return apiRequest<TaskDetail>(`/tasks/${taskId}/approve`, { method: 'POST' });
+}
+
+export function requestChanges(taskId: string, note: string): Promise<TaskDetail> {
+  return apiRequest<TaskDetail>(`/tasks/${taskId}/request-changes`, {
+    method: 'POST',
+    body: { note },
+  });
 }

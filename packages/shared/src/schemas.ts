@@ -88,6 +88,12 @@ export const rejectTaskSchema = z.strictObject({
 });
 export type RejectTaskInput = z.input<typeof rejectTaskSchema>;
 
+/** Handing work back is never silent: the worker has to know what to fix. */
+export const requestChangesSchema = z.strictObject({
+  note: requiredText(FIELD_LIMITS.reviewNote, 'Note'),
+});
+export type RequestChangesInput = z.input<typeof requestChangesSchema>;
+
 export const createNoteSchema = z.strictObject({
   content: requiredText(FIELD_LIMITS.note, 'Note'),
 });

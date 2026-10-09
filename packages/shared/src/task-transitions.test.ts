@@ -19,6 +19,7 @@ describe('task transitions (product spec T1–T7)', () => {
     ['GOING_TO_LOCATION', ['edit', 'reassign', 'cancel']],
     ['REACHED_LOCATION', ['edit', 'reassign', 'cancel']],
     ['IN_PROGRESS', ['edit', 'reassign', 'complete', 'cancel']],
+    ['AWAITING_REVIEW', ['edit', 'reassign', 'approve', 'requestChanges', 'cancel']],
     ['REJECTED', ['edit', 'reassign', 'cancel']],
     ['COMPLETED', ['reopen']],
     ['CANCELLED', []],
@@ -31,7 +32,8 @@ describe('task transitions (product spec T1–T7)', () => {
     ['ACCEPTED', ['depart', 'stepBack', 'reject']],
     ['GOING_TO_LOCATION', ['arrive', 'stepBack', 'reject']],
     ['REACHED_LOCATION', ['start', 'stepBack', 'reject']],
-    ['IN_PROGRESS', ['complete', 'addEvidence', 'deleteEvidence', 'addNote']],
+    ['IN_PROGRESS', ['submitForReview', 'addEvidence', 'deleteEvidence', 'addNote']],
+    ['AWAITING_REVIEW', []],
     ['REJECTED', []],
     ['COMPLETED', []],
     ['CANCELLED', []],
@@ -47,8 +49,27 @@ describe('task transitions (product spec T1–T7)', () => {
     const intoProgress = Object.entries(TASK_ACTIONS).filter(
       ([, rule]) => rule.to === 'IN_PROGRESS',
     );
-    expect(intoProgress.map(([name]) => name)).toEqual(['start']);
+    // Two ways in, and neither is assignment or acceptance: the worker starting
+    // on site, and a manager handing submitted work back to be put right.
+    expect(intoProgress.map(([name]) => name)).toEqual(['start', 'requestChanges']);
     expect(TASK_ACTIONS.start.from).toEqual(['REACHED_LOCATION']);
+    expect(TASK_ACTIONS.requestChanges.from).toEqual(['AWAITING_REVIEW']);
+  });
+
+  it('only a manager completes work, and only a worker submits it', () => {
+    expect(isRoleAllowed('complete', 'MANAGER')).toBe(true);
+    expect(isRoleAllowed('complete', 'FIELD_WORKER')).toBe(false);
+    expect(isRoleAllowed('submitForReview', 'FIELD_WORKER')).toBe(true);
+    expect(isRoleAllowed('submitForReview', 'MANAGER')).toBe(false);
+  });
+
+  it('never lets work reach COMPLETED without a manager', () => {
+    const intoCompleted = Object.entries(TASK_ACTIONS).filter(
+      ([, rule]) => rule.to === 'COMPLETED',
+    );
+    for (const [, rule] of intoCompleted) {
+      expect(rule.roles).not.toContain('FIELD_WORKER');
+    }
   });
 
   it('walks the steps in order', () => {
@@ -122,11 +143,6 @@ describe('task transitions (product spec T1–T7)', () => {
       expect(isRoleAllowed(action, 'MANAGER')).toBe(false);
       expect(isRoleAllowed(action, 'ADMIN')).toBe(false);
     }
-  });
-
-  it('both roles can complete', () => {
-    expect(isRoleAllowed('complete', 'MANAGER')).toBe(true);
-    expect(isRoleAllowed('complete', 'FIELD_WORKER')).toBe(true);
   });
 
   it('every action references valid statuses', () => {

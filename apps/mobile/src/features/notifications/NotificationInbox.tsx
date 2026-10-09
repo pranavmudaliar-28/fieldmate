@@ -26,6 +26,8 @@ const APPEARANCE: Record<NotificationType, { icon: IconName; tone: Tone }> = {
   TASK_REJECTED: { icon: 'close-circle-outline', tone: 'error' },
   TASK_CANCELLED: { icon: 'ban-outline', tone: 'error' },
   TASK_REOPENED: { icon: 'refresh-outline', tone: 'warning' },
+  TASK_AWAITING_REVIEW: { icon: 'hourglass-outline', tone: 'info' },
+  TASK_CHANGES_REQUESTED: { icon: 'arrow-undo-outline', tone: 'warning' },
 };
 
 export type NotificationInboxProps = {

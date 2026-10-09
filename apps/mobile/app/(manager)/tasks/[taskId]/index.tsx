@@ -1,24 +1,36 @@
 import { allowedActions, type TaskDetail, type UserSummary } from '@fieldmate/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionBar } from '../../../../src/components/ActionBar';
 import { AppHeader } from '../../../../src/components/AppHeader';
+import { BottomSheet } from '../../../../src/components/BottomSheet';
 import { Button } from '../../../../src/components/Button';
 import { ConfirmationDialog } from '../../../../src/components/ConfirmationDialog';
 import { Icon } from '../../../../src/components/Icon';
+import { Input } from '../../../../src/components/Input';
 import { OverflowMenu, type OverflowAction } from '../../../../src/components/OverflowMenu';
 import { EmptyState, ErrorState, LoadingState } from '../../../../src/components/States';
 import { useToast } from '../../../../src/components/Toast';
-import { colors, layout, radius, spacing } from '../../../../src/constants/theme';
+import {
+  MAX_FONT_SIZE_MULTIPLIER,
+  colors,
+  layout,
+  radius,
+  spacing,
+  typography,
+} from '../../../../src/constants/theme';
 import { WorkerPicker } from '../../../../src/features/assignments/WorkerPicker';
 import { TaskDetailView } from '../../../../src/features/tasks/TaskDetailView';
-import { useTask, useTaskAction } from '../../../../src/features/tasks/hooks';
+import { useRequestChanges, useTask, useTaskAction } from '../../../../src/features/tasks/hooks';
 import { ApiError } from '../../../../src/services/http';
 
-type PendingAction = 'cancel' | 'reopen' | 'complete' | null;
+type PendingAction = 'cancel' | 'reopen' | 'complete' | 'approve' | null;
 
 const EVIDENCE_HINT = 'At least 1 photo is required to complete this task.';
+
+const messageFor = (error: unknown) =>
+  error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
 
 /** S-005 Task Details for managers, with the actions allowed in each status. */
 export default function ManagerTaskDetails() {
@@ -32,11 +44,15 @@ export default function ManagerTaskDetails() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingWorker, setPendingWorker] = useState<UserSummary | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [changesOpen, setChangesOpen] = useState(false);
+  const [reviewNote, setReviewNote] = useState('');
 
   const cancel = useTaskAction(taskId, 'cancel');
   const reopen = useTaskAction(taskId, 'reopen');
   const complete = useTaskAction(taskId, 'complete');
   const reassign = useTaskAction(taskId, 'reassign');
+  const approve = useTaskAction(taskId, 'approve');
+  const requestChanges = useRequestChanges(taskId);
 
   const run = (mutation: typeof cancel, successMessage: string, workerId?: string) => {
     setActionError(null);
@@ -47,8 +63,7 @@ export default function ManagerTaskDetails() {
         setPendingWorker(null);
       },
       onError: (error) => {
-        const message =
-          error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+        const message = messageFor(error);
         setPending(null);
         setPendingWorker(null);
         setActionError(message);
@@ -97,20 +112,29 @@ export default function ManagerTaskDetails() {
   const detail: TaskDetail = task.data;
   const actions = allowedActions(detail.status, 'MANAGER');
   const canComplete = actions.includes('complete');
+  const canReview = actions.includes('approve');
   const hasEvidence = detail.evidence.length > 0;
-  const busy = cancel.isPending || reopen.isPending || complete.isPending || reassign.isPending;
+  const busy =
+    cancel.isPending ||
+    reopen.isPending ||
+    complete.isPending ||
+    reassign.isPending ||
+    approve.isPending ||
+    requestChanges.isPending;
 
   /**
    * One action in the bar and the rest behind the overflow. Five buttons used
    * to share a single row, and the last of them ran off the screen edge.
    */
-  const primary = canComplete
-    ? 'complete'
-    : actions.includes('reopen')
-      ? 'reopen'
-      : actions.includes('reassign')
-        ? 'reassign'
-        : null;
+  const primary = canReview
+    ? 'approve'
+    : canComplete
+      ? 'complete'
+      : actions.includes('reopen')
+        ? 'reopen'
+        : actions.includes('reassign')
+          ? 'reassign'
+          : null;
 
   const secondary: OverflowAction[] = [];
   if (actions.includes('edit')) {
@@ -174,6 +198,27 @@ export default function ManagerTaskDetails() {
 
       {primary ? (
         <ActionBar hint={canComplete && !hasEvidence ? EVIDENCE_HINT : undefined}>
+          {primary === 'approve' ? (
+            <>
+              <Button
+                label="Approve"
+                icon="checkmark"
+                testID="action-approve"
+                onPress={() => setPending('approve')}
+                disabled={busy}
+                style={styles.reviewAction}
+              />
+              <Button
+                label="Request changes"
+                variant="secondary"
+                icon="arrow-undo-outline"
+                testID="action-request-changes"
+                onPress={() => setChangesOpen(true)}
+                disabled={busy}
+                style={styles.reviewAction}
+              />
+            </>
+          ) : null}
           {primary === 'complete' ? (
             <Button
               label="Complete task"
@@ -221,6 +266,63 @@ export default function ManagerTaskDetails() {
         onConfirm={() => run(complete, 'Task completed')}
         onCancel={() => setPending(null)}
       />
+
+      <ConfirmationDialog
+        visible={pending === 'approve'}
+        title="Approve work"
+        message="Approve this work? The task will be marked complete."
+        confirmLabel="Approve"
+        loading={approve.isPending}
+        onConfirm={() => run(approve, 'Work approved')}
+        onCancel={() => setPending(null)}
+      />
+
+      <BottomSheet
+        visible={changesOpen}
+        title="Request changes"
+        onClose={() => setChangesOpen(false)}
+        testID="request-changes-sheet"
+      >
+        <View style={styles.sheetContent}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetBody}>
+            Tell {detail.assignment.worker.name} what to put right. The task goes back to them as In
+            progress.
+          </Text>
+          <Input
+            label="What needs changing"
+            required
+            testID="review-note"
+            value={reviewNote}
+            onChangeText={setReviewNote}
+            multiline
+            numberOfLines={3}
+            style={styles.noteInput}
+          />
+          <Button
+            label="Send back"
+            icon="arrow-undo-outline"
+            testID="submit-request-changes"
+            loading={requestChanges.isPending}
+            disabled={reviewNote.trim().length === 0}
+            onPress={() => {
+              setActionError(null);
+              requestChanges.mutate(reviewNote.trim(), {
+                onSuccess: () => {
+                  setChangesOpen(false);
+                  setReviewNote('');
+                  showToast('Sent back to the worker');
+                },
+                onError: (error: unknown) => {
+                  setChangesOpen(false);
+                  const message = messageFor(error);
+                  setActionError(message);
+                  showToast(message, 'error');
+                },
+              });
+            }}
+          />
+        </View>
+      </BottomSheet>
 
       <ConfirmationDialog
         visible={pending === 'reopen'}
@@ -280,6 +382,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.md },
   padded: { flex: 1, padding: layout.screenPadding },
+  // Approve and Request changes share the row: a review has two answers.
+  reviewAction: { flex: 1 },
+  sheetContent: { gap: spacing.md },
+  sheetBody: { ...typography.secondary, color: colors.textSecondary },
+  noteInput: { minHeight: 96 },
   overflowButton: {
     width: 44,
     height: 44,

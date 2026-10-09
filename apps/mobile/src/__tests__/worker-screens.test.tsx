@@ -73,6 +73,7 @@ function detail(overrides: Partial<TaskDetail> = {}): TaskDetail {
       rejection: null,
     },
     progress: { acceptedAt: null, departedAt: null, arrivedAt: null, startedAt: null },
+    review: { submittedAt: null, reviewedAt: null, reviewedBy: null, note: null },
     evidence: [],
     notes: [],
     createdAt: '2026-09-16T09:12:00.000Z',
@@ -199,7 +200,9 @@ describe('Task completion (S-010)', () => {
     await waitFor(() => expect(screen.getByTestId('summary-photos')).toHaveTextContent('1'));
     expect(screen.getByTestId('summary-notes')).toHaveTextContent('1');
     expect(
-      screen.getByText("Once completed, you won't be able to add or delete photos or notes."),
+      screen.getByText(
+        /you won't be able to add or delete photos or notes until a manager hands it back/,
+      ),
     ).toBeTruthy();
   });
 
@@ -212,9 +215,9 @@ describe('Task completion (S-010)', () => {
     expect(screen.getByText('At least 1 photo is required to complete this task.')).toBeTruthy();
   });
 
-  it('completes the task and confirms it', async () => {
+  it('hands the work to the manager rather than closing the task', async () => {
     api.fetchTask.mockResolvedValue(detail({ evidence: [photo] }));
-    api.completeTask.mockResolvedValue(detail({ status: 'COMPLETED', evidence: [photo] }));
+    api.completeTask.mockResolvedValue(detail({ status: 'AWAITING_REVIEW', evidence: [photo] }));
     await renderScreen(<CompleteTaskScreen />);
     await waitFor(() => expect(screen.getByTestId('confirm-complete')).toBeEnabled());
 
@@ -222,7 +225,11 @@ describe('Task completion (S-010)', () => {
 
     await waitFor(() => expect(api.completeTask).toHaveBeenCalledWith('task-1'));
     await waitFor(() => expect(screen.getByTestId('completion-success')).toBeTruthy());
-    expect(screen.getByText('Your manager has been notified.')).toBeTruthy();
+    // It is not finished, and the wording must not pretend otherwise.
+    expect(screen.getByText('Sent for review')).toBeTruthy();
+    expect(
+      screen.getByText('Your manager will check the work and either approve it or send it back.'),
+    ).toBeTruthy();
   });
 
   it('shows the server message when completion is refused', async () => {

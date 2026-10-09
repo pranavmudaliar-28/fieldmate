@@ -15,6 +15,7 @@ import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
   layout,
+  radius,
   spacing,
   toneColors,
   typography,
@@ -213,10 +214,20 @@ export default function WorkerTaskDetails() {
           </View>
         ) : null}
 
+        {detail.status === 'AWAITING_REVIEW' ? (
+          <View style={styles.reviewBanner} testID="awaiting-review-banner">
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.reviewText}>
+              Sent for review{' '}
+              {detail.review.submittedAt ? formatDateTime(detail.review.submittedAt) : ''}. Your
+              manager will approve it or send it back.
+            </Text>
+          </View>
+        ) : null}
+
         {detail.status === 'COMPLETED' ? (
           <View style={styles.completedBanner} testID="completed-banner">
             <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.completedText}>
-              You completed this task on {formatDateTime(detail.completedAt ?? detail.updatedAt)}.
+              Approved on {formatDateTime(detail.completedAt ?? detail.updatedAt)}.
             </Text>
           </View>
         ) : null}
@@ -257,7 +268,7 @@ export default function WorkerTaskDetails() {
             />
           ) : null}
 
-          {actions.includes('complete') ? (
+          {actions.includes('submitForReview') ? (
             <Button
               label="Complete task"
               testID="action-complete"
@@ -365,6 +376,12 @@ const styles = StyleSheet.create({
   action: { flex: 1 },
   sheetContent: { gap: spacing.md, paddingBottom: spacing.md },
   sheetBody: { ...typography.body, color: colors.textSecondary },
+  reviewBanner: {
+    padding: spacing.md,
+    borderRadius: radius.card,
+    backgroundColor: toneColors.info.tint,
+  },
+  reviewText: { ...typography.body, color: toneColors.info.text },
   completedBanner: {
     backgroundColor: toneColors.success.tint,
     padding: spacing.md,

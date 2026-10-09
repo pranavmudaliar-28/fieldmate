@@ -48,6 +48,7 @@ function buildTask(overrides: Partial<TaskDetail> = {}): TaskDetail {
       rejection: null,
     },
     progress: { acceptedAt: null, departedAt: null, arrivedAt: null, startedAt: null },
+    review: { submittedAt: null, reviewedAt: null, reviewedBy: null, note: null },
     evidence: [],
     notes: [],
     createdAt: '2026-09-16T09:12:00.000Z',

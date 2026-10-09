@@ -3,6 +3,7 @@ import type {
   ListTasksQuery,
   ReassignTaskInput,
   RejectTaskInput,
+  RequestChangesInput,
   UpdateTaskInput,
   WorkerStep,
 } from '@fieldmate/shared';
@@ -64,6 +65,15 @@ export function createTaskController(service: TaskService) {
     res.json(await service.complete(actor(req), taskId(req)));
   };
 
+  const approve: RequestHandler = async (req, res) => {
+    res.json(await service.approve(actor(req), taskId(req)));
+  };
+
+  const requestChanges: RequestHandler = async (req, res) => {
+    const { note } = validated<RequestChangesInput>(req);
+    res.json(await service.requestChanges(actor(req), taskId(req), note));
+  };
+
   /** One handler per forward step; the step itself decides the new status. */
   const step = (name: WorkerStep): RequestHandler => {
     return async (req, res) => {
@@ -91,6 +101,8 @@ export function createTaskController(service: TaskService) {
     cancel,
     reopen,
     complete,
+    approve,
+    requestChanges,
     accept: step('accept'),
     depart: step('depart'),
     arrive: step('arrive'),

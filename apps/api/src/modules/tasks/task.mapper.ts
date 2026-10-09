@@ -65,6 +65,15 @@ export async function toTaskDetail(
       arrivedAt: task.arrivedAt?.toISOString() ?? null,
       startedAt: task.startedAt?.toISOString() ?? null,
     },
+    review: {
+      submittedAt: task.submittedAt?.toISOString() ?? null,
+      reviewedAt: task.reviewedAt?.toISOString() ?? null,
+      reviewedBy:
+        task.reviewedById && task.reviewedByName
+          ? { id: task.reviewedById, name: task.reviewedByName }
+          : null,
+      note: task.reviewNote,
+    },
     evidence,
     notes: rows.notes.map((note) => ({
       id: note.id,

@@ -4,6 +4,7 @@ import {
   listTasksQuerySchema,
   reassignTaskSchema,
   rejectTaskSchema,
+  requestChangesSchema,
   updateTaskSchema,
 } from '@fieldmate/shared';
 import { Router, type RequestHandler } from 'express';
@@ -88,6 +89,22 @@ export function createTaskRouter(deps: {
     controller.reopen,
   );
   router.post('/:taskId/complete', withTaskId, controller.complete);
+
+  // The review. Work a worker submits waits here until a manager accepts it or
+  // hands it back with a note saying what to put right (docs/02 F-008).
+  router.post(
+    '/:taskId/approve',
+    requireRole(...TASK_MANAGING_ROLES),
+    withTaskId,
+    controller.approve,
+  );
+  router.post(
+    '/:taskId/request-changes',
+    requireRole(...TASK_MANAGING_ROLES),
+    withTaskId,
+    validate(requestChangesSchema),
+    controller.requestChanges,
+  );
 
   // The worker's lifecycle, one endpoint per step. A task only becomes
   // IN_PROGRESS through /start, which needs the worker to have arrived first.

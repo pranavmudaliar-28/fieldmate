@@ -68,6 +68,8 @@ export type TaskDetail = {
   };
   /** When each step of the worker's lifecycle happened; null until it does. */
   progress: TaskProgress;
+  /** The manager's look at finished work (docs/02 F-008). */
+  review: TaskReview;
   /** Oldest first. */
   evidence: Evidence[];
   /** Oldest first. */
@@ -84,6 +86,18 @@ export type TaskProgress = {
   arrivedAt: string | null;
   /** When work actually began on site — the start of "time on site". */
   startedAt: string | null;
+};
+
+/**
+ * Null throughout until a worker submits. `note` is the reason the last
+ * review handed the work back, and outlives that review so the worker can
+ * still read what was asked while they put it right.
+ */
+export type TaskReview = {
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: UserSummary | null;
+  note: string | null;
 };
 
 export type Paginated<T> = { items: T[]; nextCursor: string | null };
