@@ -149,6 +149,8 @@ export function createTaskRepository(db: Database) {
         id: tasks.id,
         status: tasks.status,
         completedAt: tasks.completedAt,
+        /** The manager who assigned it, and so the one a rejection goes to. */
+        createdBy: tasks.createdBy,
         assignmentId: taskAssignments.id,
         workerId: taskAssignments.workerId,
       })

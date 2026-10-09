@@ -47,6 +47,21 @@ export const MAX_EVIDENCE_BYTES = 10 * 1024 * 1024;
 export const PUSH_PLATFORMS = ['ios', 'android'] as const;
 export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
 
+/**
+ * Every event a user is told about. The three original push triggers, plus the
+ * three that only ever reached a manager or worker by them re-reading the list
+ * (docs/02 F-009).
+ */
+export const NOTIFICATION_TYPES = [
+  'TASK_ASSIGNED',
+  'TASK_UPDATED',
+  'TASK_COMPLETED',
+  'TASK_REJECTED',
+  'TASK_CANCELLED',
+  'TASK_REOPENED',
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
 export const FIELD_LIMITS = {
   userName: 100,
   email: 254,
@@ -59,6 +74,8 @@ export const FIELD_LIMITS = {
   rejectionReason: 1000,
   note: 5000,
   pushToken: 255,
+  notificationTitle: 100,
+  notificationBody: 200,
 } as const;
 
 export const PAGINATION = {

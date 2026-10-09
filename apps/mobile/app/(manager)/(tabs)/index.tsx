@@ -21,6 +21,7 @@ import {
 import { useAuth } from '../../../src/features/auth/auth-context';
 import { NotificationPrompt } from '../../../src/features/notifications/NotificationPrompt';
 import { TASK_PAGE_LIMIT, isCapped } from '../../../src/features/tasks/constants';
+import { InboxBell } from '../../../src/features/notifications/InboxBell';
 import { useTaskList } from '../../../src/features/tasks/hooks';
 import { formatDayHeading } from '../../../src/utils/format';
 
@@ -57,7 +58,12 @@ export default function ManagerDashboard() {
         size="large"
         eyebrow={formatDayHeading()}
         title={`Hello, ${user?.name.split(' ')[0] ?? 'there'}`}
-        right={<Avatar name={user?.name ?? ''} variant="ink" />}
+        right={
+          <View style={styles.headerActions}>
+            <InboxBell href="/(manager)/notifications" />
+            <Avatar name={user?.name ?? ''} variant="ink" />
+          </View>
+        }
       />
 
       <ScrollView
@@ -225,6 +231,7 @@ function NeedsAttentionCard({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   content: { padding: layout.screenPadding, gap: spacing.lg, paddingTop: spacing.sm },
   section: { gap: spacing.smPlus },
   stats: { flexDirection: 'row', gap: spacing.smPlus },

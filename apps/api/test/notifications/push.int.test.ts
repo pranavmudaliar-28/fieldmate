@@ -238,33 +238,62 @@ describe('push triggers', () => {
     expect(testPush.sent[0]?.userIds).toEqual([otherManager.id]);
   });
 
-  it.each([
-    [
-      'cancel',
-      async (taskId: string) =>
-        request(app).post(`/api/v1/tasks/${taskId}/cancel`).auth(manager.token, { type: 'bearer' }),
-    ],
-    [
-      'start',
-      async (taskId: string) =>
-        request(app).post(`/api/v1/tasks/${taskId}/start`).auth(worker.token, { type: 'bearer' }),
-    ],
-    [
-      'reject',
-      async (taskId: string) =>
-        request(app)
-          .post(`/api/v1/tasks/${taskId}/reject`)
-          .auth(worker.token, { type: 'bearer' })
-          .send({ reason: 'No access' }),
-    ],
-  ])('sends no push for %s', async (_action, run) => {
+  it('sends no push for an action the lifecycle refuses', async () => {
     const taskId = await createTask();
     testPush.reset();
 
-    await run(taskId);
+    // Starting straight from ASSIGNED is a 409, so nothing happened to report.
+    await request(app).post(`/api/v1/tasks/${taskId}/start`).auth(worker.token, { type: 'bearer' });
     await settle();
 
     expect(testPush.sent).toHaveLength(0);
+  });
+
+  it('tells the worker when their task is cancelled', async () => {
+    const taskId = await createTask();
+    testPush.reset();
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/cancel`)
+      .auth(manager.token, { type: 'bearer' });
+    await settle();
+
+    expect(testPush.sent).toHaveLength(1);
+    expect(testPush.sent[0]?.userIds).toEqual([worker.id]);
+    expect(testPush.sent[0]?.message.type).toBe('TASK_CANCELLED');
+  });
+
+  it('tells the worker when their task is reopened', async () => {
+    const taskId = await createTask();
+    await forceStatus(taskId, 'COMPLETED');
+    testPush.reset();
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/reopen`)
+      .auth(manager.token, { type: 'bearer' });
+    await settle();
+
+    expect(testPush.sent).toHaveLength(1);
+    expect(testPush.sent[0]?.userIds).toEqual([worker.id]);
+    expect(testPush.sent[0]?.message.type).toBe('TASK_REOPENED');
+  });
+
+  it('tells the manager who assigned it when a worker rejects', async () => {
+    const taskId = await createTask();
+    testPush.reset();
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/reject`)
+      .auth(worker.token, { type: 'bearer' })
+      .send({ reason: 'No access' });
+    await settle();
+
+    // The assigning manager, not every manager: they are the one who reassigns,
+    // and the worker can no longer see the task to tell them.
+    expect(testPush.sent).toHaveLength(1);
+    expect(testPush.sent[0]?.userIds).toEqual([manager.id]);
+    expect(testPush.sent[0]?.message.type).toBe('TASK_REJECTED');
+    expect(testPush.sent[0]?.userIds).not.toContain(otherManager.id);
   });
 
   it('a failing push never fails the action that triggered it', async () => {

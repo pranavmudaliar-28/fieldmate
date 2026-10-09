@@ -13,12 +13,8 @@ import {
   type UserSummary,
   type WorkerStep,
 } from '@fieldmate/shared';
-import type { Logger } from '../../config/logger.js';
-import {
-  pushMessages,
-  type PushMessage,
-  type PushService,
-} from '../../services/push/push.service.js';
+import { pushMessages, type PushMessage } from '../../services/push/push.service.js';
+import type { Notifier } from '../../services/push/notifier.js';
 import type { StorageService } from '../../services/storage/storage.service.js';
 import type { DeviceTokenRepository } from '../users/device-token.repository.js';
 import { AppError } from '../../utils/app-error.js';
@@ -52,22 +48,18 @@ const STATUS_STAMPS = {
 export function createTaskService(deps: {
   repository: TaskRepository;
   storage: StorageService;
-  push: PushService;
+  notifier: Notifier;
   tokens: DeviceTokenRepository;
-  logger: Logger;
 }) {
-  const { repository, storage, push, tokens, logger } = deps;
+  const { repository, storage, notifier, tokens } = deps;
 
   /**
    * Pushes are sent after the change is committed and never block the response:
    * a delivery problem must not fail the action that triggered it (docs/05 §10).
    */
-  function notify(userIds: string[], message: PushMessage): void {
-    void push
-      .send(userIds, message)
-      .catch((error: unknown) =>
-        logger.warn({ err: error, type: message.type }, 'Failed to send push notification'),
-      );
+  /** Push and inbox together, after the commit — see createNotifier. */
+  function notify(userIds: string[], taskId: string, message: PushMessage): void {
+    notifier.notify(userIds, taskId, message);
   }
 
   /** Loads the task fresh so responses always reflect the committed state. */
@@ -157,7 +149,7 @@ export function createTaskService(deps: {
       });
 
       const task = await detail(taskId);
-      notify([input.workerId], pushMessages.taskAssigned(taskId, task.title));
+      notify([input.workerId], taskId, pushMessages.taskAssigned(taskId, task.title));
       return task;
     },
 
@@ -211,7 +203,7 @@ export function createTaskService(deps: {
       // Only a real change is worth a push, and a rejected task is no longer
       // visible to its worker, so it is skipped (docs/05 §10).
       if (changed && task.status !== 'REJECTED') {
-        notify([task.assignment.worker.id], pushMessages.taskUpdated(taskId, task.title));
+        notify([task.assignment.worker.id], taskId, pushMessages.taskUpdated(taskId, task.title));
       }
       return task;
     },
@@ -240,7 +232,7 @@ export function createTaskService(deps: {
       if (result === undefined) throw taskNotFound();
 
       const task = await detail(taskId);
-      notify([workerId], pushMessages.taskAssigned(taskId, task.title));
+      notify([workerId], taskId, pushMessages.taskAssigned(taskId, task.title));
       return task;
     },
 
@@ -262,7 +254,7 @@ export function createTaskService(deps: {
 
       const task = await detail(taskId);
       // The manager follows the journey, so each step is worth a push.
-      notify([task.assignment.worker.id], pushMessages.taskUpdated(taskId, task.title));
+      notify([task.assignment.worker.id], taskId, pushMessages.taskUpdated(taskId, task.title));
       return task;
     },
 
@@ -293,10 +285,15 @@ export function createTaskService(deps: {
         assertCanPerform('reject', actor, { status: task.status, currentWorkerId: task.workerId });
         await repository.recordRejection(tx, task.assignmentId, reason);
         await repository.setStatus(tx, taskId, 'REJECTED', null);
-        return true;
+        return task.createdBy;
       });
 
       if (result === undefined) throw taskNotFound();
+
+      // To the manager who assigned it: they are the one who has to reassign,
+      // and the worker can no longer see the task to tell them (docs/05 §7.13).
+      const task = await detail(taskId);
+      notify([result], taskId, pushMessages.taskRejected(taskId, task.title, actor.name));
     },
 
     async cancel(actor: Actor, taskId: string): Promise<TaskDetail> {
@@ -307,7 +304,11 @@ export function createTaskService(deps: {
       });
 
       if (result === undefined) throw taskNotFound();
-      return detail(taskId);
+
+      // The worker may be on their way to a job that is now off.
+      const task = await detail(taskId);
+      notify([task.assignment.worker.id], taskId, pushMessages.taskCancelled(taskId, task.title));
+      return task;
     },
 
     async reopen(actor: Actor, taskId: string): Promise<TaskDetail> {
@@ -319,7 +320,11 @@ export function createTaskService(deps: {
       });
 
       if (result === undefined) throw taskNotFound();
-      return detail(taskId);
+
+      // It lands back on the same worker, who has to start over.
+      const task = await detail(taskId);
+      notify([task.assignment.worker.id], taskId, pushMessages.taskReopened(taskId, task.title));
+      return task;
     },
 
     /**
@@ -350,7 +355,7 @@ export function createTaskService(deps: {
       const task = await detail(taskId);
       // Everyone who manages the work hears about it, except whoever did it.
       const managerIds = (await tokens.listManagerIds()).filter((id) => id !== actor.id);
-      notify(managerIds, pushMessages.taskCompleted(taskId, task.title, actor.name));
+      notify(managerIds, taskId, pushMessages.taskCompleted(taskId, task.title, actor.name));
       return task;
     },
   };

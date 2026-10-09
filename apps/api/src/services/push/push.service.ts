@@ -18,7 +18,7 @@ function shorten(text: string): string {
   return text.length <= MAX_BODY_LENGTH ? text : `${text.slice(0, MAX_BODY_LENGTH - 1)}…`;
 }
 
-/** The three approved triggers (docs/05 §10). */
+/** Every event a user is told about (docs/02 F-009). */
 export const pushMessages = {
   taskAssigned: (taskId: string, taskTitle: string): PushMessage => ({
     type: 'TASK_ASSIGNED',
@@ -39,5 +39,29 @@ export const pushMessages = {
     taskId,
     title: 'Task completed',
     body: shorten(`${taskTitle} · by ${completedBy}`),
+  }),
+
+  /** To the manager who assigned it: they are the one who has to reassign. */
+  taskRejected: (taskId: string, taskTitle: string, rejectedBy: string): PushMessage => ({
+    type: 'TASK_REJECTED',
+    taskId,
+    title: 'Task rejected',
+    body: shorten(`${taskTitle} · by ${rejectedBy}`),
+  }),
+
+  /** To the worker holding it, so they stop travelling to a job that is off. */
+  taskCancelled: (taskId: string, taskTitle: string): PushMessage => ({
+    type: 'TASK_CANCELLED',
+    taskId,
+    title: 'Task cancelled',
+    body: shorten(taskTitle),
+  }),
+
+  /** To the worker it lands back on. */
+  taskReopened: (taskId: string, taskTitle: string): PushMessage => ({
+    type: 'TASK_REOPENED',
+    taskId,
+    title: 'Task reopened',
+    body: shorten(taskTitle),
   }),
 };

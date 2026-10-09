@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../../src/components/Button';
 import { Card } from '../../../src/components/Card';
 import { DashboardHeader } from '../../../src/components/DashboardHeader';
+import { InboxBell } from '../../../src/features/notifications/InboxBell';
 import { Input } from '../../../src/components/Input';
 import { EmptyState, ErrorState, LoadingState } from '../../../src/components/States';
 import {
@@ -50,7 +51,7 @@ export default function UsersScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      <DashboardHeader />
+      <DashboardHeader right={<InboxBell href="/(admin)/notifications" />} />
 
       <View style={styles.controls}>
         <Input

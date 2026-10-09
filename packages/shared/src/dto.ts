@@ -1,4 +1,4 @@
-import type { EvidenceMimeType, Role, TaskStatus } from './constants.js';
+import type { EvidenceMimeType, NotificationType, Role, TaskStatus } from './constants.js';
 
 export type UserSummary = { id: string; name: string };
 
@@ -90,6 +90,21 @@ export type Paginated<T> = { items: T[]; nextCursor: string | null };
 
 export type ListResponse<T> = { items: T[] };
 
-export type PushNotificationType = 'TASK_ASSIGNED' | 'TASK_UPDATED' | 'TASK_COMPLETED';
+/** A push and an inbox row describe the same event, so they share one list. */
+export type PushNotificationType = NotificationType;
 
 export type PushNotificationData = { type: PushNotificationType; taskId: string };
+
+/** One row in the inbox: what happened, to which task, and whether it was read. */
+export type Notification = {
+  id: string;
+  type: NotificationType;
+  taskId: string;
+  title: string;
+  body: string;
+  /** Null until the user opens it. */
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type UnreadCount = { unread: number };

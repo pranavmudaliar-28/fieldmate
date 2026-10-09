@@ -1,4 +1,5 @@
 import type { Role } from '@fieldmate/shared';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { MAX_FONT_SIZE_MULTIPLIER, colors, layout, spacing, typography } from '../constants/theme';
 import { LogoutButton } from '../features/auth/LogoutButton';
@@ -11,7 +12,7 @@ const ROLE_LABELS: Record<Role, string> = {
 };
 
 /** Dashboard chrome: app name and role on the left, log out on the right. */
-export function DashboardHeader() {
+export function DashboardHeader({ right }: { right?: ReactNode }) {
   const { user } = useAuth();
 
   return (
@@ -30,6 +31,7 @@ export function DashboardHeader() {
           </Text>
         ) : null}
       </View>
+      {right}
       <LogoutButton />
     </View>
   );

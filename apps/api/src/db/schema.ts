@@ -1,4 +1,4 @@
-import { ROLES, TASK_STATUSES } from '@fieldmate/shared';
+import { NOTIFICATION_TYPES, ROLES, TASK_STATUSES } from '@fieldmate/shared';
 import { sql } from 'drizzle-orm';
 import {
   boolean,
@@ -22,6 +22,7 @@ const pk = () => uuid('id').primaryKey().defaultRandom();
 
 export const userRole = pgEnum('user_role', ROLES);
 export const taskStatus = pgEnum('task_status', TASK_STATUSES);
+export const notificationType = pgEnum('notification_type', NOTIFICATION_TYPES);
 
 export const users = pgTable(
   'users',
@@ -195,6 +196,39 @@ export const devicePushTokens = pgTable(
   ],
 );
 
+/**
+ * The in-app inbox (docs/02 F-009). A row is written whenever a user is told
+ * something, whether or not a push reaches the device: pushes are best-effort,
+ * and a worker who declined the permission would otherwise never learn that a
+ * task was cancelled.
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: pk(),
+    // Cascades: a notification is not history, so it must never be the reason
+    // a user cannot be deleted (that guard belongs to tasks, docs/07 §2).
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    type: notificationType('type').notNull(),
+    title: varchar('title', { length: 100 }).notNull(),
+    body: varchar('body', { length: 200 }).notNull(),
+    /** Null until the user opens it. */
+    readAt: ts('read_at'),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('notifications_user_created_idx').on(t.userId, t.createdAt.desc(), t.id.desc()),
+    index('notifications_unread_idx')
+      .on(t.userId)
+      .where(sql`${t.readAt} IS NULL`),
+  ],
+);
+
 export const schema = {
   users,
   tasks,
@@ -203,6 +237,7 @@ export const schema = {
   taskEvidence,
   taskNotes,
   devicePushTokens,
+  notifications,
 };
 
 export type UserRow = typeof users.$inferSelect;

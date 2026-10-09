@@ -118,6 +118,18 @@ export const listTasksQuerySchema = z.strictObject({
 });
 export type ListTasksQuery = z.output<typeof listTasksQuerySchema>;
 
+/** The inbox is always the caller's own, so it takes paging and nothing else. */
+export const listNotificationsQuerySchema = z.strictObject({
+  limit: z.coerce
+    .number('Limit must be a number.')
+    .int('Limit must be a whole number.')
+    .min(1, `Limit must be between 1 and ${PAGINATION.maxLimit}.`)
+    .max(PAGINATION.maxLimit, `Limit must be between 1 and ${PAGINATION.maxLimit}.`)
+    .default(PAGINATION.defaultLimit),
+  cursor: z.string().max(200).optional(),
+});
+export type ListNotificationsQuery = z.output<typeof listNotificationsQuerySchema>;
+
 export const listUsersQuerySchema = z.strictObject({
   role: z.literal('FIELD_WORKER', 'Role must be FIELD_WORKER.'),
 });

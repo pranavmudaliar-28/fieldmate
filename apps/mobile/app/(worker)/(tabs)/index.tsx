@@ -25,6 +25,7 @@ import {
 } from '../../../src/constants/theme';
 import { useAuth } from '../../../src/features/auth/auth-context';
 import { NotificationPrompt } from '../../../src/features/notifications/NotificationPrompt';
+import { InboxBell } from '../../../src/features/notifications/InboxBell';
 import { useTaskList } from '../../../src/features/tasks/hooks';
 import { formatDayHeading, formatRelativeTime } from '../../../src/utils/format';
 
@@ -80,7 +81,12 @@ export default function WorkerDashboard() {
         size="large"
         eyebrow={formatDayHeading()}
         title={`Hello, ${user?.name.split(' ')[0] ?? 'there'}`}
-        right={<Avatar name={user?.name ?? ''} variant="accent" />}
+        right={
+          <View style={styles.headerActions}>
+            <InboxBell href="/(worker)/notifications" />
+            <Avatar name={user?.name ?? ''} variant="accent" />
+          </View>
+        }
       />
 
       <ScrollView
@@ -191,6 +197,7 @@ function CurrentJobCard({ task }: { task: TaskListItem }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   content: { padding: layout.screenPadding, gap: spacing.lg, paddingTop: spacing.sm },
   section: { gap: spacing.smPlus },
   hero: { padding: spacing.mdPlus, gap: spacing.md },

@@ -20,6 +20,8 @@ import { requireRole } from '../../middleware/require-role.js';
 import { validate } from '../../middleware/validate.js';
 import type { StorageService } from '../../services/storage/storage.service.js';
 import { createTaskController } from './task.controller.js';
+import { createNotificationRepository } from '../notifications/notification.repository.js';
+import { createNotifier } from '../../services/push/notifier.js';
 import { createTaskRepository } from './task.repository.js';
 import { createTaskService } from './task.service.js';
 
@@ -37,9 +39,12 @@ export function createTaskRouter(deps: {
     createTaskService({
       repository,
       storage: deps.storage,
-      push: deps.push,
+      notifier: createNotifier({
+        push: deps.push,
+        notifications: createNotificationRepository(deps.db),
+        logger: deps.logger,
+      }),
       tokens: createDeviceTokenRepository(deps.db),
-      logger: deps.logger,
     }),
   );
 
