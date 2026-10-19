@@ -53,6 +53,8 @@ export type ButtonProps = {
   /** Explains to screen readers why the button is disabled. */
   disabledReason?: string;
   fullWidth?: boolean;
+  /** The 60dp size of the worker's next step; on by default for a large signal button. */
+  prominent?: boolean;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -68,6 +70,7 @@ export function Button({
   disabled = false,
   disabledReason,
   fullWidth = true,
+  prominent: prominentProp,
   testID,
   style,
 }: ButtonProps) {
@@ -84,6 +87,7 @@ export function Button({
 
   const appearance = variantStyles[variant];
   const isGhost = variant === 'ghost' || variant === 'destructiveGhost';
+  const prominent = prominentProp ?? (variant === 'signal' && size === 'lg');
   const iconSize = size === 'lg' ? 20 : 18;
   const disabledColor = isGhost ? colors.textDisabled : colors.onDisabledFill;
   const iconColor = disabled ? disabledColor : appearance.label.color;
@@ -106,7 +110,7 @@ export function Button({
           styles.base,
           size === 'lg' ? styles.large : styles.medium,
           appearance.container,
-          variant === 'signal' && size === 'lg' && styles.signalLarge,
+          prominent && styles.prominent,
           pressed && !isInactive && appearance.pressed,
           disabled && !isGhost && styles.disabled,
         ]}
@@ -153,7 +157,7 @@ const styles = StyleSheet.create({
   /** A label that has to wrap, in a half-width button or at a large text size, stays centred. */
   label: { textAlign: 'center', flexShrink: 1 },
   /** The worker's next step is the one thing on the screen, so it is a size up. */
-  signalLarge: { minHeight: 60, borderRadius: 16 },
+  prominent: { minHeight: 60, borderRadius: 16 },
   signalLabel: { fontSize: 18, lineHeight: 22, fontFamily: fontFamily.bold },
   disabled: { backgroundColor: colors.border, borderColor: colors.border },
   disabledLabel: { textDecorationLine: 'none' },

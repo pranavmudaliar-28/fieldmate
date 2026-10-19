@@ -9,6 +9,12 @@ import * as tasksApi from '../features/tasks/api';
 import { apiRequest } from '../services/http';
 
 jest.mock('../features/tasks/api');
+// The map is a web view; a stand-in keeps the location card renderable here.
+jest.mock('../features/location/MapPicker', () => {
+  const { View } = jest.requireActual('react-native');
+  const stub = ({ testID }: { testID?: string }) => <View testID={testID} />;
+  return { MapPreview: stub, MapPickerModal: stub };
+});
 jest.mock('../services/http', () => ({
   ...jest.requireActual('../services/http'),
   apiRequest: jest.fn(),
@@ -146,6 +152,24 @@ describe('Worker task details (S-008)', () => {
     await waitFor(() =>
       expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/step-back', { method: 'POST' }),
     );
+  });
+
+  it('shows a map of the site only when the task has a pin', async () => {
+    await renderDetails(buildTask());
+    expect(screen.queryByTestId('location-map')).toBeNull();
+    expect(screen.getByTestId('open-in-maps')).toBeTruthy();
+
+    await renderDetails(
+      buildTask({
+        location: {
+          address: '14 Harbour Rd',
+          addressDetails: null,
+          latitude: 18.5204,
+          longitude: 73.8567,
+        },
+      }),
+    );
+    expect(screen.getByTestId('location-map')).toBeTruthy();
   });
 
   it('shows how far the job has got', async () => {

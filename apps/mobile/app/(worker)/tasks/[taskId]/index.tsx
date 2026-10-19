@@ -348,6 +348,7 @@ export default function WorkerTaskDetails() {
             <Button
               label="Reject"
               variant="destructiveOutline"
+              prominent
               testID="action-reject"
               onPress={() => setRejectOpen(true)}
               disabled={busy}

@@ -7,6 +7,12 @@ import { OfflineQueueProvider } from '../features/offline/offline-queue';
 import * as tasksApi from '../features/tasks/api';
 
 jest.mock('../features/tasks/api');
+// The map is a web view; a stand-in keeps the location card renderable here.
+jest.mock('../features/location/MapPicker', () => {
+  const { View } = jest.requireActual('react-native');
+  const stub = ({ testID }: { testID?: string }) => <View testID={testID} />;
+  return { MapPreview: stub, MapPickerModal: stub };
+});
 
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 jest.mock('expo-router', () => ({

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import { MapPreview } from '../location/MapPicker';
 import { Icon } from '../../components/Icon';
 import { PhotoGrid } from '../../components/PhotoGrid';
 import { StatusBadge } from '../../components/StatusBadge';
@@ -282,9 +283,17 @@ function LocationCard({ task }: { task: TaskDetail }) {
   const hasPin = task.location.latitude !== null && task.location.longitude !== null;
 
   return (
-    <Card flat style={styles.location}>
+    <Card flat bleed style={styles.location}>
+      {hasPin ? (
+        <MapPreview
+          latitude={task.location.latitude as number}
+          longitude={task.location.longitude as number}
+          height={110}
+          style={styles.locationMap}
+          testID="location-map"
+        />
+      ) : null}
       <View style={styles.locationRow}>
-        <Icon name="location-outline" size={22} color={colors.textPrimary} />
         <View style={styles.locationText}>
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.address}>
             {task.location.address}
@@ -299,26 +308,26 @@ function LocationCard({ task }: { task: TaskDetail }) {
             </Text>
           ) : null}
         </View>
+        <Button
+          label="Open in Maps"
+          variant="secondary"
+          size="md"
+          fullWidth={false}
+          trailingIcon="open-outline"
+          testID="open-in-maps"
+          onPress={() =>
+            openInMaps(
+              task.location.address,
+              hasPin
+                ? {
+                    latitude: task.location.latitude as number,
+                    longitude: task.location.longitude as number,
+                  }
+                : null,
+            )
+          }
+        />
       </View>
-      <Button
-        label="Open in Maps"
-        icon="open-outline"
-        variant="secondary"
-        size="md"
-        fullWidth={false}
-        testID="open-in-maps"
-        onPress={() =>
-          openInMaps(
-            task.location.address,
-            hasPin
-              ? {
-                  latitude: task.location.latitude as number,
-                  longitude: task.location.longitude as number,
-                }
-              : null,
-          )
-        }
-      />
     </Card>
   );
 }
@@ -401,10 +410,18 @@ const styles = StyleSheet.create({
   reviewNote: { backgroundColor: colors.warningTint, borderColor: toneColors.warning.dot },
   reviewNoteTitle: { ...typography.secondaryStrong, color: toneColors.warning.text, flex: 1 },
   reviewNoteBody: { ...typography.body, color: colors.textPrimary },
-  location: { gap: spacing.md, padding: spacing.mdPlus },
-  locationRow: { flexDirection: 'row', gap: spacing.smPlus },
+  location: { gap: 0 },
+  /** Square at the bottom: the address row sits directly under it. */
+  locationMap: { borderRadius: 0 },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+  },
   locationText: { flex: 1, gap: 2 },
-  address: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary },
+  address: { ...typography.bodyStrong, color: colors.textPrimary },
   addressDetails: { ...typography.secondary, color: colors.textSecondary },
   section: { gap: spacing.smPlus },
   sectionHead: {

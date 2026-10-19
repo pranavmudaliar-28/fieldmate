@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { Button } from '../../components/Button';
@@ -36,14 +44,43 @@ export function MapPreview({
   onPress,
   height = 168,
   testID,
+  style,
 }: {
   latitude: number;
   longitude: number;
-  onPress: () => void;
+  /** Without it the map is only a picture, for showing where a task is. */
+  onPress?: () => void;
   height?: number;
   testID?: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   const html = staticMapHtml(latitude, longitude);
+
+  const map = (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <WebView
+        key={`${latitude},${longitude}`}
+        originWhitelist={['*']}
+        source={{ html }}
+        style={styles.web}
+        javaScriptEnabled
+        scrollEnabled={false}
+      />
+    </View>
+  );
+
+  if (!onPress) {
+    return (
+      <View
+        testID={testID}
+        style={[styles.preview, { height }, style]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {map}
+      </View>
+    );
+  }
 
   return (
     <Pressable
@@ -51,19 +88,10 @@ export function MapPreview({
       accessibilityRole="button"
       accessibilityLabel="Adjust the pin on a map"
       testID={testID}
-      style={[styles.preview, { height }]}
+      style={[styles.preview, { height }, style]}
     >
       {/* The map takes no touches at all, so a drag here scrolls the form. */}
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <WebView
-          key={`${latitude},${longitude}`}
-          originWhitelist={['*']}
-          source={{ html }}
-          style={styles.web}
-          javaScriptEnabled
-          scrollEnabled={false}
-        />
-      </View>
+      {map}
 
       <View style={styles.previewBadge} pointerEvents="none">
         <Icon name="move-outline" size={15} color={colors.textOnInverse} />
