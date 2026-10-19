@@ -80,6 +80,7 @@ describe('TaskForm (S-004)', () => {
 
     await waitFor(() => expect(screen.getByTestId(`worker-option-${WORKER_2}`)).toBeTruthy());
     await user.press(screen.getByTestId(`worker-option-${WORKER_2}`));
+    await user.press(screen.getByTestId('worker-picker-confirm'));
     await user.press(screen.getByTestId('task-submit'));
 
     await waitFor(() =>
@@ -142,6 +143,7 @@ describe('TaskForm (S-004)', () => {
     await user.press(screen.getByTestId('task-worker-select'));
     await waitFor(() => expect(screen.getByTestId(`worker-option-${WORKER_1}`)).toBeTruthy());
     await user.press(screen.getByTestId(`worker-option-${WORKER_1}`));
+    await user.press(screen.getByTestId('worker-picker-confirm'));
     await user.press(screen.getByTestId('task-submit'));
 
     await waitFor(() =>

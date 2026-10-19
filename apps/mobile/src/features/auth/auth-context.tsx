@@ -32,9 +32,16 @@ export type AuthContextValue = AuthState & {
   clearSessionExpired: () => void;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+/**
+ * The launch screen waits on the session check, and a server that never
+ * answers (a dev machine whose LAN address changed, a captive Wi-Fi) would
+ * hold it there for good. Past this, the check counts as offline: the stored
+ * token is kept and the user gets the retry screen.
+ */
+export const BOOTSTRAP_TIMEOUT_MS = 15_000;
+const BOOTSTRAP_TIMEOUT_MESSAGE = 'The server took too long to answer. Check your connection.';
 
-const SESSION_EXPIRED_MESSAGE = 'Your session has expired. Please log in again.';
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -74,8 +81,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     tokenRef.current = token;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new ApiError('NETWORK_ERROR', BOOTSTRAP_TIMEOUT_MESSAGE));
+      }, BOOTSTRAP_TIMEOUT_MS);
+    });
     try {
-      const user = await authApi.getCurrentUser();
+      const user = await Promise.race([authApi.getCurrentUser(controller.signal), timedOut]);
       setState({ status: 'signedIn', user, bootstrapError: null });
     } catch (error) {
       if (error instanceof ApiError && error.isNetworkError) {
@@ -84,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       await forgetSession();
+    } finally {
+      clearTimeout(timer);
     }
   }, [forgetSession]);
 
@@ -129,5 +146,3 @@ export function useAuth(): AuthContextValue {
   if (!context) throw new Error('useAuth must be used inside AuthProvider.');
   return context;
 }
-
-export { SESSION_EXPIRED_MESSAGE };

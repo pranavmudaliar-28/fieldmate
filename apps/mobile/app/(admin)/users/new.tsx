@@ -1,7 +1,10 @@
 import type { CreateUserInput } from '@fieldmate/shared';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { useToast } from '../../../src/components/Toast';
+import { colors } from '../../../src/constants/theme';
 import { UserForm } from '../../../src/features/admin/UserForm';
 import { useCreateUser } from '../../../src/features/admin/hooks';
 import { ApiError } from '../../../src/services/http';
@@ -27,14 +30,18 @@ export default function AddUserScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'Add user' }} />
+    <View style={styles.screen}>
+      <AppHeader title="New user" onBack={() => router.back()} backIcon="close" />
       <UserForm
         mode="create"
         submitting={createUser.isPending}
         submitError={error}
         onSubmit={submit}
       />
-    </>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+});

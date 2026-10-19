@@ -8,8 +8,11 @@ import {
   tabularNumbers,
   toneColors,
   typography,
+  type IconName,
   type Tone,
 } from '../constants/theme';
+import type { BadgePalette } from './Badge';
+import { Icon } from './Icon';
 
 export type StatCardProps = {
   label: string;
@@ -17,46 +20,56 @@ export type StatCardProps = {
   /** True when the real total is larger than the page we counted. */
   capped?: boolean;
   tone?: Tone;
-  /** Fills the card with the tone, for the count that must be noticed. */
+  /** A status's own colours; wins over `tone`. */
+  palette?: BadgePalette;
+  icon?: IconName;
+  /** Fills the tile with its colour, for the count that must be noticed. */
   emphasis?: boolean;
   onPress?: () => void;
   testID?: string;
 };
 
-/** A single count. The dot repeats the status colour used in the lists. */
+/** A single count: the status icon and word on the left, the number on the right. */
 export function StatCard({
   label,
   value,
   capped = false,
   tone = 'neutral',
+  palette,
+  icon,
   emphasis = false,
   onPress,
   testID,
 }: StatCardProps) {
-  const palette = toneColors[tone];
+  const fill = palette ?? toneColors[tone];
   const shown = `${value}${capped ? '+' : ''}`;
   const description = `${shown} ${label}`;
 
   const body = (
     <>
-      <View style={[styles.dot, { backgroundColor: palette.dot }]} />
+      <View style={styles.labels}>
+        {icon ? <Icon name={icon} size={20} color={fill.text} /> : null}
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={[styles.label, { color: fill.text }]}
+          numberOfLines={2}
+        >
+          {label}
+        </Text>
+      </View>
       <Text
         maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-        style={[styles.value, emphasis && { color: palette.text }]}
+        style={[styles.value, emphasis && { color: fill.text }]}
       >
         {shown}
-      </Text>
-      <Text
-        maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-        style={[styles.label, emphasis && { color: palette.text }]}
-        numberOfLines={2}
-      >
-        {label}
       </Text>
     </>
   );
 
-  const containerStyle = [styles.card, emphasis ? { backgroundColor: palette.tint } : styles.plain];
+  const containerStyle = [
+    styles.card,
+    emphasis ? { backgroundColor: fill.tint, borderColor: fill.text } : styles.plain,
+  ];
 
   if (!onPress) {
     return (
@@ -82,18 +95,22 @@ export function StatCard({
 const styles = StyleSheet.create({
   card: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    minHeight: 88,
     borderRadius: radius.card,
-    paddingVertical: spacing.smPlus + 2,
-    paddingHorizontal: spacing.smPlus,
-    gap: spacing.xs + 2,
+    borderWidth: 1.5,
+    padding: spacing.md,
   },
-  plain: { backgroundColor: colors.surface, ...elevation.card },
+  plain: { backgroundColor: colors.surface, borderColor: colors.surface, ...elevation.card },
   pressed: { opacity: 0.9 },
-  dot: { width: 8, height: 8, borderRadius: radius.pill },
+  labels: { flex: 1, gap: spacing.sm, alignSelf: 'stretch', justifyContent: 'space-between' },
+  label: { ...typography.secondaryStrong },
   value: {
-    ...typography.display,
+    ...typography.hero,
     ...tabularNumbers,
     color: colors.textPrimary,
   },
-  label: { ...typography.caption, color: colors.textSecondary },
 });

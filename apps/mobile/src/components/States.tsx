@@ -4,6 +4,7 @@ import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
   elevation,
+  layout,
   motion,
   radius,
   spacing,
@@ -76,11 +77,9 @@ export function LoadingState({
         // Shaped like the cards that are coming, so nothing jumps on arrival.
         [0, 1, 2].map((index) => (
           <View key={index} style={styles.skeletonCard}>
-            <View style={styles.skeletonStripe} />
-            <View style={styles.skeletonBody}>
-              <Shimmer style={styles.skeletonTitle} />
-              <Shimmer style={styles.skeletonLine} />
-            </View>
+            <Shimmer style={styles.skeletonBadge} />
+            <Shimmer style={styles.skeletonTitle} />
+            <Shimmer style={styles.skeletonLine} />
           </View>
         ))
       ) : (
@@ -110,7 +109,7 @@ export function EmptyState({
   return (
     <View style={styles.centered} testID={testID}>
       <View style={styles.emblem}>
-        <Icon name={icon} size={26} color={colors.accent} />
+        <Icon name={icon} size={44} color={colors.textPrimary} />
       </View>
       <Text
         maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
@@ -155,30 +154,50 @@ export function ErrorState({
           {message}
         </Text>
       </View>
-      {onRetry ? <Button label="Try again" variant="ink" size="md" onPress={onRetry} /> : null}
+      {onRetry ? (
+        <Button label="Try again" variant="secondary" size="md" onPress={onRetry} />
+      ) : null}
     </View>
   );
 }
 
 export function SectionHeader({
   title,
+  count,
+  countStyle = 'signal',
   actionLabel,
   onAction,
 }: {
   title: string;
+  /** A count beside the title; hidden at zero. */
+  count?: number;
+  /** Signal for "this needs you", ink for a plain tally. */
+  countStyle?: 'signal' | 'ink';
   actionLabel?: string;
   onAction?: () => void;
 }) {
   return (
     <View style={styles.sectionHeader}>
-      <Text
-        maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-        style={styles.sectionTitle}
-        accessibilityRole="header"
-      >
-        {title}
-      </Text>
-      <View style={styles.rule} />
+      <View style={styles.sectionTitleRow}>
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={styles.sectionTitle}
+          accessibilityRole="header"
+          accessibilityLabel={count ? `${title}, ${count}` : title}
+        >
+          {title}
+        </Text>
+        {count ? (
+          <View style={[styles.count, countStyle === 'ink' && styles.countInk]}>
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+              style={[styles.countText, countStyle === 'ink' && styles.countTextInk]}
+            >
+              {count}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       {actionLabel && onAction ? (
         <Button
           label={actionLabel}
@@ -197,18 +216,17 @@ const styles = StyleSheet.create({
   skeletonGroup: { gap: spacing.smPlus },
   skeleton: { backgroundColor: colors.surfaceMuted, borderRadius: radius.control },
   skeletonCard: {
-    flexDirection: 'row',
     backgroundColor: colors.surface,
     borderRadius: radius.card,
-    overflow: 'hidden',
+    padding: spacing.md,
+    gap: spacing.smPlus,
     ...elevation.card,
   },
-  skeletonStripe: { width: 4, alignSelf: 'stretch', backgroundColor: colors.border },
-  skeletonBody: { flex: 1, padding: spacing.md, gap: spacing.smPlus },
-  skeletonTitle: { height: 14, width: '80%' },
-  skeletonLine: { height: 10, width: '50%' },
+  skeletonBadge: { height: 26, width: 112, borderRadius: radius.badge },
+  skeletonTitle: { height: 16, width: '80%' },
+  skeletonLine: { height: 12, width: '55%' },
   skeletonDetail: { gap: spacing.smPlus },
-  skeletonPill: { height: 28, width: 128, borderRadius: radius.pill },
+  skeletonPill: { height: 30, width: 136, borderRadius: radius.badge },
   skeletonHeading: { height: 26, width: '90%' },
   skeletonBlock: { height: 132 },
   centered: {
@@ -216,27 +234,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.smPlus,
     paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   emblem: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.control + 2,
-    backgroundColor: colors.surfaceInverse,
+    width: 112,
+    height: 112,
+    borderRadius: radius.sheet,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
-  title: { ...typography.sectionTitle, color: colors.textPrimary, textAlign: 'center' },
+  title: {
+    ...typography.sectionTitle,
+    fontFamily: typography.display.fontFamily,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
   message: { ...typography.body, color: colors.textSecondary, textAlign: 'center' },
   errorBox: {
-    backgroundColor: colors.errorTint,
+    backgroundColor: colors.surface,
     borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.smPlus,
   },
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   errorMessage: { ...typography.secondaryStrong, color: colors.errorText, flex: 1 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.smPlus },
-  sectionTitle: { ...typography.label, color: colors.textSecondary },
-  rule: { flex: 1, height: 1, backgroundColor: colors.border },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.smPlus,
+    minHeight: layout.minTouchTarget,
+  },
+  sectionTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionTitle: { ...typography.sectionTitle, color: colors.textPrimary, flexShrink: 1 },
+  count: {
+    minWidth: 28,
+    height: 28,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countInk: { backgroundColor: colors.surfaceInverse },
+  countText: { ...typography.secondaryStrong, color: colors.onAccent },
+  countTextInk: { color: colors.textOnInverse },
 });

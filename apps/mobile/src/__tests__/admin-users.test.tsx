@@ -120,10 +120,11 @@ describe('Users screen (S-011)', () => {
     expect(mockRouter.push).toHaveBeenCalledWith('/(admin)/users/user-2');
   });
 
-  it('offers a shortcut to the task screens', async () => {
+  it('says whether each user can sign in, in words', async () => {
     await renderScreen(<UsersScreen />);
-    await userEvent.setup().press(screen.getByTestId('go-to-tasks'));
-    expect(mockRouter.push).toHaveBeenCalledWith('/(manager)/(tabs)');
+
+    await waitFor(() => expect(screen.getByText('Priya Nair')).toBeTruthy());
+    expect(screen.getAllByText('Active')).toHaveLength(2);
   });
 });
 
@@ -146,7 +147,7 @@ describe('User details (S-012)', () => {
     const user = userEvent.setup();
     await user.press(screen.getByTestId('deactivate-user'));
 
-    await waitFor(() => expect(screen.getByText(/will not be able to log in/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByText(/is signed out and can’t sign in/)).toBeTruthy());
     expect(api.updateUser).not.toHaveBeenCalled();
 
     await user.press(screen.getByRole('button', { name: 'Deactivate' }));
@@ -161,14 +162,35 @@ describe('User details (S-012)', () => {
     expect(screen.queryByTestId('deactivate-user')).toBeNull();
   });
 
-  it('blocks deleting a user who appears in task history, and explains why', async () => {
+  it('explains why a user with task history cannot be deleted, and offers deactivation', async () => {
     api.fetchUser.mockResolvedValue(managed({ hasHistory: true }));
+    api.updateUser.mockResolvedValue(managed({ hasHistory: true, isActive: false }));
     await renderScreen(<UserDetailsScreen />);
+    await waitFor(() => expect(screen.getByTestId('delete-user')).toBeEnabled());
 
-    await waitFor(() => expect(screen.getByTestId('delete-user')).toBeDisabled());
-    expect(
-      screen.getByText(/cannot be deleted. Deactivating keeps the record intact./),
-    ).toBeTruthy();
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('delete-user'));
+
+    await waitFor(() => expect(screen.getByText('Priya can’t be deleted')).toBeTruthy());
+    expect(screen.getByText(/keeps every past task intact/)).toBeTruthy();
+    expect(api.deleteUser).not.toHaveBeenCalled();
+
+    await user.press(screen.getByRole('button', { name: 'Deactivate instead' }));
+    await waitFor(() => expect(api.updateUser).toHaveBeenCalledWith('user-2', { isActive: false }));
+  });
+
+  it('deletes a user with no history after confirmation', async () => {
+    api.deleteUser.mockResolvedValue(undefined);
+    await renderScreen(<UserDetailsScreen />);
+    await waitFor(() => expect(screen.getByTestId('delete-user')).toBeEnabled());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('delete-user'));
+    await waitFor(() => expect(screen.getByText(/has no task history/)).toBeTruthy());
+    const confirm = screen.getAllByRole('button', { name: 'Delete permanently' });
+    await user.press(confirm[confirm.length - 1]!);
+
+    await waitFor(() => expect(api.deleteUser).toHaveBeenCalledWith('user-2'));
   });
 
   it('does not let an admin deactivate or delete themselves', async () => {
@@ -179,21 +201,45 @@ describe('User details (S-012)', () => {
 
     await waitFor(() => expect(screen.getByTestId('deactivate-user')).toBeDisabled());
     expect(screen.getByTestId('delete-user')).toBeDisabled();
-    expect(screen.getByText(/your own account/)).toBeTruthy();
+    expect(
+      screen.getByText('This is your own account, so some actions are unavailable.'),
+    ).toBeTruthy();
+    expect(screen.getByText('You can’t deactivate your own account.')).toBeTruthy();
   });
 
-  it('requires a long enough password before setting one', async () => {
+  it('requires a long enough, confirmed password before setting one', async () => {
+    api.setUserPassword.mockResolvedValue(undefined);
     await renderScreen(<UserDetailsScreen />);
-    await waitFor(() => expect(screen.getByTestId('set-password')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('open-set-password')).toBeTruthy());
 
     const user = userEvent.setup();
-    expect(screen.getByTestId('set-password')).toBeDisabled();
+    await user.press(screen.getByTestId('open-set-password'));
+    await waitFor(() => expect(screen.getByTestId('set-password')).toBeDisabled());
+    // Setting a password always signs the user out; it is said, not offered.
+    expect(screen.getByText('Priya is signed out on all devices.')).toBeTruthy();
 
     await user.type(screen.getByTestId('new-password'), 'LongEnough1');
+    expect(screen.getByTestId('set-password')).toBeDisabled();
+    await user.type(screen.getByTestId('confirm-password'), 'LongEnough1');
     await waitFor(() => expect(screen.getByTestId('set-password')).toBeEnabled());
 
     await user.press(screen.getByTestId('set-password'));
-    await waitFor(() => expect(screen.getByText(/signed out on all devices/)).toBeTruthy());
+    await waitFor(() => expect(api.setUserPassword).toHaveBeenCalledWith('user-2', 'LongEnough1'));
+  });
+
+  it('generates a password that fills both fields', async () => {
+    await renderScreen(<UserDetailsScreen />);
+    await waitFor(() => expect(screen.getByTestId('open-set-password')).toBeTruthy());
+
+    const user = userEvent.setup();
+    await user.press(screen.getByTestId('open-set-password'));
+    await waitFor(() => expect(screen.getByTestId('generate-password')).toBeTruthy());
+    await user.press(screen.getByTestId('generate-password'));
+
+    const generated = screen.getByTestId('new-password').props.value as string;
+    expect(generated.length).toBeGreaterThanOrEqual(8);
+    expect(screen.getByTestId('confirm-password').props.value).toBe(generated);
+    await waitFor(() => expect(screen.getByTestId('set-password')).toBeEnabled());
   });
 
   it('shows a server refusal, such as the last-admin guard', async () => {

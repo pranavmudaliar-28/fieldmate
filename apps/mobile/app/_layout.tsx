@@ -8,9 +8,10 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OfflineBanner } from '../src/components/OfflineBanner';
 import { ToastProvider } from '../src/components/Toast';
-import { interFonts } from '../src/constants/fonts';
+import { appFonts } from '../src/constants/fonts';
 import { colors, elevation, layout } from '../src/constants/theme';
 import { AuthProvider } from '../src/features/auth/auth-context';
+import { OfflineQueueProvider } from '../src/features/offline/offline-queue';
 import { createQueryClient } from '../src/lib/query-client';
 
 void SplashScreen.preventAutoHideAsync();
@@ -63,7 +64,7 @@ function AppColumn({ children }: PropsWithChildren) {
 
 export default function RootLayout() {
   const [queryClient] = useState(createQueryClient);
-  const [fontsLoaded, fontError] = useFonts(interFonts);
+  const [fontsLoaded, fontError] = useFonts(appFonts);
 
   // A missing font file must not leave the user on a blank splash screen; the
   // system face is an acceptable fallback, an unstartable app is not.
@@ -79,18 +80,25 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <AppColumn>
-            <ToastProvider>
-              <StatusBar style="dark" />
-              <OfflineBanner />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.background },
-                }}
-              />
-            </ToastProvider>
-          </AppColumn>
+          {/* Inside the query client: a finished replay refreshes the task caches. */}
+          <OfflineQueueProvider>
+            <AppColumn>
+              <ToastProvider>
+                <StatusBar style="dark" />
+                <OfflineBanner />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.background },
+                    // Only top-level switches happen here — splash to sign-in, sign-in
+                    // to a role's home — so they cross-fade instead of sliding.
+                    // Screens inside a role push on that role's own stack.
+                    animation: 'fade',
+                  }}
+                />
+              </ToastProvider>
+            </AppColumn>
+          </OfflineQueueProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

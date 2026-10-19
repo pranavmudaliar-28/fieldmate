@@ -1,20 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ROLES, createUserSchema, type CreateUserInput, type Role } from '@fieldmate/shared';
+import { createUserSchema, type CreateUserInput, type Role } from '@fieldmate/shared';
 import { Controller, useForm, type Resolver } from 'react-hook-form';
 import { z } from 'zod';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionBar } from '../../components/ActionBar';
 import { Button } from '../../components/Button';
+import { ChoiceList } from '../../components/ChoiceList';
+import { Icon } from '../../components/Icon';
 import { Input } from '../../components/Input';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
-  fontFamily,
   layout,
   radius,
   spacing,
+  toneColors,
   typography,
+  type IconName,
 } from '../../constants/theme';
+import { generatePassword } from './password';
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Admin',
@@ -23,10 +27,19 @@ export const ROLE_LABELS: Record<Role, string> = {
 };
 
 export const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  ADMIN: 'Manages people and can do everything a manager can.',
-  MANAGER: 'Creates and assigns tasks, and reviews completed work.',
-  FIELD_WORKER: 'Carries out assigned tasks in the field.',
+  ADMIN: 'Manages users and access',
+  MANAGER: 'Creates, assigns and reviews tasks',
+  FIELD_WORKER: 'Accepts tasks and submits work',
 };
+
+export const ROLE_ICONS: Record<Role, IconName> = {
+  ADMIN: 'shield-outline',
+  MANAGER: 'people-outline',
+  FIELD_WORKER: 'hammer-outline',
+};
+
+/** Workers first: they are most of the accounts an admin creates. */
+const ROLE_ORDER: Role[] = ['FIELD_WORKER', 'MANAGER', 'ADMIN'];
 
 export type UserFormValues = CreateUserInput;
 
@@ -38,7 +51,7 @@ export type UserFormProps = {
   onSubmit: (values: UserFormValues) => void;
 };
 
-/** S-013 Add / edit user. In edit mode the password field is hidden. */
+/** S-013 Add / edit user. In edit mode the password has its own action. */
 export function UserForm({
   mode,
   defaultValues,
@@ -55,6 +68,8 @@ export function UserForm({
   const {
     control,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isDirty },
   } = useForm<UserFormValues>({
     resolver: zodResolver(schema) as Resolver<UserFormValues>,
@@ -68,6 +83,7 @@ export function UserForm({
   });
 
   const submit = handleSubmit((values) => onSubmit(values));
+  const firstName = watch('name').trim().split(/\s+/)[0] || 'them';
 
   return (
     <View style={styles.flex}>
@@ -77,7 +93,7 @@ export function UserForm({
           name="name"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              label="Name"
+              label="Full name"
               required
               testID="user-name"
               value={value}
@@ -94,8 +110,9 @@ export function UserForm({
           name="email"
           render={({ field: { onChange, onBlur, value } }) => (
             <Input
-              label="Email"
+              label="Work email"
               required
+              icon="mail-outline"
               testID="user-email"
               value={value}
               onChangeText={onChange}
@@ -115,33 +132,20 @@ export function UserForm({
           render={({ field: { onChange, value } }) => (
             <View style={styles.field}>
               <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
-                Role *
+                Role
               </Text>
-              {ROLES.map((role) => {
-                const selected = value === role;
-                return (
-                  <Pressable
-                    key={role}
-                    onPress={() => onChange(role)}
-                    disabled={submitting}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={ROLE_LABELS[role]}
-                    testID={`role-${role}`}
-                    style={[styles.roleOption, selected && styles.roleOptionSelected]}
-                  >
-                    <Text
-                      maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-                      style={[styles.roleName, selected && styles.roleNameSelected]}
-                    >
-                      {ROLE_LABELS[role]}
-                    </Text>
-                    <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.roleHint}>
-                      {ROLE_DESCRIPTIONS[role]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              <ChoiceList
+                choices={ROLE_ORDER.map((role) => ({
+                  value: role,
+                  label: ROLE_LABELS[role],
+                  description: ROLE_DESCRIPTIONS[role],
+                  testID: `role-${role}`,
+                }))}
+                selected={value}
+                onSelect={onChange}
+                disabled={submitting}
+                accessibilityLabel="Role"
+              />
             </View>
           )}
         />
@@ -152,31 +156,60 @@ export function UserForm({
             name="password"
             render={({ field: { onChange, onBlur, value } }) => (
               <Input
-                label="Password"
+                label="Temporary password"
                 required
                 testID="user-password"
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
-                {...(errors.password?.message ? { error: errors.password.message } : {})}
-                helper="Share it with the user; they can keep using it until you change it."
-                secure
+                {...(errors.password?.message
+                  ? { error: errors.password.message }
+                  : {
+                      helper: `Share it with ${firstName} in person. They can sign in with it straight away.`,
+                    })}
+                // Shown in full: the admin reads it out, so hiding it only invites typos.
                 autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.password}
                 editable={!submitting}
+                accessory={
+                  <Button
+                    label="Generate"
+                    variant="tonal"
+                    size="md"
+                    fullWidth={false}
+                    testID="generate-password"
+                    onPress={() =>
+                      setValue('password', generatePassword(), {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                  />
+                }
               />
             )}
           />
-        ) : null}
+        ) : (
+          <View style={styles.note}>
+            <Icon name="information-circle-outline" size={18} color={colors.textSecondary} />
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.noteText}>
+              To change the password, use Set password on the user’s details.
+            </Text>
+          </View>
+        )}
 
         {submitError ? (
-          <Text
-            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-            style={styles.error}
-            accessibilityRole="alert"
-            testID="user-form-error"
-          >
-            {submitError}
-          </Text>
+          <View style={styles.errorBox} accessibilityRole="alert">
+            <Icon name="alert-circle-outline" size={18} color={toneColors.error.text} />
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+              style={styles.error}
+              testID="user-form-error"
+            >
+              {submitError}
+            </Text>
+          </View>
         ) : null}
       </ScrollView>
 
@@ -195,21 +228,18 @@ export function UserForm({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  content: { padding: layout.screenPadding, gap: spacing.md },
-  field: { gap: spacing.xs },
-  label: { ...typography.secondary, color: colors.textPrimary },
-  roleOption: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.control,
-    backgroundColor: colors.surface,
+  content: { padding: layout.screenPadding, paddingTop: spacing.xs, gap: spacing.mdPlus },
+  field: { gap: spacing.sm },
+  label: { ...typography.secondaryStrong, color: colors.textPrimary },
+  password: { fontFamily: typography.mono.fontFamily, fontSize: 17 },
+  note: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
+  noteText: { ...typography.secondary, color: colors.textSecondary, flex: 1 },
+  errorBox: {
+    flexDirection: 'row',
+    gap: spacing.sm,
     padding: spacing.md,
-    gap: 2,
-    minHeight: layout.minTouchTarget,
+    borderRadius: radius.action,
+    backgroundColor: toneColors.error.tint,
   },
-  roleOptionSelected: { borderColor: colors.primary, borderWidth: 2 },
-  roleName: { ...typography.body, color: colors.textPrimary },
-  roleNameSelected: { color: colors.primary, fontFamily: fontFamily.semibold },
-  roleHint: { ...typography.caption, color: colors.textSecondary },
-  error: { ...typography.secondary, color: colors.errorText },
+  error: { ...typography.secondaryStrong, color: colors.errorText, flex: 1 },
 });

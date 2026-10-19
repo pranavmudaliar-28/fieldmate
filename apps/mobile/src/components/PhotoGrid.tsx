@@ -60,11 +60,20 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
                   transition={100}
                 />
               </Pressable>
-              {picked ? (
-                <View style={styles.sourceMark} pointerEvents="none" testID={`gallery-${photo.id}`}>
-                  <Icon name="images" size={12} color={colors.textOnInverse} />
-                </View>
-              ) : null}
+              <View
+                style={styles.sourceMark}
+                pointerEvents="none"
+                {...(picked ? { testID: `gallery-${photo.id}` } : {})}
+              >
+                <Icon
+                  name={picked ? 'image-outline' : 'camera-outline'}
+                  size={14}
+                  color={colors.textOnInverse}
+                />
+                <Text maxFontSizeMultiplier={1.2} style={styles.sourceText}>
+                  {picked ? 'Gallery' : 'Camera'}
+                </Text>
+              </View>
               {onDelete && mine ? (
                 <Pressable
                   onPress={() => onDelete(photo)}
@@ -101,25 +110,32 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
   );
 }
 
-const THUMBNAIL = 98;
-
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.smPlus },
-  cell: { width: THUMBNAIL, height: THUMBNAIL },
-  thumbnailWrapper: { borderRadius: radius.card, overflow: 'hidden' },
-  thumbnail: { width: THUMBNAIL, height: THUMBNAIL, backgroundColor: colors.surfaceMuted },
-  /** Sits on the photo: a caption row under every tile made the grid unreadable. */
-  /** Marks a photo that was picked rather than taken (docs/02 F-006). */
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  /** Three across, whatever the width of the card holding them. */
+  cell: { width: '31.9%', aspectRatio: 1 },
+  thumbnailWrapper: { flex: 1, borderRadius: radius.action, overflow: 'hidden' },
+  thumbnail: { width: '100%', height: '100%', backgroundColor: colors.surfaceMuted },
+  /**
+   * Says where every photo came from, on the photo: a caption row under each
+   * tile made the grid unreadable (docs/02 F-006).
+   */
   sourceMark: {
     position: 'absolute',
-    bottom: spacing.xs,
-    left: spacing.xs,
-    width: 22,
-    height: 22,
-    borderRadius: radius.pill,
-    backgroundColor: colors.scrim,
+    bottom: spacing.sm,
+    left: spacing.sm,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(15, 17, 21, 0.78)',
+  },
+  sourceText: {
+    ...typography.caption,
+    fontFamily: typography.secondaryStrong.fontFamily,
+    color: colors.textOnInverse,
   },
   delete: {
     position: 'absolute',

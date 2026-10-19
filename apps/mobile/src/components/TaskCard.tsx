@@ -31,7 +31,6 @@ function TaskCardComponent({
   showRejection = false,
 }: TaskCardProps) {
   const appearance = statusAppearance[task.status];
-  const tone = toneColors[appearance.tone];
 
   const label = [
     task.title,
@@ -43,84 +42,82 @@ function TaskCardComponent({
     .join(', ');
 
   return (
-    <Card onPress={onPress} accessibilityLabel={label} testID={`task-card-${task.id}`} bleed>
-      <View style={styles.row}>
-        {/* A second, redundant channel for status, so a long list can be
-            scanned at arm's length before any word is read. */}
-        <View style={[styles.stripe, { backgroundColor: tone.dot }]} />
-
-        <View style={styles.body}>
-          <View style={styles.header}>
-            <Text
-              numberOfLines={2}
-              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={styles.title}
-            >
-              {task.title}
-            </Text>
-            <StatusBadge status={task.status} />
-          </View>
-
-          <View style={styles.metaRow}>
-            <Icon name="location-outline" size={15} color={colors.textSecondary} />
-            <Text
-              numberOfLines={1}
-              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={styles.meta}
-            >
-              {task.address}
-            </Text>
-          </View>
-
-          <View style={styles.footer}>
-            {showWorker ? (
-              <View style={styles.worker}>
-                <Avatar name={task.worker.name} size="sm" variant={appearance.tone} />
-                <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.workerName}>
-                  {task.worker.name}
-                </Text>
-              </View>
-            ) : (
-              <View />
-            )}
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.timestamp}>
-              Updated {formatRelativeTime(task.updatedAt)}
-            </Text>
-          </View>
-
-          {showRejection && task.rejection ? (
-            <View style={styles.rejection}>
-              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.rejectionText}>
-                Rejected: “{task.rejection.reason}”
-              </Text>
-            </View>
-          ) : null}
-        </View>
+    <Card onPress={onPress} accessibilityLabel={label} testID={`task-card-${task.id}`}>
+      <View style={styles.top}>
+        <StatusBadge status={task.status} />
+        {showWorker ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.timestamp}>
+            {formatRelativeTime(task.updatedAt)}
+          </Text>
+        ) : (
+          <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
+        )}
       </View>
+
+      <Text numberOfLines={2} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.title}>
+        {task.title}
+      </Text>
+
+      <View style={styles.metaRow}>
+        <Icon name="location-outline" size={16} color={colors.textSecondary} />
+        <Text
+          numberOfLines={1}
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={styles.meta}
+        >
+          {task.address}
+        </Text>
+      </View>
+
+      {showRejection && task.rejection ? (
+        <View style={styles.rejection}>
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.rejectionText}>
+            “{task.rejection.reason}”
+          </Text>
+        </View>
+      ) : null}
+
+      {showWorker ? (
+        <View style={styles.worker}>
+          <Avatar name={task.worker.name} size="sm" />
+          <Text
+            numberOfLines={1}
+            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.workerName}
+          >
+            {task.worker.name}
+          </Text>
+        </View>
+      ) : null}
     </Card>
   );
 }
 
-/** Memoised: these are the rows of every list in the app (docs/04 §10). */
+/** Memoised: these are the rows of every list in the app. */
 export const TaskCard = memo(TaskCardComponent);
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row' },
-  stripe: { width: 4, alignSelf: 'stretch' },
-  body: { flex: 1, padding: spacing.md, gap: spacing.sm },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  title: { ...typography.cardTitle, color: colors.textPrimary, flex: 1 },
+  top: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  timestamp: { ...typography.caption, color: colors.textSecondary },
+  title: { ...typography.cardTitle, color: colors.textPrimary },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
   meta: { ...typography.secondary, color: colors.textSecondary, flex: 1 },
-  footer: {
+  worker: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.smPlus,
+    borderTopWidth: StyleSheet.hairlineWidth * 2,
+    borderTopColor: colors.border,
   },
-  worker: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
-  workerName: { ...typography.caption, color: colors.textSecondary },
-  timestamp: { ...typography.caption, color: colors.textDisabled },
+  workerName: { ...typography.secondaryStrong, color: colors.textPrimary, flex: 1 },
   rejection: {
     backgroundColor: toneColors.error.tint,
     borderRadius: radius.control,

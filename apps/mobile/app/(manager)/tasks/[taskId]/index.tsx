@@ -1,4 +1,4 @@
-import { allowedActions, type TaskDetail, type UserSummary } from '@fieldmate/shared';
+import { FIELD_LIMITS, allowedActions, type TaskDetail, type UserSummary } from '@fieldmate/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -18,6 +18,7 @@ import {
   layout,
   radius,
   spacing,
+  toneColors,
   typography,
 } from '../../../../src/constants/theme';
 import { WorkerPicker } from '../../../../src/features/assignments/WorkerPicker';
@@ -25,12 +26,15 @@ import { TaskDetailView } from '../../../../src/features/tasks/TaskDetailView';
 import { useRequestChanges, useTask, useTaskAction } from '../../../../src/features/tasks/hooks';
 import { ApiError } from '../../../../src/services/http';
 
-type PendingAction = 'cancel' | 'reopen' | 'complete' | 'approve' | null;
+type PendingAction = 'cancel' | 'reopen' | 'complete' | 'approve' | 'needsPhoto' | null;
 
-const EVIDENCE_HINT = 'At least 1 photo is required to complete this task.';
+/** Common reasons, added to the note with one tap rather than typed outside. */
+const QUICK_NOTES = ['Photo is unclear', 'Missing readings'];
 
 const messageFor = (error: unknown) =>
   error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+
+const firstName = (name: string) => name.split(' ')[0] ?? name;
 
 /** S-005 Task Details for managers, with the actions allowed in each status. */
 export default function ManagerTaskDetails() {
@@ -76,7 +80,7 @@ export default function ManagerTaskDetails() {
   if (task.isPending) {
     return (
       <View style={styles.screen}>
-        <AppHeader title="Task details" onBack={() => router.back()} />
+        <AppHeader title="" onBack={() => router.back()} />
         <View style={styles.padded}>
           <LoadingState variant="detail" />
         </View>
@@ -89,7 +93,7 @@ export default function ManagerTaskDetails() {
       task.error instanceof ApiError && (task.error.status === 404 || task.error.status === 403);
     return (
       <View style={styles.screen}>
-        <AppHeader title="Task details" onBack={() => router.back()} />
+        <AppHeader title="" onBack={() => router.back()} />
         <View style={styles.padded}>
           {notAvailable ? (
             <EmptyState
@@ -97,7 +101,7 @@ export default function ManagerTaskDetails() {
               title="This task is no longer available"
               message="It may have been removed or reassigned."
               action={{
-                label: 'Go to dashboard',
+                label: 'Go to overview',
                 onPress: () => router.replace('/(manager)/(tabs)'),
               }}
             />
@@ -110,8 +114,8 @@ export default function ManagerTaskDetails() {
   }
 
   const detail: TaskDetail = task.data;
+  const worker = detail.assignment.worker;
   const actions = allowedActions(detail.status, 'MANAGER');
-  const canComplete = actions.includes('complete');
   const canReview = actions.includes('approve');
   const hasEvidence = detail.evidence.length > 0;
   const busy =
@@ -123,24 +127,23 @@ export default function ManagerTaskDetails() {
     requestChanges.isPending;
 
   /**
-   * One action in the bar and the rest behind the overflow. Five buttons used
-   * to share a single row, and the last of them ran off the screen edge.
+   * The bar holds a decision only: review, hand back a rejected task, or
+   * reopen finished work. Everything else waits behind the overflow, so the
+   * bar never fills with buttons that are not the point of the screen.
    */
   const primary = canReview
     ? 'approve'
-    : canComplete
-      ? 'complete'
+    : detail.status === 'REJECTED' && actions.includes('reassign')
+      ? 'reassign'
       : actions.includes('reopen')
         ? 'reopen'
-        : actions.includes('reassign')
-          ? 'reassign'
-          : null;
+        : null;
 
   const secondary: OverflowAction[] = [];
   if (actions.includes('edit')) {
     secondary.push({
       label: 'Edit task',
-      icon: 'create-outline',
+      icon: 'pencil-outline',
       testID: 'action-edit',
       onPress: () => router.push(`/(manager)/tasks/${taskId}/edit`),
     });
@@ -153,6 +156,15 @@ export default function ManagerTaskDetails() {
       onPress: () => setPickerOpen(true),
     });
   }
+  if (actions.includes('complete')) {
+    secondary.push({
+      label: 'Mark as completed',
+      icon: 'checkmark-done-outline',
+      testID: 'action-complete',
+      // Explained rather than greyed out: a disabled row says nothing about why.
+      onPress: () => setPending(hasEvidence ? 'complete' : 'needsPhoto'),
+    });
+  }
   if (actions.includes('cancel')) {
     secondary.push({
       label: 'Cancel task',
@@ -163,10 +175,13 @@ export default function ManagerTaskDetails() {
     });
   }
 
+  const addQuickNote = (text: string) =>
+    setReviewNote((current) => (current.trim() ? `${current.trim()} ${text}.` : `${text}.`));
+
   return (
     <View style={styles.screen}>
       <AppHeader
-        title="Task details"
+        title=""
         onBack={() => router.back()}
         right={
           secondary.length > 0 ? (
@@ -175,9 +190,9 @@ export default function ManagerTaskDetails() {
               accessibilityRole="button"
               accessibilityLabel="More actions"
               testID="header-overflow"
-              style={styles.overflowButton}
+              style={({ pressed }) => [styles.overflowButton, pressed && styles.overflowPressed]}
             >
-              <Icon name="ellipsis-horizontal" size={22} color={colors.onPrimary} />
+              <Icon name="ellipsis-horizontal" size={24} color={colors.textPrimary} />
             </Pressable>
           ) : null
         }
@@ -189,17 +204,29 @@ export default function ManagerTaskDetails() {
           <RefreshControl refreshing={task.isRefetching} onRefresh={() => void task.refetch()} />
         }
       >
-        <TaskDetailView task={detail}>
-          {actionError ? (
-            <ErrorState message={actionError} onRetry={() => void task.refetch()} />
-          ) : null}
-        </TaskDetailView>
+        <TaskDetailView
+          task={detail}
+          perspective="manager"
+          notice={
+            actionError ? (
+              <ErrorState message={actionError} onRetry={() => void task.refetch()} />
+            ) : null
+          }
+        />
       </ScrollView>
 
       {primary ? (
-        <ActionBar hint={canComplete && !hasEvidence ? EVIDENCE_HINT : undefined}>
+        <ActionBar>
           {primary === 'approve' ? (
             <>
+              <Button
+                label="Request changes"
+                variant="secondary"
+                testID="action-request-changes"
+                onPress={() => setChangesOpen(true)}
+                disabled={busy}
+                style={styles.reviewAction}
+              />
               <Button
                 label="Approve"
                 icon="checkmark"
@@ -208,26 +235,7 @@ export default function ManagerTaskDetails() {
                 disabled={busy}
                 style={styles.reviewAction}
               />
-              <Button
-                label="Request changes"
-                variant="secondary"
-                icon="arrow-undo-outline"
-                testID="action-request-changes"
-                onPress={() => setChangesOpen(true)}
-                disabled={busy}
-                style={styles.reviewAction}
-              />
             </>
-          ) : null}
-          {primary === 'complete' ? (
-            <Button
-              label="Complete task"
-              icon="checkmark"
-              testID="action-complete"
-              onPress={() => setPending('complete')}
-              disabled={!hasEvidence || busy}
-              disabledReason={EVIDENCE_HINT}
-            />
           ) : null}
           {primary === 'reopen' ? (
             <Button
@@ -258,10 +266,23 @@ export default function ManagerTaskDetails() {
       />
 
       <ConfirmationDialog
+        visible={pending === 'needsPhoto'}
+        title="Can’t mark as completed yet"
+        message="This task has no photos. A task needs at least one photo before it can be completed."
+        confirmLabel="OK"
+        cancelLabel="Close"
+        icon="camera-outline"
+        onConfirm={() => setPending(null)}
+        onCancel={() => setPending(null)}
+      />
+
+      <ConfirmationDialog
         visible={pending === 'complete'}
-        title="Complete task"
-        message="Complete this task? The worker will no longer be able to add photos or notes."
-        confirmLabel="Complete"
+        title="Mark as completed without review?"
+        message={`${firstName(worker.name)} hasn’t submitted this yet. The task moves straight to Completed and ${firstName(worker.name)} is notified. Photos and notes added so far are kept.`}
+        confirmLabel="Mark as completed"
+        icon="checkmark-done-outline"
+        tone="success"
         loading={complete.isPending}
         onConfirm={() => run(complete, 'Task completed')}
         onCancel={() => setPending(null)}
@@ -269,11 +290,14 @@ export default function ManagerTaskDetails() {
 
       <ConfirmationDialog
         visible={pending === 'approve'}
-        title="Approve work"
-        message="Approve this work? The task will be marked complete."
+        title="Approve this work?"
+        message={`The task moves to Completed and ${firstName(worker.name)} is notified. You can reopen it later if something’s wrong.`}
         confirmLabel="Approve"
+        confirmIcon="checkmark"
+        icon="checkmark-done-outline"
+        tone="success"
         loading={approve.isPending}
-        onConfirm={() => run(approve, 'Work approved')}
+        onConfirm={() => run(approve, 'Task approved')}
         onCancel={() => setPending(null)}
       />
 
@@ -284,23 +308,43 @@ export default function ManagerTaskDetails() {
         testID="request-changes-sheet"
       >
         <View style={styles.sheetContent}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetBody}>
-            Tell {detail.assignment.worker.name} what to put right. The task goes back to them as In
-            progress.
-          </Text>
+          <View style={styles.sheetNotice}>
+            <Icon name="hammer-outline" size={18} color={toneColors.warning.text} />
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetNoticeText}>
+              The task goes back to In progress. {firstName(worker.name)} sees your note at the top.
+            </Text>
+          </View>
           <Input
-            label="What needs changing"
+            label="What needs to change?"
+            placeholder={`Tell ${firstName(worker.name)} what to fix or add`}
             required
             testID="review-note"
             value={reviewNote}
             onChangeText={setReviewNote}
+            maxLength={FIELD_LIMITS.reviewNote}
+            showCount
             multiline
-            numberOfLines={3}
+            numberOfLines={4}
             style={styles.noteInput}
           />
+          <View style={styles.quickNotes}>
+            {QUICK_NOTES.map((text) => (
+              <Pressable
+                key={text}
+                onPress={() => addQuickNote(text)}
+                accessibilityRole="button"
+                accessibilityLabel={`Add “${text}” to the note`}
+                style={({ pressed }) => [styles.quickNote, pressed && styles.quickNotePressed]}
+              >
+                <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.quickNoteText}>
+                  + {text}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
           <Button
-            label="Send back"
-            icon="arrow-undo-outline"
+            label={`Send to ${firstName(worker.name)}`}
+            icon="send-outline"
             testID="submit-request-changes"
             loading={requestChanges.isPending}
             disabled={reviewNote.trim().length === 0}
@@ -310,7 +354,7 @@ export default function ManagerTaskDetails() {
                 onSuccess: () => {
                   setChangesOpen(false);
                   setReviewNote('');
-                  showToast('Sent back to the worker');
+                  showToast(`Sent back to ${firstName(worker.name)}`);
                 },
                 onError: (error: unknown) => {
                   setChangesOpen(false);
@@ -326,9 +370,10 @@ export default function ManagerTaskDetails() {
 
       <ConfirmationDialog
         visible={pending === 'reopen'}
-        title="Reopen task"
-        message={`Reopen this task? It will go back to ${detail.assignment.worker.name} as Assigned.`}
-        confirmLabel="Reopen"
+        title="Reopen this task?"
+        message={`It goes back to ${firstName(worker.name)} as a new assignment and starts from the beginning.`}
+        confirmLabel="Reopen task"
+        icon="refresh"
         loading={reopen.isPending}
         onConfirm={() => run(reopen, 'Task reopened')}
         onCancel={() => setPending(null)}
@@ -336,11 +381,16 @@ export default function ManagerTaskDetails() {
 
       <ConfirmationDialog
         visible={pending === 'cancel'}
-        title="Cancel task"
-        message="Cancel this task? This can't be undone."
+        title="Cancel this task?"
+        message={
+          detail.status === 'IN_PROGRESS'
+            ? `${worker.name} is working on it right now. ${firstName(worker.name)} will be notified and the task will move to Cancelled. Photos and notes are kept. This can't be undone.`
+            : `${firstName(worker.name)} will be notified and the task will move to Cancelled. This can't be undone.`
+        }
         confirmLabel="Cancel task"
         cancelLabel="Keep task"
         destructive
+        icon="ban-outline"
         loading={cancel.isPending}
         onConfirm={() => run(cancel, 'Task cancelled')}
         onCancel={() => setPending(null)}
@@ -348,14 +398,14 @@ export default function ManagerTaskDetails() {
 
       <ConfirmationDialog
         visible={pendingWorker !== null}
-        title="Reassign task"
+        title={pendingWorker ? `Reassign to ${pendingWorker.name}?` : 'Reassign'}
         message={
           pendingWorker
-            ? `Reassign to ${pendingWorker.name}? ${detail.assignment.worker.name} will lose access to this task.` +
-              (detail.status === 'IN_PROGRESS' ? ' The task will go back to Assigned.' : '')
+            ? `${firstName(worker.name)} stops seeing this task. ${firstName(pendingWorker.name)} gets it as a new assignment.`
             : ''
         }
         confirmLabel="Reassign"
+        icon="swap-horizontal-outline"
         loading={reassign.isPending}
         onConfirm={() =>
           pendingWorker &&
@@ -367,10 +417,11 @@ export default function ManagerTaskDetails() {
       <WorkerPicker
         visible={pickerOpen}
         title="Reassign to"
-        disabledWorkerId={detail.status === 'REJECTED' ? null : detail.assignment.worker.id}
-        onSelect={(worker) => {
+        disabledWorkerId={detail.status === 'REJECTED' ? null : worker.id}
+        confirmLabel={(selected) => `Continue with ${firstName(selected.name)}`}
+        onSelect={(selected) => {
           setPickerOpen(false);
-          setPendingWorker(worker);
+          setPendingWorker(selected);
         }}
         onClose={() => setPickerOpen(false)}
       />
@@ -380,19 +431,39 @@ export default function ManagerTaskDetails() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.md },
+  content: { padding: layout.screenPadding, paddingTop: 0, paddingBottom: spacing.xl },
   padded: { flex: 1, padding: layout.screenPadding },
   // Approve and Request changes share the row: a review has two answers.
   reviewAction: { flex: 1 },
-  sheetContent: { gap: spacing.md },
-  sheetBody: { ...typography.secondary, color: colors.textSecondary },
-  noteInput: { minHeight: 96 },
-  overflowButton: {
-    width: 44,
-    height: 44,
+  sheetContent: { gap: spacing.md, paddingBottom: spacing.md },
+  sheetNotice: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.action,
+    backgroundColor: toneColors.warning.tint,
+  },
+  sheetNoticeText: { ...typography.secondary, color: toneColors.warning.text, flex: 1 },
+  noteInput: { minHeight: 120, textAlignVertical: 'top' },
+  quickNotes: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  quickNote: {
+    minHeight: layout.minTouchTarget,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  quickNotePressed: { backgroundColor: colors.surfaceMuted },
+  quickNoteText: { ...typography.secondaryStrong, color: colors.textPrimary },
+  overflowButton: {
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
+    marginRight: -spacing.smPlus,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  overflowPressed: { backgroundColor: colors.surface },
 });

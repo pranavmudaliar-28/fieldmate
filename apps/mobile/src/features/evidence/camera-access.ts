@@ -10,7 +10,7 @@ export function unavailableReason(): string | null {
 
 /** What to tell a worker who has turned the permission off, and how to fix it. */
 export const deniedHelp: { body: string; action: string | null } = {
-  body: 'Camera access is off. Turn it on in Settings to add photos.',
+  body: 'FieldMate can’t use the camera. Turn it on in your phone’s Settings, or add a photo from your gallery.',
   action: 'Open Settings',
 };
 

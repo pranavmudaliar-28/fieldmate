@@ -18,6 +18,7 @@ import {
   motion,
   radius,
   spacing,
+  toneColors,
   typography,
 } from '../constants/theme';
 import { useReduceMotion } from '../hooks/use-reduce-motion';
@@ -57,7 +58,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [toast, enter]);
 
   const value = useMemo(() => ({ showToast }), [showToast]);
-  const palette = toast?.tone === 'error' ? colors.errorText : colors.accent;
+  const palette = toast?.tone === 'error' ? toneColors.error.dot : toneColors.success.dot;
 
   return (
     <ToastContext.Provider value={value}>
@@ -83,9 +84,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         >
           <View style={[styles.emblem, { backgroundColor: palette }]}>
             <Icon
-              name={toast.tone === 'error' ? 'close' : 'checkmark'}
-              size={14}
-              color={toast.tone === 'error' ? colors.onPrimary : colors.onAccent}
+              name={toast.tone === 'error' ? 'alert' : 'checkmark'}
+              size={16}
+              color={colors.onPrimary}
             />
           </View>
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.message}>
@@ -111,18 +112,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.smPlus,
+    minHeight: 56,
     paddingVertical: spacing.smPlus,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.pill,
+    borderRadius: radius.action,
     backgroundColor: colors.surfaceInverse,
     ...elevation.overlay,
   },
   emblem: {
-    width: 22,
-    height: 22,
+    width: 28,
+    height: 28,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  message: { ...typography.secondaryStrong, color: colors.textOnInverse, flex: 1 },
+  message: { ...typography.bodyStrong, color: colors.textOnInverse, flex: 1 },
 });

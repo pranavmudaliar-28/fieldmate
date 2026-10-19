@@ -6,15 +6,13 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
+import { useQueuedWrite } from '../offline/use-queued-write';
+import { taskKeys } from './constants';
 import * as api from './api';
 
-export const taskKeys = {
-  all: ['tasks'] as const,
-  lists: () => [...taskKeys.all, 'list'] as const,
-  list: (statuses?: TaskStatus[]) => [...taskKeys.lists(), statuses ?? 'all'] as const,
-  detail: (taskId: string) => [...taskKeys.all, 'detail', taskId] as const,
-  workers: ['users', 'workers'] as const,
-};
+// Re-exported so every existing caller keeps its import; defined in
+// constants.ts, which imports nothing of ours (see the note there).
+export { taskKeys };
 
 /** Actions return the updated task, so write it into the cache and refresh lists. */
 function applyTaskUpdate(queryClient: QueryClient, task: TaskDetail) {
@@ -74,6 +72,7 @@ export function useTaskAction(
   action: 'reassign' | 'cancel' | 'reopen' | 'complete' | 'approve',
 ) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
     mutationFn: (workerId?: string) => {
       switch (action) {
@@ -84,12 +83,16 @@ export function useTaskAction(
         case 'reopen':
           return api.reopenTask(taskId);
         case 'complete':
-          return api.completeTask(taskId);
+          // A worker handing work over is queueable; a manager closing a task
+          // is not — see useQueuedWrite.
+          return write({ action: { kind: 'complete' }, online: () => api.completeTask(taskId) });
         case 'approve':
           return api.approveTask(taskId);
       }
     },
-    onSuccess: (task) => applyTaskUpdate(queryClient, task),
+    onSuccess: (task) => {
+      if (task) applyTaskUpdate(queryClient, task);
+    },
   });
 }
 

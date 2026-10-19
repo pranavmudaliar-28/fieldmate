@@ -8,6 +8,8 @@ import {
   spacing,
   toneColors,
   typography,
+  type IconName,
+  type Tone,
 } from '../constants/theme';
 import { Button } from './Button';
 import { Icon } from './Icon';
@@ -20,6 +22,12 @@ export type ConfirmationDialogProps = {
   cancelLabel?: string;
   destructive?: boolean;
   loading?: boolean;
+  /** The mark above the title; defaults to a warning or a question. */
+  icon?: IconName;
+  /** Colours the mark, e.g. success for approve. Destructive is always error. */
+  tone?: Tone;
+  /** Shown on the confirm button, before its label. */
+  confirmIcon?: IconName;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -32,9 +40,13 @@ export function ConfirmationDialog({
   cancelLabel = 'Cancel',
   destructive = false,
   loading = false,
+  icon,
+  tone,
+  confirmIcon,
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
+  const emblemTone = destructive ? toneColors.error : tone ? toneColors[tone] : null;
   const titleRef = useRef<Text>(null);
 
   // Opening a dialog moves screen-reader focus to its title (docs/04 §8).
@@ -54,11 +66,13 @@ export function ConfirmationDialog({
     >
       <View style={styles.overlay}>
         <View style={styles.dialog} accessibilityViewIsModal accessibilityRole="alert">
-          <View style={[styles.emblem, destructive ? styles.emblemDanger : styles.emblemNeutral]}>
+          <View
+            style={[styles.emblem, { backgroundColor: emblemTone?.tint ?? colors.surfaceMuted }]}
+          >
             <Icon
-              name={destructive ? 'warning-outline' : 'help-circle-outline'}
-              size={22}
-              color={destructive ? toneColors.error.text : colors.textPrimary}
+              name={icon ?? (destructive ? 'warning-outline' : 'help-circle-outline')}
+              size={24}
+              color={emblemTone?.text ?? colors.textPrimary}
             />
           </View>
           <Text
@@ -72,23 +86,17 @@ export function ConfirmationDialog({
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.message}>
             {message}
           </Text>
+          {/* Stacked, the decision on top: two side-by-side labels truncate
+              long before the text scale limit. */}
           <View style={styles.actions}>
-            <Button
-              label={cancelLabel}
-              variant="secondary"
-              size="md"
-              onPress={onCancel}
-              disabled={loading}
-              style={styles.action}
-            />
             <Button
               label={confirmLabel}
               variant={destructive ? 'destructive' : 'primary'}
-              size="md"
               onPress={onConfirm}
               loading={loading}
-              style={styles.action}
+              {...(confirmIcon ? { icon: confirmIcon } : {})}
             />
+            <Button label={cancelLabel} variant="secondary" onPress={onCancel} disabled={loading} />
           </View>
         </View>
       </View>
@@ -110,21 +118,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.sheet,
     padding: spacing.lg,
-    gap: spacing.sm,
+    gap: spacing.smPlus,
     ...elevation.overlay,
   },
   emblem: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.control,
+    width: 52,
+    height: 52,
+    borderRadius: radius.action,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
   },
-  emblemDanger: { backgroundColor: toneColors.error.tint },
-  emblemNeutral: { backgroundColor: colors.surfaceMuted },
-  title: { ...typography.display, color: colors.textPrimary },
+  title: {
+    ...typography.sectionTitle,
+    fontFamily: typography.display.fontFamily,
+    color: colors.textPrimary,
+  },
   message: { ...typography.body, color: colors.textSecondary },
-  actions: { flexDirection: 'row', gap: spacing.smPlus, marginTop: spacing.smPlus },
-  action: { flex: 1 },
+  actions: { gap: spacing.smPlus, marginTop: spacing.sm },
 });

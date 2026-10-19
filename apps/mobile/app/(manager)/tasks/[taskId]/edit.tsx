@@ -1,10 +1,11 @@
 import type { CreateTaskInput } from '@fieldmate/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AppHeader } from '../../../../src/components/AppHeader';
 import { ErrorState, LoadingState } from '../../../../src/components/States';
 import { useToast } from '../../../../src/components/Toast';
-import { layout } from '../../../../src/constants/theme';
+import { colors, layout } from '../../../../src/constants/theme';
 import { TaskForm } from '../../../../src/features/tasks/TaskForm';
 import { useTask, useUpdateTask } from '../../../../src/features/tasks/hooks';
 import { ApiError } from '../../../../src/services/http';
@@ -36,18 +37,28 @@ export default function EditTaskScreen() {
     );
   };
 
+  const worker = task.data?.assignment.worker;
+  const firstName = worker?.name.split(' ')[0] ?? '';
+  // The API tells the assignee about an edit, except on a task they handed back.
+  const notice =
+    task.data && worker && task.data.status !== 'REJECTED'
+      ? `${firstName} is notified when you save.`
+      : null;
+
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'Edit task' }} />
+    <View style={styles.screen}>
+      <AppHeader title="Edit task" onBack={() => router.back()} backIcon="close" />
 
       {task.isPending ? (
-        <View style={{ padding: layout.screenPadding }}>
+        <View style={styles.padded}>
           <LoadingState variant="detail" />
         </View>
       ) : null}
 
       {task.isError ? (
-        <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
+        <View style={styles.padded}>
+          <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
+        </View>
       ) : null}
 
       {task.data ? (
@@ -60,11 +71,17 @@ export default function EditTaskScreen() {
             workerName: task.data.assignment.worker.name,
             location: task.data.location,
           }}
+          notice={notice}
           submitting={updateTask.isPending}
           submitError={error}
           onSubmit={submit}
         />
       ) : null}
-    </>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  padded: { padding: layout.screenPadding },
+});

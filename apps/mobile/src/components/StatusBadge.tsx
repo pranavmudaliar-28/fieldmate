@@ -3,19 +3,19 @@ import { statusAppearance } from '../constants/theme';
 import { Badge } from './Badge';
 
 /**
- * Icon plus the word on a tint (docs/04 §2.2), so status survives sunlight,
- * colour blindness and a greyscale screenshot. A dot as well was one signal too
- * many — the card's stripe already repeats the colour.
+ * Icon plus the word on the status's own tint, so status survives sunlight,
+ * colour blindness and a greyscale screenshot.
  */
-export function StatusBadge({ status }: { status: TaskStatus }) {
+export function StatusBadge({ status, label }: { status: TaskStatus; label?: string }) {
   const appearance = statusAppearance[status];
+  const text = label ?? appearance.label;
 
   return (
     <Badge
-      label={appearance.label}
-      tone={appearance.tone}
+      label={text}
+      palette={appearance}
       icon={appearance.icon}
-      accessibilityLabel={`Status: ${appearance.label}`}
+      accessibilityLabel={`Status: ${text}`}
       testID={`status-badge-${status}`}
     />
   );

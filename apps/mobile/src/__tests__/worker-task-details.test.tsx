@@ -1,8 +1,9 @@
 import type { TaskDetail, TaskStatus } from '@fieldmate/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, userEvent, waitFor, within } from '@testing-library/react-native';
 import WorkerTaskDetails from '../../app/(worker)/tasks/[taskId]/index';
 import { ToastProvider } from '../components/Toast';
+import { OfflineQueueProvider } from '../features/offline/offline-queue';
 import { useAuth } from '../features/auth/auth-context';
 import * as tasksApi from '../features/tasks/api';
 import { apiRequest } from '../services/http';
@@ -72,9 +73,12 @@ async function renderDetails(task: TaskDetail) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await render(
     <QueryClientProvider client={client}>
-      <ToastProvider>
-        <WorkerTaskDetails />
-      </ToastProvider>
+      {/* The screen reports what is still waiting to send, so it needs the queue. */}
+      <OfflineQueueProvider>
+        <ToastProvider>
+          <WorkerTaskDetails />
+        </ToastProvider>
+      </OfflineQueueProvider>
     </QueryClientProvider>,
   );
   await waitFor(() => expect(screen.getByText('Replace water meter')).toBeTruthy());
@@ -157,9 +161,12 @@ describe('Worker task details (S-008)', () => {
       }),
     );
 
-    expect(screen.getByTestId('worker-journey')).toBeTruthy();
-    expect(screen.getByText('Arrived on site')).toBeTruthy();
-    expect(screen.getByText('Work started')).toBeTruthy();
+    const journey = within(screen.getByTestId('worker-journey'));
+    for (const step of ['Accepted', 'On the way', 'Arrived', 'In progress', 'Submitted']) {
+      expect(journey.getByText(step)).toBeTruthy();
+    }
+    // Times are kept for screen readers even though the row has no room for them.
+    expect(journey.getByLabelText(/Arrived .*, In progress not yet/)).toBeTruthy();
   });
 
   it('requires a reason to reject and confirms first', async () => {
@@ -190,11 +197,33 @@ describe('Worker task details (S-008)', () => {
     );
   });
 
+  it('sends a chosen reason together with any details', async () => {
+    await renderDetails(buildTask());
+    const user = userEvent.setup();
+
+    await user.press(screen.getByTestId('action-reject'));
+    await waitFor(() => expect(screen.getByTestId('reject-sheet')).toBeTruthy());
+    await user.press(screen.getByTestId('reject-choice-clash'));
+    await waitFor(() => expect(screen.getByTestId('submit-reject')).toBeEnabled());
+    await user.type(screen.getByTestId('reject-reason'), 'At the Andheri job until 4 pm.');
+    await user.press(screen.getByTestId('submit-reject'));
+
+    const confirmButtons = await screen.findAllByRole('button', { name: 'Reject task' });
+    await user.press(confirmButtons[confirmButtons.length - 1]!);
+
+    await waitFor(() =>
+      expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/reject', {
+        method: 'POST',
+        body: { reason: 'Clashes with another job: At the Andheri job until 4 pm.' },
+      }),
+    );
+  });
+
   it('shows photo and note controls once the task is in progress', async () => {
     await renderDetails(buildTask({ status: 'IN_PROGRESS' }));
 
     expect(screen.getByTestId('add-photo')).toBeTruthy();
-    expect(screen.getByTestId('note-input')).toBeTruthy();
+    expect(screen.getByTestId('add-note')).toBeTruthy();
     expect(screen.queryByTestId('action-start')).toBeNull();
     // Once work has started there is no backing out and no undo.
     expect(screen.queryByTestId('action-reject')).toBeNull();
@@ -211,7 +240,7 @@ describe('Worker task details (S-008)', () => {
     await renderDetails(buildTask({ status: 'IN_PROGRESS' }));
 
     expect(screen.getByTestId('action-complete')).toBeDisabled();
-    expect(screen.getByText('At least 1 photo is required to complete this task.')).toBeTruthy();
+    expect(screen.getByText('Add at least 1 photo to submit for review.')).toBeTruthy();
   });
 
   it('enables Complete when the task has a photo', async () => {
@@ -229,8 +258,10 @@ describe('Worker task details (S-008)', () => {
     } as never);
 
     const user = userEvent.setup();
-    await user.type(screen.getByTestId('note-input'), 'Replaced valve.');
     await user.press(screen.getByTestId('add-note'));
+    await waitFor(() => expect(screen.getByTestId('note-input')).toBeTruthy());
+    await user.type(screen.getByTestId('note-input'), 'Replaced valve.');
+    await user.press(screen.getByTestId('save-new-note'));
 
     await waitFor(() =>
       expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/notes', {

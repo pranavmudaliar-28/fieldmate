@@ -5,15 +5,16 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "e2e": "maestro test e2e",
     "e2e:critical": "maestro test e2e/critical-flow.yaml"
   },
   "dependencies": {
-    "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/geist": "^0.4.2",
+    "@expo-google-fonts/geist-mono": "^0.4.3",
     "@expo/vector-icons": "^15.0.2",
     "@fieldmate/shared": "*",
     "@hookform/resolvers": "^5.9.1",

@@ -59,6 +59,24 @@ describe('theme tokens', () => {
     expect(Object.keys(statusAppearance).sort()).toEqual([...TASK_STATUSES].sort());
   });
 
+  it.each(Object.entries(statusAppearance))(
+    '%s badge text meets 5.4:1 on its tint',
+    (_status, appearance) => {
+      expect(contrast(appearance.text, appearance.tint)).toBeGreaterThanOrEqual(5.4);
+    },
+  );
+
+  it('gives every status its own colour', () => {
+    const tints = Object.values(statusAppearance).map((a) => a.tint);
+    expect(new Set(tints).size).toBe(tints.length);
+  });
+
+  it('tertiary text still meets WCAG AA on paper and surface', () => {
+    for (const bg of [colors.background, colors.surface]) {
+      expect(contrast(colors.textTertiary, bg)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it('keeps touch targets at least 48dp', () => {
     expect(layout.minTouchTarget).toBeGreaterThanOrEqual(48);
     expect(layout.buttonHeightMedium).toBeGreaterThanOrEqual(48);

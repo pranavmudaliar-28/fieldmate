@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import ManagerTaskDetails from '../../app/(manager)/tasks/[taskId]/index';
 import { ToastProvider } from '../components/Toast';
+import { OfflineQueueProvider } from '../features/offline/offline-queue';
 import * as tasksApi from '../features/tasks/api';
 
 jest.mock('../features/tasks/api');
@@ -42,9 +43,11 @@ async function renderDetails(task: TaskDetail) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await render(
     <QueryClientProvider client={client}>
-      <ToastProvider>
-        <ManagerTaskDetails />
-      </ToastProvider>
+      <OfflineQueueProvider>
+        <ToastProvider>
+          <ManagerTaskDetails />
+        </ToastProvider>
+      </OfflineQueueProvider>
     </QueryClientProvider>,
   );
   await waitFor(() => expect(screen.getByText('Replace water meter')).toBeTruthy());
@@ -72,22 +75,25 @@ describe('Manager task details (S-005)', () => {
   it('offers edit, reassign and cancel for an assigned task', async () => {
     await renderDetails(buildTask());
 
-    // One action in the bar; the rest behind the overflow, so nothing is cut off.
-    expect(screen.getByTestId('action-reassign')).toBeTruthy();
-    expect(screen.queryByTestId('action-edit')).toBeNull();
+    // Nothing to decide yet, so no action bar: everything waits behind the overflow.
+    expect(screen.queryByTestId('action-reassign')).toBeNull();
 
     await openOverflow();
+    expect(screen.getByTestId('action-reassign')).toBeTruthy();
     expect(screen.getByTestId('action-edit')).toBeTruthy();
     expect(screen.getByTestId('action-cancel')).toBeTruthy();
     expect(screen.queryByTestId('action-complete')).toBeNull();
     expect(screen.queryByTestId('action-reopen')).toBeNull();
   });
 
-  it('disables Complete until the task has a photo, and explains why', async () => {
+  it('explains why a task without photos cannot be completed', async () => {
     await renderDetails(buildTask({ status: 'IN_PROGRESS' }));
+    await openOverflow();
+    await userEvent.setup().press(screen.getByTestId('action-complete'));
 
-    expect(screen.getByTestId('action-complete')).toBeDisabled();
-    expect(screen.getByText('At least 1 photo is required to complete this task.')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Can’t mark as completed yet')).toBeTruthy());
+    expect(screen.getByText(/A task needs at least one photo/)).toBeTruthy();
+    expect(api.completeTask).not.toHaveBeenCalled();
   });
 
   it('completes an in-progress task with a photo after confirmation', async () => {
@@ -108,16 +114,12 @@ describe('Manager task details (S-005)', () => {
     api.completeTask.mockResolvedValue({ ...task, status: 'COMPLETED' });
 
     const user = userEvent.setup();
+    await openOverflow();
     await user.press(screen.getByTestId('action-complete'));
 
-    await waitFor(() =>
-      expect(
-        screen.getByText(
-          'Complete this task? The worker will no longer be able to add photos or notes.',
-        ),
-      ).toBeTruthy(),
-    );
-    await user.press(screen.getByRole('button', { name: 'Complete' }));
+    await waitFor(() => expect(screen.getByText('Mark as completed without review?')).toBeTruthy());
+    expect(screen.getByText(/Priya hasn’t submitted this yet/)).toBeTruthy();
+    await user.press(screen.getByRole('button', { name: 'Mark as completed' }));
 
     await waitFor(() => expect(api.completeTask).toHaveBeenCalledWith('task-1'));
   });
@@ -127,9 +129,8 @@ describe('Manager task details (S-005)', () => {
     await openOverflow();
     await userEvent.setup().press(screen.getByTestId('action-cancel'));
 
-    await waitFor(() =>
-      expect(screen.getByText("Cancel this task? This can't be undone.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText('Cancel this task?')).toBeTruthy());
+    expect(screen.getByText(/This can't be undone\./)).toBeTruthy();
     expect(api.cancelTask).not.toHaveBeenCalled();
   });
 
@@ -178,16 +179,18 @@ describe('Manager task details (S-005)', () => {
     });
 
     const user = userEvent.setup();
+    await openOverflow();
     await user.press(screen.getByTestId('action-reassign'));
     await waitFor(() => expect(screen.getByTestId(`worker-option-${other.id}`)).toBeTruthy());
     await user.press(screen.getByTestId(`worker-option-${other.id}`));
+    // Choosing and committing are separate taps.
+    expect(api.reassignTask).not.toHaveBeenCalled();
+    await user.press(screen.getByRole('button', { name: 'Continue with Sam' }));
 
-    await waitFor(() =>
-      expect(
-        screen.getByText(/Reassign to Sam Lee\? Priya Nair will lose access to this task\./),
-      ).toBeTruthy(),
-    );
-    // Both the action bar and the dialog have a "Reassign" button; confirm in the dialog.
+    await waitFor(() => expect(screen.getByText('Reassign to Sam Lee?')).toBeTruthy());
+    expect(
+      screen.getByText('Priya stops seeing this task. Sam gets it as a new assignment.'),
+    ).toBeTruthy();
     const confirmButtons = screen.getAllByRole('button', { name: 'Reassign' });
     await user.press(confirmButtons[confirmButtons.length - 1]!);
 
@@ -198,10 +201,11 @@ describe('Manager task details (S-005)', () => {
     await renderDetails(buildTask());
     api.fetchFieldWorkers.mockResolvedValue([WORKER]);
 
+    await openOverflow();
     await userEvent.setup().press(screen.getByTestId('action-reassign'));
 
     await waitFor(() => expect(screen.getByTestId(`worker-option-${WORKER.id}`)).toBeDisabled());
-    expect(screen.getByText('Current')).toBeTruthy();
+    expect(screen.getByText('Currently assigned')).toBeTruthy();
   });
   describe('reviewing submitted work (F-008)', () => {
     const submitted = () =>
@@ -231,7 +235,7 @@ describe('Manager task details (S-005)', () => {
 
       await user.press(screen.getByTestId('action-approve'));
       await waitFor(() =>
-        expect(screen.getByText(/The task will be marked complete/)).toBeTruthy(),
+        expect(screen.getByText(/The task moves to Completed and Priya is notified/)).toBeTruthy(),
       );
       const confirm = screen.getAllByRole('button', { name: 'Approve' });
       await user.press(confirm[confirm.length - 1]!);
@@ -280,7 +284,8 @@ describe('Manager task details (S-005)', () => {
       );
 
       expect(screen.getByTestId('task-review-note')).toBeTruthy();
-      expect(screen.getByText(/Changes requested by Anita Rao/)).toBeTruthy();
+      expect(screen.getByText(/Anita requested changes/)).toBeTruthy();
+      expect(screen.getByText('In progress · Changes requested')).toBeTruthy();
       expect(screen.getByText(/The serial number is not readable./)).toBeTruthy();
     });
   });

@@ -1,4 +1,3 @@
-import type { TaskStatus } from '@fieldmate/shared';
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -8,20 +7,32 @@ import { Icon } from '../../components/Icon';
 import { EmptyState, ErrorState, LoadingState } from '../../components/States';
 import { useTabBarSpacing } from '../../components/TabBar';
 import { TaskCard } from '../../components/TaskCard';
-import { colors, layout, radius, spacing, statusAppearance } from '../../constants/theme';
+import { colors, layout, radius, spacing, type IconName } from '../../constants/theme';
+import { TASK_FILTERS, type TaskFilter } from './constants';
 import { useTaskList } from './hooks';
 
-const FILTERS: FilterChip<TaskStatus | null>[] = [
+const FILTERS: FilterChip<TaskFilter | null>[] = [
   { label: 'All', value: null, testID: 'filter-ALL' },
-  ...(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'REJECTED', 'CANCELLED'] as TaskStatus[]).map(
-    (status) => ({
-      label: statusAppearance[status].label,
-      value: status,
-      testID: `filter-${status}`,
-      tone: statusAppearance[status].tone,
-    }),
-  ),
+  ...TASK_FILTERS.map((filter) => ({
+    label: filter.label,
+    value: filter.value,
+    testID: `filter-${filter.value}`,
+  })),
 ];
+
+/** What an empty filter means, said the way the manager would think it. */
+const EMPTY: Partial<Record<TaskFilter, { icon: IconName; title: string; message: string }>> = {
+  AWAITING_REVIEW: {
+    icon: 'hourglass-outline',
+    title: 'All caught up',
+    message: 'Nothing is waiting for your review. We’ll notify you when a worker submits.',
+  },
+  REJECTED: {
+    icon: 'arrow-undo-outline',
+    title: 'Nothing handed back',
+    message: 'No worker has rejected a task.',
+  },
+};
 
 export type TaskListScreenProps = {
   /** Supplied by the route file so typed routes stay literal. */
@@ -37,25 +48,27 @@ export function TaskListScreen({ onOpenTask, onCreateTask }: TaskListScreenProps
   const params = useLocalSearchParams<{ status?: string }>();
   const tabBarSpacing = useTabBarSpacing();
   const initial = FILTERS.find((option) => option.value === params.status)?.value ?? null;
-  const [filter, setFilter] = useState<TaskStatus | null>(initial);
+  const [filter, setFilter] = useState<TaskFilter | null>(initial);
 
-  const query = useTaskList(filter ? [filter] : undefined);
+  const statuses = TASK_FILTERS.find((option) => option.value === filter)?.statuses;
+  const query = useTaskList(statuses);
   const tasks = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const empty = filter ? EMPTY[filter] : undefined;
 
   return (
     <View style={styles.screen}>
       <AppHeader
         size="large"
-        title="All tasks"
+        title="Tasks"
         right={
           <Pressable
             onPress={onCreateTask}
             accessibilityRole="button"
             accessibilityLabel="Create task"
             testID="create-task-button"
-            style={styles.create}
+            style={({ pressed }) => [styles.create, pressed && styles.createPressed]}
           >
-            <Icon name="add" size={24} color={colors.onAccent} />
+            <Icon name="add" size={28} color={colors.onPrimary} />
           </Pressable>
         }
       />
@@ -96,16 +109,21 @@ export function TaskListScreen({ onOpenTask, onCreateTask }: TaskListScreenProps
           }}
           ListFooterComponent={query.isFetchingNextPage ? <LoadingState variant="inline" /> : null}
           ListEmptyComponent={
-            <EmptyState
-              icon={filter ? 'filter-outline' : 'clipboard-outline'}
-              title={filter ? 'No tasks with this status' : 'No tasks yet'}
-              message={
-                filter
-                  ? 'Try a different filter.'
-                  : 'Create your first task to assign work to the field.'
-              }
-              {...(filter ? {} : { action: { label: 'Create task', onPress: onCreateTask } })}
-            />
+            filter ? (
+              <EmptyState
+                icon={empty?.icon ?? 'filter-outline'}
+                title={empty?.title ?? 'No tasks with this status'}
+                message={empty?.message ?? 'Try a different filter.'}
+                action={{ label: 'Show all tasks', onPress: () => setFilter(null) }}
+              />
+            ) : (
+              <EmptyState
+                icon="file-tray-outline"
+                title="No tasks yet"
+                message="Create one to get started."
+                action={{ label: 'Create task', onPress: onCreateTask }}
+              />
+            )
           }
         />
       ) : null}
@@ -117,13 +135,19 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   create: {
-    width: 46,
-    height: 46,
+    width: 56,
+    height: 56,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  list: { paddingHorizontal: layout.screenPadding, gap: spacing.smPlus },
-  padded: { paddingHorizontal: layout.screenPadding },
+  createPressed: { backgroundColor: colors.primaryPressed },
+  list: {
+    paddingHorizontal: layout.screenPadding,
+    paddingTop: spacing.smPlus,
+    gap: spacing.smPlus,
+    flexGrow: 1,
+  },
+  padded: { paddingHorizontal: layout.screenPadding, paddingTop: spacing.smPlus },
 });

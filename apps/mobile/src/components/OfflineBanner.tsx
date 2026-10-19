@@ -11,7 +11,7 @@ export function OfflineBanner() {
 
   return (
     <View style={styles.banner} accessibilityRole="alert" accessibilityLiveRegion="polite">
-      <Icon name="cloud-offline-outline" size={16} color={colors.accent} />
+      <Icon name="cloud-offline-outline" size={18} color={colors.onOffline} />
       <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.text}>
         {OFFLINE_MESSAGE}
       </Text>
@@ -25,9 +25,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surfaceInverse,
-    paddingVertical: spacing.sm,
+    backgroundColor: colors.offline,
+    paddingVertical: spacing.smPlus,
     paddingHorizontal: spacing.md,
   },
-  text: { ...typography.secondaryStrong, color: colors.textOnInverse },
+  text: { ...typography.secondaryStrong, color: colors.onOffline },
 });

@@ -3,7 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import { ApiError } from '../../services/http';
 import * as authApi from './api';
-import { AuthProvider, useAuth } from './auth-context';
+import { AuthProvider, BOOTSTRAP_TIMEOUT_MS, useAuth } from './auth-context';
 import * as tokenStorage from './token-storage';
 
 jest.mock('./api');
@@ -82,6 +82,30 @@ describe('AuthProvider bootstrap', () => {
     api.getCurrentUser.mockResolvedValue(MANAGER);
     await act(async () => auth.retryBootstrap());
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedIn:MANAGER'));
+  });
+
+  it('gives up on a server that never answers, so the splash cannot hang', async () => {
+    jest.useFakeTimers();
+    try {
+      storage.loadToken.mockResolvedValue('stored-token');
+      let signal: AbortSignal | undefined;
+      api.getCurrentUser.mockImplementation((s) => {
+        signal = s;
+        return new Promise(() => {});
+      });
+      await renderAuth();
+      expect(screen.getByTestId('status')).toHaveTextContent('loading:none');
+
+      await act(async () => {
+        jest.advanceTimersByTime(BOOTSTRAP_TIMEOUT_MS);
+      });
+
+      expect(screen.getByTestId('status')).toHaveTextContent('bootstrapFailed:none');
+      expect(signal?.aborted).toBe(true);
+      expect(storage.clearToken).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

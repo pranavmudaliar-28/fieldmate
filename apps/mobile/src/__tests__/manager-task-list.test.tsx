@@ -130,13 +130,25 @@ describe('Manager task list (S-003)', () => {
 
   it('explains an empty filtered list differently', async () => {
     api.fetchTasks.mockResolvedValue(page([]));
-    mockParams.status = 'REJECTED';
+    mockParams.status = 'CANCELLED';
     await renderList();
 
     await waitFor(() => expect(screen.getByText('No tasks with this status')).toBeTruthy());
-    // A filtered empty list offers no shortcut to create; the header still does.
+    // A filtered empty list leads back to every task; the header still creates.
     const emptyState = within(screen.getByTestId('empty-state'));
     expect(emptyState.queryByRole('button', { name: 'Create task' })).toBeNull();
+    expect(emptyState.getByRole('button', { name: 'Show all tasks' })).toBeTruthy();
+  });
+
+  it('says the review queue is clear rather than empty', async () => {
+    api.fetchTasks.mockResolvedValue(page([]));
+    mockParams.status = 'AWAITING_REVIEW';
+    await renderList();
+
+    await waitFor(() => expect(screen.getByText('All caught up')).toBeTruthy());
+    expect(api.fetchTasks).toHaveBeenCalledWith(
+      expect.objectContaining({ statuses: ['AWAITING_REVIEW'] }),
+    );
   });
 
   it('shows a retry when the list cannot be loaded', async () => {

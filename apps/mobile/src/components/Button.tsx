@@ -7,6 +7,7 @@ import {
   Text,
   View,
   type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import {
@@ -21,7 +22,21 @@ import {
 } from '../constants/theme';
 import { Icon } from './Icon';
 
-export type ButtonVariant = 'primary' | 'ink' | 'secondary' | 'destructive' | 'ghost';
+/**
+ * `primary` is ink. `signal` is the hi-vis yellow and is reserved for the
+ * worker's next journey step — one per screen at most, so it always means
+ * "this is what you do next". `ink` is kept as a name for `primary`.
+ */
+export type ButtonVariant =
+  | 'primary'
+  | 'signal'
+  | 'ink'
+  | 'secondary'
+  | 'tonal'
+  | 'destructive'
+  | 'destructiveOutline'
+  | 'destructiveGhost'
+  | 'ghost';
 
 export type ButtonProps = {
   label: string;
@@ -30,6 +45,8 @@ export type ButtonProps = {
   size?: 'lg' | 'md';
   /** Sits before the label. Decorative: the label already says what it does. */
   icon?: IconName;
+  /** Sits after the label, for a button that moves the task forward. */
+  trailingIcon?: IconName;
   loading?: boolean;
   disabled?: boolean;
   /** Explains to screen readers why the button is disabled. */
@@ -45,6 +62,7 @@ export function Button({
   variant = 'primary',
   size = 'lg',
   icon,
+  trailingIcon,
   loading = false,
   disabled = false,
   disabledReason,
@@ -64,15 +82,13 @@ export function Button({
   };
 
   const appearance = variantStyles[variant];
+  const isGhost = variant === 'ghost' || variant === 'destructiveGhost';
+  const iconSize = size === 'lg' ? 20 : 18;
+  const iconColor = disabled ? colors.textDisabled : appearance.label.color;
 
   return (
     <Animated.View
-      style={[
-        fullWidth ? styles.fullWidth : styles.hugContent,
-        { transform: [{ scale }] },
-        !isInactive && appearance.lift,
-        style,
-      ]}
+      style={[fullWidth ? styles.fullWidth : styles.hugContent, { transform: [{ scale }] }, style]}
     >
       <Pressable
         testID={testID}
@@ -89,26 +105,25 @@ export function Button({
           size === 'lg' ? styles.large : styles.medium,
           appearance.container,
           pressed && !isInactive && appearance.pressed,
-          disabled && styles.disabled,
+          disabled && !isGhost && styles.disabled,
         ]}
       >
         {loading ? (
           <ActivityIndicator color={appearance.label.color} />
         ) : (
           <View style={styles.content}>
-            {icon ? (
-              <Icon
-                name={icon}
-                size={size === 'lg' ? 20 : 18}
-                color={disabled ? colors.textDisabled : appearance.label.color}
-              />
-            ) : null}
+            {icon ? <Icon name={icon} size={iconSize} color={iconColor} /> : null}
             <Text
               maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={[styles.label, appearance.label, disabled && styles.disabledLabel]}
+              style={[
+                size === 'lg' ? typography.button : typography.buttonMedium,
+                appearance.label,
+                disabled && styles.disabledLabel,
+              ]}
             >
               {label}
             </Text>
+            {trailingIcon ? <Icon name={trailingIcon} size={iconSize} color={iconColor} /> : null}
           </View>
         )}
       </Pressable>
@@ -125,62 +140,68 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  large: { height: layout.buttonHeightLarge },
-  medium: { height: layout.buttonHeightMedium, borderRadius: radius.control },
-  fullWidth: { alignSelf: 'stretch', borderRadius: radius.action },
-  hugContent: { alignSelf: 'flex-start', borderRadius: radius.action },
+  large: { minHeight: layout.buttonHeightLarge },
+  medium: { minHeight: layout.buttonHeightMedium },
+  fullWidth: { alignSelf: 'stretch' },
+  hugContent: { alignSelf: 'flex-start' },
   content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  label: { ...typography.button },
-  disabled: { backgroundColor: colors.surfaceMuted, borderColor: colors.border },
-  disabledLabel: { color: colors.textDisabled },
+  disabled: { backgroundColor: colors.border, borderColor: colors.border },
+  disabledLabel: { color: colors.textDisabled, textDecorationLine: 'none' },
 });
 
 type Appearance = {
   container: ViewStyle;
   pressed: ViewStyle;
-  label: { color: string };
-  /** Shadow, applied to the outer wrapper so it is not clipped by the border. */
-  lift: ViewStyle;
+  label: TextStyle & { color: string };
 };
 
-const noLift: ViewStyle = {};
-
 const variantStyles: Record<ButtonVariant, Appearance> = {
-  /** The one action colour: a yellow fill with ink on top. */
   primary: {
-    container: { backgroundColor: colors.accent },
-    pressed: { backgroundColor: colors.accentPressed },
-    label: { color: colors.onAccent },
-    lift: {
-      shadowColor: colors.accentPressed,
-      shadowOpacity: 0.55,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 4,
-    },
+    container: { backgroundColor: colors.primary },
+    pressed: { backgroundColor: colors.primaryPressed },
+    label: { color: colors.onPrimary },
   },
   ink: {
     container: { backgroundColor: colors.primary },
     pressed: { backgroundColor: colors.primaryPressed },
     label: { color: colors.onPrimary },
-    lift: noLift,
+  },
+  /** The worker's next step: yellow with ink on top. */
+  signal: {
+    container: { backgroundColor: colors.accent },
+    pressed: { backgroundColor: colors.accentPressed },
+    label: { color: colors.onAccent },
   },
   secondary: {
-    container: { backgroundColor: colors.surface, borderColor: colors.border },
+    container: { backgroundColor: colors.surface, borderColor: colors.primary },
     pressed: { backgroundColor: colors.surfaceMuted },
     label: { color: colors.primary },
-    lift: noLift,
+  },
+  tonal: {
+    container: { backgroundColor: colors.surfaceMuted },
+    pressed: { backgroundColor: colors.border },
+    label: { color: colors.primary },
   },
   destructive: {
     container: { backgroundColor: colors.error },
     pressed: { opacity: 0.85 },
     label: { color: colors.onPrimary },
-    lift: noLift,
   },
+  destructiveOutline: {
+    container: { backgroundColor: colors.surface, borderColor: colors.error },
+    pressed: { backgroundColor: colors.errorTint },
+    label: { color: colors.errorText },
+  },
+  /** A text link: underlined so it reads as tappable without a box. */
   ghost: {
     container: { backgroundColor: 'transparent' },
     pressed: { backgroundColor: colors.surfaceMuted },
-    label: { color: colors.primary },
-    lift: noLift,
+    label: { color: colors.primary, textDecorationLine: 'underline' },
+  },
+  /** A destructive way out that must not compete with the next step. */
+  destructiveGhost: {
+    container: { backgroundColor: 'transparent' },
+    pressed: { backgroundColor: colors.errorTint },
+    label: { color: colors.errorText, textDecorationLine: 'underline' },
   },
 };

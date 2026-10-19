@@ -6,16 +6,16 @@ import {
   radius,
   spacing,
   tabularNumbers,
-  toneColors,
   typography,
   type Tone,
 } from '../constants/theme';
+import { Icon } from './Icon';
 
 export type FilterChip<T> = {
   label: string;
   value: T;
   testID: string;
-  /** Shows the status dot, so a chip reads the same way as a task card. */
+  /** Kept for callers; the chip itself no longer draws a status dot. */
   tone?: Tone;
   count?: number;
 };
@@ -28,8 +28,8 @@ export type FilterChipsProps<T> = {
 };
 
 /**
- * One implementation for both lists. This markup previously existed twice,
- * once for tasks and once for users, with identical styles.
+ * One row of filters, shared by tasks and users. Chips draw at 40 but keep a
+ * 48 hit area; the selected one is ink with a check, so it reads without colour.
  */
 export function FilterChips<T>({ options, selected, onSelect, testID }: FilterChipsProps<T>) {
   return (
@@ -54,25 +54,25 @@ export function FilterChips<T>({ options, selected, onSelect, testID }: FilterCh
               option.count === undefined ? option.label : `${option.label}, ${option.count}`
             }
             testID={option.testID}
-            style={[styles.chip, isSelected && styles.chipSelected]}
+            style={styles.hitArea}
           >
-            {option.tone && !isSelected ? (
-              <View style={[styles.dot, { backgroundColor: toneColors[option.tone].dot }]} />
-            ) : null}
-            <Text
-              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={[styles.label, isSelected && styles.labelSelected]}
-            >
-              {option.label}
-            </Text>
-            {option.count !== undefined ? (
+            <View style={[styles.chip, isSelected && styles.chipSelected]}>
+              {isSelected ? <Icon name="checkmark" size={16} color={colors.textOnInverse} /> : null}
               <Text
                 maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-                style={[styles.count, isSelected && styles.labelSelected]}
+                style={[styles.label, isSelected && styles.labelSelected]}
               >
-                {option.count}
+                {option.label}
               </Text>
-            ) : null}
+              {option.count !== undefined ? (
+                <Text
+                  maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+                  style={[styles.count, isSelected && styles.labelSelected]}
+                >
+                  {option.count}
+                </Text>
+              ) : null}
+            </View>
           </Pressable>
         );
       })}
@@ -85,21 +85,22 @@ const styles = StyleSheet.create({
   row: {
     gap: spacing.sm,
     paddingHorizontal: layout.screenPadding,
-    paddingVertical: spacing.sm,
     alignItems: 'center',
   },
+  hitArea: { minHeight: layout.minTouchTarget, justifyContent: 'center' },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    height: layout.minTouchTarget,
+    gap: spacing.xs + 2,
+    minHeight: layout.chipHeight,
     paddingHorizontal: spacing.md,
     borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipSelected: { backgroundColor: colors.surfaceInverse },
-  dot: { width: 7, height: 7, borderRadius: radius.pill },
-  label: { ...typography.secondaryStrong, color: colors.textPrimary },
+  chipSelected: { backgroundColor: colors.surfaceInverse, borderColor: colors.surfaceInverse },
+  label: { ...typography.secondaryStrong, fontSize: 15, color: colors.textPrimary },
   labelSelected: { color: colors.textOnInverse },
-  count: { ...typography.secondaryStrong, ...tabularNumbers, color: colors.textDisabled },
+  count: { ...typography.secondaryStrong, ...tabularNumbers, color: colors.textTertiary },
 });

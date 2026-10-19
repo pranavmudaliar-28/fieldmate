@@ -16,9 +16,15 @@ describe('Input', () => {
     expect(onChangeText).toHaveBeenCalled();
   });
 
-  it('marks a required field for screen readers', async () => {
+  it('marks a required field for screen readers, without a visual asterisk', async () => {
     await render(<Input label="Address" required testID="field" />);
-    expect(screen.getByText('Address *')).toBeTruthy();
+    expect(screen.getByText('Address')).toBeTruthy();
+    expect(screen.getByTestId('field').props['aria-required']).toBe(true);
+  });
+
+  it('counts characters against the limit when asked', async () => {
+    await render(<Input label="Note" value="Hello" maxLength={1000} showCount testID="field" />);
+    expect(screen.getByText('5 / 1000')).toBeTruthy();
   });
 
   /**

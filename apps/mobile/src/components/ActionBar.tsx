@@ -1,15 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Keyboard, PixelRatio, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  MAX_FONT_SIZE_MULTIPLIER,
-  colors,
-  elevation,
-  layout,
-  radius,
-  spacing,
-  typography,
-} from '../constants/theme';
+import { MAX_FONT_SIZE_MULTIPLIER, colors, layout, spacing, typography } from '../constants/theme';
+import { Icon } from './Icon';
 
 /** Above this text scale two buttons no longer fit side by side (docs/04 §8). */
 const STACK_ABOVE_FONT_SCALE = 1.3;
@@ -50,9 +43,12 @@ export function ActionBar({ children, hint }: { children: ReactNode; hint?: stri
       ]}
     >
       {hint ? (
-        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.hint}>
-          {hint}
-        </Text>
+        <View style={styles.hintRow}>
+          <Icon name="information-circle-outline" size={18} color={colors.textSecondary} />
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.hint}>
+            {hint}
+          </Text>
+        </View>
       ) : null}
       <View style={stacked ? styles.actionsStacked : styles.actions}>{children}</View>
     </View>
@@ -62,14 +58,14 @@ export function ActionBar({ children, hint }: { children: ReactNode; hint?: stri
 const styles = StyleSheet.create({
   bar: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     paddingHorizontal: layout.screenPadding,
     paddingTop: spacing.md,
     gap: spacing.smPlus,
-    ...elevation.floating,
   },
-  hint: { ...typography.caption, color: colors.textSecondary },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  hint: { ...typography.secondary, color: colors.textSecondary, flex: 1 },
   actions: { flexDirection: 'row', gap: spacing.smPlus },
   actionsStacked: { flexDirection: 'column-reverse', gap: spacing.sm },
 });

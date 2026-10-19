@@ -1,6 +1,7 @@
 import type { Note, TaskDetail, WorkerStep } from '@fieldmate/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../services/http';
+import { useQueuedWrite } from '../offline/use-queued-write';
 import { taskKeys } from './hooks';
 
 /** One endpoint per step of the worker's lifecycle (docs/05 §7). */
@@ -45,10 +46,12 @@ function deleteEvidence(taskId: string, evidenceId: string): Promise<void> {
 /** Moves the task one step forward: accept, depart, arrive, then start. */
 export function useAdvanceTask(taskId: string) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: (step: WorkerStep) => advanceTask(taskId, step),
+    mutationFn: (step: WorkerStep) =>
+      write({ action: { kind: 'step', step }, online: () => advanceTask(taskId, step) }),
     onSuccess: (task) => {
-      queryClient.setQueryData(taskKeys.detail(taskId), task);
+      if (task) queryClient.setQueryData(taskKeys.detail(taskId), task);
       void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
     },
   });
@@ -57,10 +60,11 @@ export function useAdvanceTask(taskId: string) {
 /** Undoes a mistapped step, until the work itself has started. */
 export function useStepBack(taskId: string) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: () => stepBackTask(taskId),
+    mutationFn: () => write({ action: { kind: 'stepBack' }, online: () => stepBackTask(taskId) }),
     onSuccess: (task) => {
-      queryClient.setQueryData(taskKeys.detail(taskId), task);
+      if (task) queryClient.setQueryData(taskKeys.detail(taskId), task);
       void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
     },
   });
@@ -68,8 +72,10 @@ export function useStepBack(taskId: string) {
 
 export function useRejectTask(taskId: string) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: (reason: string) => rejectTask(taskId, reason),
+    mutationFn: (reason: string) =>
+      write({ action: { kind: 'reject', reason }, online: () => rejectTask(taskId, reason) }),
     onSuccess: () => {
       // The worker loses access, so drop the cached task entirely.
       queryClient.removeQueries({ queryKey: taskKeys.detail(taskId) });
@@ -80,8 +86,10 @@ export function useRejectTask(taskId: string) {
 
 export function useAddNote(taskId: string) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: (content: string) => addNote(taskId, content),
+    mutationFn: (content: string) =>
+      write({ action: { kind: 'note.add', content }, online: () => addNote(taskId, content) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
     },
@@ -91,9 +99,13 @@ export function useAddNote(taskId: string) {
 /** The author's own note, while the task is in progress (docs/02 F-007). */
 export function useUpdateNote(taskId: string) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
     mutationFn: ({ noteId, content }: { noteId: string; content: string }) =>
-      updateNote(taskId, noteId, content),
+      write({
+        action: { kind: 'note.edit', noteId, content },
+        online: () => updateNote(taskId, noteId, content),
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
     },
@@ -102,8 +114,10 @@ export function useUpdateNote(taskId: string) {
 
 export function useDeleteNote(taskId: string) {
   const queryClient = useQueryClient();
+  const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: (noteId: string) => deleteNote(taskId, noteId),
+    mutationFn: (noteId: string) =>
+      write({ action: { kind: 'note.delete', noteId }, online: () => deleteNote(taskId, noteId) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
     },

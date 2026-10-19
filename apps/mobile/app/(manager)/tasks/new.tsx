@@ -1,10 +1,11 @@
 import type { CreateTaskInput } from '@fieldmate/shared';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { ConfirmationDialog } from '../../../src/components/ConfirmationDialog';
 import { useToast } from '../../../src/components/Toast';
-import { colors, layout, spacing, typography } from '../../../src/constants/theme';
+import { colors } from '../../../src/constants/theme';
 import { TaskForm } from '../../../src/features/tasks/TaskForm';
 import { useCreateTask } from '../../../src/features/tasks/hooks';
 import { ApiError } from '../../../src/services/http';
@@ -41,26 +42,8 @@ export default function CreateTaskScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: 'New task',
-          headerBackVisible: false,
-          headerLeft: () => (
-            <Pressable
-              onPress={leave}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-              testID="close-create-task"
-              hitSlop={8}
-              style={styles.headerButton}
-            >
-              <Text style={styles.headerLabel}>Close</Text>
-            </Pressable>
-          ),
-        }}
-      />
+    <View style={styles.screen}>
+      <AppHeader title="New task" onBack={leave} backIcon="close" backTestID="close-create-task" />
 
       <TaskForm
         mode="create"
@@ -73,25 +56,21 @@ export default function CreateTaskScreen() {
       <ConfirmationDialog
         visible={confirmDiscard}
         title="Discard changes?"
-        message="Your new task will not be saved."
+        message="This task hasn’t been created yet. Everything you entered will be lost."
         confirmLabel="Discard"
         cancelLabel="Keep editing"
         destructive
+        icon="trash-outline"
         onConfirm={() => {
           setConfirmDiscard(false);
           router.back();
         }}
         onCancel={() => setConfirmDiscard(false)}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerButton: {
-    minHeight: layout.minTouchTarget,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-  },
-  headerLabel: { ...typography.button, color: colors.primary },
+  screen: { flex: 1, backgroundColor: colors.background },
 });

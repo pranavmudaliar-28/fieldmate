@@ -1,8 +1,13 @@
-import { WORKER_ACTIVE_STATUSES, type TaskListItem, type TaskStatus } from '@fieldmate/shared';
+import {
+  WORKER_PROGRESS_STATUSES,
+  nextWorkerStep,
+  type TaskListItem,
+  type TaskStatus,
+} from '@fieldmate/shared';
 import { useRouter } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '../../../src/components/AppHeader';
-import { Avatar } from '../../../src/components/Avatar';
+import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
 import { Card } from '../../../src/components/Card';
 import { Icon } from '../../../src/components/Icon';
@@ -14,6 +19,7 @@ import {
 } from '../../../src/components/States';
 import { useTabBarSpacing } from '../../../src/components/TabBar';
 import { TaskCard } from '../../../src/components/TaskCard';
+import { useToast } from '../../../src/components/Toast';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
@@ -24,30 +30,44 @@ import {
   typography,
 } from '../../../src/constants/theme';
 import { useAuth } from '../../../src/features/auth/auth-context';
-import { NotificationPrompt } from '../../../src/features/notifications/NotificationPrompt';
 import { InboxBell } from '../../../src/features/notifications/InboxBell';
+import { NotificationPrompt } from '../../../src/features/notifications/NotificationPrompt';
 import { useTaskList } from '../../../src/features/tasks/hooks';
-import { formatDayHeading, formatRelativeTime } from '../../../src/utils/format';
+import { useAdvanceTask } from '../../../src/features/tasks/worker-hooks';
+import { WORKER_STEP_UI } from '../../../src/features/tasks/worker-steps';
+import { ApiError } from '../../../src/services/http';
+import { formatDayHeading } from '../../../src/utils/format';
 
 const SECTION_LIMIT = 10;
 
 /**
  * Everything the worker has taken on but not finished. Without this a task
  * would vanish from the dashboard the moment it was accepted, because it is
- * no longer ASSIGNED and not yet IN_PROGRESS.
+ * no longer ASSIGNED and not yet IN_PROGRESS. Work waiting on review is
+ * listed too, but never raised as the current job: there is nothing to do.
  */
-const UNDER_WAY = WORKER_ACTIVE_STATUSES.filter((status) => status !== 'ASSIGNED') as TaskStatus[];
+const UNDER_WAY: TaskStatus[] = [
+  ...WORKER_PROGRESS_STATUSES.filter((status) => status !== 'ASSIGNED'),
+  'AWAITING_REVIEW',
+];
+
+/** Steps along the journey, for the five-segment bar on the current job. */
+const STEPS_DONE: Partial<Record<TaskStatus, number>> = {
+  ACCEPTED: 1,
+  GOING_TO_LOCATION: 2,
+  REACHED_LOCATION: 3,
+  IN_PROGRESS: 4,
+  AWAITING_REVIEW: 5,
+};
 
 /** The job furthest along is the one to raise. */
 function mostAdvanced(tasks: TaskListItem[]): TaskListItem | undefined {
-  return [...tasks].sort(
-    (a, b) =>
-      WORKER_ACTIVE_STATUSES.indexOf(b.status as never) -
-      WORKER_ACTIVE_STATUSES.indexOf(a.status as never),
-  )[0];
+  return tasks
+    .filter((task) => task.status !== 'AWAITING_REVIEW')
+    .sort((a, b) => (STEPS_DONE[b.status] ?? 0) - (STEPS_DONE[a.status] ?? 0))[0];
 }
 
-/** S-006 Worker Dashboard: the live job first, then what is waiting. */
+/** S-006 Worker Home: the live job and its next step first, then what is waiting. */
 export default function WorkerDashboard() {
   const { user } = useAuth();
   const router = useRouter();
@@ -79,12 +99,7 @@ export default function WorkerDashboard() {
         size="large"
         eyebrow={formatDayHeading()}
         title={`Hello, ${user?.name.split(' ')[0] ?? 'there'}`}
-        right={
-          <View style={styles.headerActions}>
-            <InboxBell href="/(worker)/notifications" />
-            <Avatar name={user?.name ?? ''} variant="accent" />
-          </View>
-        }
+        right={<InboxBell href="/(worker)/notifications" />}
       />
 
       <ScrollView
@@ -103,8 +118,13 @@ export default function WorkerDashboard() {
 
         {isEmpty ? (
           <EmptyState
-            title="No tasks right now"
-            message="New tasks assigned to you will appear here."
+            icon="checkmark-circle-outline"
+            title="You’re all clear"
+            message="No tasks right now. When your manager assigns you one, it’ll show up here and you’ll get a notification."
+            action={{
+              label: 'See completed tasks',
+              onPress: () => router.push('/(worker)/(tabs)/tasks'),
+            }}
           />
         ) : null}
 
@@ -112,7 +132,7 @@ export default function WorkerDashboard() {
 
         {assignedTasks.length > 0 ? (
           <View style={styles.section}>
-            <SectionHeader title="New assignments" />
+            <SectionHeader title="New assignments" count={assignedTasks.length} countStyle="ink" />
             {assignedTasks.map((task) => (
               <TaskCard
                 key={task.id}
@@ -137,83 +157,128 @@ export default function WorkerDashboard() {
   );
 }
 
-/** The one job being worked right now, raised above everything else. */
+/**
+ * The one job being worked right now, on ink so it outranks everything else,
+ * with its next step one tap away in signal yellow.
+ */
 function CurrentJobCard({ task }: { task: TaskListItem }) {
   const router = useRouter();
+  const { showToast } = useToast();
+  const advance = useAdvanceTask(task.id);
   const open = () => router.push(`/(worker)/tasks/${task.id}`);
+
+  const appearance = statusAppearance[task.status];
+  const step = nextWorkerStep(task.status);
+  const done = STEPS_DONE[task.status] ?? 0;
+  const next = step
+    ? WORKER_STEP_UI[step].next
+    : 'Next: add photos and notes, then submit for review';
 
   return (
     <Card variant="inverse" style={styles.hero} testID={`current-job-${task.id}`}>
       <View style={styles.heroTop}>
-        <View style={[styles.pulse, { backgroundColor: colors.accent }]} />
         <Text
           maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
           style={styles.heroLabel}
           accessibilityRole="header"
         >
-          {statusAppearance[task.status].label}
+          Current task
         </Text>
-        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.heroUpdated}>
-          {formatRelativeTime(task.updatedAt)}
-        </Text>
+        {/* The status hue, lifted for an ink background. */}
+        <Badge
+          label={appearance.label}
+          icon={appearance.icon}
+          palette={{ text: appearance.tint, tint: `${appearance.text}55` }}
+          accessibilityLabel={`Status: ${appearance.label}`}
+        />
       </View>
 
-      <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={task.title}>
+      <Pressable
+        onPress={open}
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${task.title}`}
+        testID="hero-open-task"
+        style={styles.heroBody}
+      >
         <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.heroTitle}>
           {task.title}
         </Text>
+        <View style={styles.heroMeta}>
+          <Icon name="location-outline" size={18} color={colors.textOnInverseMuted} />
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.heroAddress}>
+            {task.address}
+          </Text>
+        </View>
       </Pressable>
 
-      <View style={styles.heroMeta}>
-        <Icon name="location-outline" size={15} color={colors.textOnInverseMuted} />
-        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.heroAddress}>
-          {task.address}
+      <View style={styles.progress} accessible accessibilityLabel={`Step ${done} of 5. ${next}`}>
+        <View style={styles.segments}>
+          {[1, 2, 3, 4, 5].map((index) => (
+            <View key={index} style={[styles.segment, index <= done && styles.segmentDone]} />
+          ))}
+        </View>
+        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.next}>
+          {next}
         </Text>
       </View>
 
-      <View style={styles.heroActions}>
+      {step ? (
+        <Button
+          label={WORKER_STEP_UI[step].label}
+          icon={WORKER_STEP_UI[step].icon}
+          variant="signal"
+          testID={`hero-action-${step}`}
+          loading={advance.isPending}
+          onPress={() =>
+            advance.mutate(step, {
+              onSuccess: () => showToast(WORKER_STEP_UI[step].done),
+              onError: (error) =>
+                showToast(
+                  error instanceof ApiError
+                    ? error.message
+                    : 'Couldn’t update status. Check your connection and try again.',
+                  'error',
+                ),
+            })
+          }
+        />
+      ) : (
         <Button
           label="Add photo"
           icon="camera-outline"
+          variant="signal"
           testID="hero-add-photo"
           onPress={() => router.push(`/(worker)/tasks/${task.id}/evidence`)}
-          style={styles.heroAction}
         />
-        <Pressable
-          onPress={open}
-          accessibilityRole="button"
-          accessibilityLabel="Open task"
-          testID="hero-open-task"
-          style={styles.heroOpen}
-        >
-          <Icon name="arrow-forward" size={22} color={colors.textOnInverse} />
-        </Pressable>
-      </View>
+      )}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  content: { padding: layout.screenPadding, gap: spacing.lg, paddingTop: spacing.sm },
+  content: { padding: layout.screenPadding, gap: spacing.section, paddingTop: spacing.xs },
   section: { gap: spacing.smPlus },
-  hero: { padding: spacing.mdPlus, gap: spacing.md },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  pulse: { width: 8, height: 8, borderRadius: radius.pill },
-  heroLabel: { ...typography.label, color: colors.accent, flex: 1 },
-  heroUpdated: { ...typography.caption, color: colors.textOnInverseMuted },
-  heroTitle: { ...typography.display, color: colors.textOnInverse },
-  heroMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  heroAddress: { ...typography.secondary, color: colors.textOnInverseMuted, flex: 1 },
-  heroActions: { flexDirection: 'row', gap: spacing.smPlus },
-  heroAction: { flex: 1 },
-  heroOpen: {
-    width: layout.buttonHeightLarge,
-    height: layout.buttonHeightLarge,
-    borderRadius: radius.action,
-    backgroundColor: colors.surfaceInverseRaised,
+  hero: { padding: spacing.mdPlus, gap: spacing.md, borderRadius: radius.sheet },
+  heroTop: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
   },
+  heroLabel: { ...typography.label, color: colors.accent },
+  heroBody: { gap: spacing.sm },
+  heroTitle: { ...typography.display, color: colors.textOnInverse },
+  heroMeta: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  heroAddress: { ...typography.body, color: colors.textOnInverseMuted, flex: 1 },
+  progress: { gap: spacing.sm },
+  segments: { flexDirection: 'row', gap: spacing.xs + 2 },
+  segment: {
+    flex: 1,
+    height: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.borderInverse,
+  },
+  segmentDone: { backgroundColor: colors.accent },
+  next: { ...typography.secondary, color: colors.textOnInverseMuted },
 });

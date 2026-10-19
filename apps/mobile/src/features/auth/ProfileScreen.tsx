@@ -1,28 +1,47 @@
 import type { Role } from '@fieldmate/shared';
+import Constants from 'expo-constants';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { Avatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
+import { Icon } from '../../components/Icon';
 import { useTabBarSpacing } from '../../components/TabBar';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  elevation,
   layout,
+  radius,
   spacing,
   typography,
+  type IconName,
 } from '../../constants/theme';
 import { NotificationPrompt } from '../notifications/NotificationPrompt';
 import { useAuth } from './auth-context';
-import { LOGOUT_CONFIRMATION } from './LogoutButton';
+
+const LOGOUT_CONFIRMATION =
+  "You'll need to sign in again on this device. This signs you out on all your devices.";
 
 const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Admin',
   MANAGER: 'Manager',
   FIELD_WORKER: 'Field worker',
+};
+
+/** What each role can do, said once where the person can check it. */
+const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  ADMIN: 'Admin · manages users and access',
+  MANAGER: 'Manager · can create and review tasks',
+  FIELD_WORKER: 'Field worker · accepts tasks and submits work',
+};
+
+const ROLE_ICONS: Record<Role, IconName> = {
+  ADMIN: 'key-outline',
+  MANAGER: 'people-outline',
+  FIELD_WORKER: 'construct-outline',
 };
 
 /**
@@ -35,6 +54,7 @@ export function ProfileScreen() {
   const tabBarSpacing = useTabBarSpacing();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const version = Constants.expoConfig?.version;
 
   const confirm = async () => {
     setBusy(true);
@@ -51,7 +71,7 @@ export function ProfileScreen() {
       <AppHeader size="large" title="Profile" />
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarSpacing }]}>
-        <Card style={styles.identity}>
+        <View style={styles.identity}>
           <Avatar name={user?.name ?? ''} size="lg" variant="accent" />
           <View style={styles.identityText}>
             <Text
@@ -61,37 +81,49 @@ export function ProfileScreen() {
             >
               {user?.name ?? ''}
             </Text>
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.email}>
-              {user?.email ?? ''}
-            </Text>
+            {user ? (
+              <Badge
+                label={ROLE_LABELS[user.role]}
+                icon={ROLE_ICONS[user.role]}
+                palette={{ text: colors.textOnInverse, tint: colors.surfaceInverseRaised }}
+                testID="header-role"
+              />
+            ) : null}
           </View>
-          {user ? (
-            <Badge
-              label={ROLE_LABELS[user.role]}
-              emphasis="inverse"
-              testID="header-role"
-              style={styles.role}
-            />
-          ) : null}
-        </Card>
+        </View>
+
+        {user ? (
+          <View style={styles.details}>
+            <DetailRow icon="mail-outline" label="Email" value={user.email} />
+            <View style={styles.divider} />
+            <DetailRow icon="shield-outline" label="Role" value={ROLE_DESCRIPTIONS[user.role]} />
+          </View>
+        ) : null}
 
         {user ? <NotificationPrompt role={user.role} /> : null}
 
         <Button
           label="Log out"
-          variant="secondary"
+          variant="destructiveOutline"
           icon="log-out-outline"
           testID="logout-button"
           onPress={() => setConfirming(true)}
         />
+
+        {version ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.version}>
+            FieldMate {version}
+          </Text>
+        ) : null}
       </ScrollView>
 
       <ConfirmationDialog
         visible={confirming}
-        title="Log out"
+        title="Log out?"
         message={LOGOUT_CONFIRMATION}
         confirmLabel="Log out"
         cancelLabel="Stay signed in"
+        icon="log-out-outline"
         loading={busy}
         onConfirm={() => void confirm()}
         onCancel={() => setConfirming(false)}
@@ -100,12 +132,51 @@ export function ProfileScreen() {
   );
 }
 
+function DetailRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
+  return (
+    <View style={styles.detailRow} accessible accessibilityLabel={`${label}: ${value}`}>
+      <Icon name={icon} size={22} color={colors.textSecondary} />
+      <View style={styles.detailText}>
+        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.detailLabel}>
+          {label}
+        </Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.detailValue}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: layout.screenPadding, gap: spacing.md },
-  identity: { alignItems: 'center', gap: spacing.smPlus, paddingVertical: spacing.lg },
-  identityText: { alignItems: 'center', gap: spacing.xs },
-  name: { ...typography.display, color: colors.textPrimary, textAlign: 'center' },
-  email: { ...typography.secondary, color: colors.textSecondary },
-  role: { alignSelf: 'center' },
+  content: { padding: layout.screenPadding, paddingTop: spacing.xs, gap: spacing.mdPlus },
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.sheet,
+    backgroundColor: colors.surfaceInverse,
+    ...elevation.floating,
+  },
+  identityText: { flex: 1, gap: spacing.sm, alignItems: 'flex-start' },
+  name: {
+    ...typography.sectionTitle,
+    fontFamily: typography.display.fontFamily,
+    color: colors.textOnInverse,
+  },
+  details: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+  },
+  divider: { height: 1, backgroundColor: colors.border },
+  detailRow: { flexDirection: 'row', gap: spacing.smPlus, paddingVertical: spacing.md },
+  detailText: { flex: 1, gap: 2 },
+  detailLabel: { ...typography.secondary, color: colors.textSecondary },
+  detailValue: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary },
+  version: { ...typography.mono, color: colors.textSecondary, textAlign: 'center' },
 });

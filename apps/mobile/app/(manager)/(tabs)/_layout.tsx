@@ -11,9 +11,11 @@ const TABS: TabConfig[] = [
 
 /** S-002 / S-003 / Profile. Task details and forms are pushed above these. */
 export default function ManagerTabsLayout() {
-  // Shares a cache key with the overview, so the badge costs no extra request.
+  // Shares cache keys with the overview, so the badge costs no extra request.
+  const review = useTaskList(['AWAITING_REVIEW'], TASK_PAGE_LIMIT);
   const rejected = useTaskList(['REJECTED'], TASK_PAGE_LIMIT);
-  const needsAttention = rejected.data?.pages[0]?.items.length ?? 0;
+  const needsAttention =
+    (review.data?.pages[0]?.items.length ?? 0) + (rejected.data?.pages[0]?.items.length ?? 0);
 
   return (
     <Tabs

@@ -11,9 +11,13 @@ import {
 } from '../constants/theme';
 import { Icon } from './Icon';
 
+export type BadgePalette = { text: string; tint: string; outline?: string };
+
 export type BadgeProps = {
   label: string;
   tone?: Tone;
+  /** Overrides the tone, for colours outside the five families (task statuses). */
+  palette?: BadgePalette;
   /** A saturated dot, readable at a glance before the word is read. */
   dot?: boolean;
   icon?: IconName;
@@ -24,13 +28,11 @@ export type BadgeProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-/**
- * A pill of state. Replaces the ad-hoc pills that were re-declared in the task
- * list, the user list and the user detail screen.
- */
+/** A small tag of state: tinted fill, dark hue text, optional icon. */
 export function Badge({
   label,
   tone = 'neutral',
+  palette,
   dot = false,
   icon,
   emphasis = 'tint',
@@ -38,15 +40,17 @@ export function Badge({
   testID,
   style,
 }: BadgeProps) {
-  const palette = toneColors[tone];
+  const toneColor = toneColors[tone];
+  const fill = palette ?? toneColor;
   const inverse = emphasis === 'inverse';
-  const foreground = inverse ? colors.accent : palette.text;
+  const foreground = inverse ? colors.accent : fill.text;
 
   return (
     <View
       style={[
         styles.badge,
-        { backgroundColor: inverse ? colors.surfaceInverse : palette.tint },
+        { backgroundColor: inverse ? colors.surfaceInverse : fill.tint },
+        palette?.outline ? [styles.outlined, { borderColor: palette.outline }] : null,
         style,
       ]}
       accessible
@@ -54,9 +58,9 @@ export function Badge({
       testID={testID}
     >
       {dot ? (
-        <View style={[styles.dot, { backgroundColor: inverse ? colors.accent : palette.dot }]} />
+        <View style={[styles.dot, { backgroundColor: inverse ? colors.accent : toneColor.dot }]} />
       ) : null}
-      {icon ? <Icon name={icon} size={13} color={foreground} /> : null}
+      {icon ? <Icon name={icon} size={14} color={foreground} /> : null}
       <Text
         maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
         style={[styles.label, { color: foreground }]}
@@ -73,10 +77,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs + 2,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.smPlus,
-    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.badge,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
+  outlined: { borderWidth: 1, borderStyle: 'dashed' },
   dot: { width: 8, height: 8, borderRadius: radius.pill },
-  label: { ...typography.caption },
+  label: { ...typography.caption, fontFamily: typography.secondaryStrong.fontFamily },
 });

@@ -4,6 +4,7 @@ import {
   colors,
   fontFamily,
   radius,
+  statusAppearance,
   type Tone,
   toneColors,
 } from '../constants/theme';
@@ -13,17 +14,31 @@ export type AvatarSize = 'sm' | 'md' | 'lg';
 export type AvatarProps = {
   name: string;
   size?: AvatarSize;
-  /** `accent` marks the signed-in person; a tone tints a teammate. */
-  variant?: 'accent' | 'ink' | 'muted' | Tone;
+  /**
+   * `ink` marks the signed-in person; `person` gives a teammate a tint of
+   * their own, so the same worker looks the same in every list.
+   */
+  variant?: 'person' | 'accent' | 'ink' | 'muted' | Tone;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
 
 const DIMENSIONS: Record<AvatarSize, { box: number; text: number }> = {
-  sm: { box: 24, text: 10 },
-  md: { box: 40, text: 14 },
-  lg: { box: 64, text: 22 },
+  sm: { box: 30, text: 12 },
+  md: { box: 44, text: 15 },
+  lg: { box: 72, text: 24 },
 };
+
+/** The status tints double as people colours; ink and grey are left out. */
+const PEOPLE = [
+  statusAppearance.GOING_TO_LOCATION,
+  statusAppearance.IN_PROGRESS,
+  statusAppearance.COMPLETED,
+  statusAppearance.AWAITING_REVIEW,
+  statusAppearance.REACHED_LOCATION,
+  statusAppearance.ACCEPTED,
+  statusAppearance.REJECTED,
+];
 
 /** Initials on a tinted circle: the data model has no profile photo field. */
 export function initialsOf(name: string): string {
@@ -34,9 +49,9 @@ export function initialsOf(name: string): string {
   return (first + last).toUpperCase();
 }
 
-export function Avatar({ name, size = 'md', variant = 'muted', testID, style }: AvatarProps) {
+export function Avatar({ name, size = 'md', variant = 'person', testID, style }: AvatarProps) {
   const { box, text } = DIMENSIONS[size];
-  const palette = paletteFor(variant);
+  const palette = paletteFor(variant, name);
 
   return (
     <View
@@ -60,10 +75,16 @@ export function Avatar({ name, size = 'md', variant = 'muted', testID, style }: 
   );
 }
 
-function paletteFor(variant: NonNullable<AvatarProps['variant']>): {
-  background: string;
-  foreground: string;
-} {
+function paletteFor(
+  variant: NonNullable<AvatarProps['variant']>,
+  name: string,
+): { background: string; foreground: string } {
+  if (variant === 'person') {
+    let hash = 0;
+    for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+    const person = PEOPLE[Math.abs(hash) % PEOPLE.length]!;
+    return { background: person.tint, foreground: person.text };
+  }
   if (variant === 'accent') return { background: colors.accent, foreground: colors.onAccent };
   if (variant === 'ink') return { background: colors.surfaceInverse, foreground: colors.accent };
   if (variant === 'muted')
@@ -74,5 +95,5 @@ function paletteFor(variant: NonNullable<AvatarProps['variant']>): {
 
 const styles = StyleSheet.create({
   circle: { borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontFamily: fontFamily.extrabold },
+  initials: { fontFamily: fontFamily.bold },
 });

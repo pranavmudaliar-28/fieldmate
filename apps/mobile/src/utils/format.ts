@@ -41,10 +41,21 @@ export function formatTime(isoDate: string): string {
   return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
-/** The eyebrow above a dashboard greeting, e.g. "Wed 16 September". */
+/** Time between two stamps, e.g. "1h 40m" or "35m". Empty if either is missing. */
+export function formatDuration(fromIso: string | null, toIso: string | null): string {
+  if (!fromIso || !toIso) return '';
+  const minutes = Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60000);
+  if (Number.isNaN(minutes) || minutes < 0) return '';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}
+
+/** The eyebrow above a dashboard greeting, e.g. "Saturday, 10 October". */
 export function formatDayHeading(date: Date = new Date()): string {
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'long' });
+  return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 export function formatCoordinates(

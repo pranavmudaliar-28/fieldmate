@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
+import { SplashView } from '../../components/SplashView';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
@@ -8,7 +9,14 @@ import {
   spacing,
   typography,
 } from '../../constants/theme';
+import { useMinimumDuration } from '../../hooks/use-minimum-duration';
 import { useAuth } from './auth-context';
+
+/**
+ * How long the launch screen stays up at the least, counted from app start.
+ * Long enough to read the name, short enough never to feel like a wait.
+ */
+export const SPLASH_MIN_MS = 1200;
 
 /**
  * Shown while the stored session is being checked, and when that check could
@@ -16,8 +24,11 @@ import { useAuth } from './auth-context';
  */
 export function SessionGate() {
   const { status, bootstrapError, retryBootstrap } = useAuth();
+  const splashShown = useMinimumDuration(SPLASH_MIN_MS);
 
-  if (status === 'signedOut') return <Redirect href="/(auth)/login" />;
+  if (status === 'signedOut') {
+    return splashShown ? <Redirect href="/(auth)/login" /> : <SplashView />;
+  }
 
   if (status === 'bootstrapFailed') {
     return (
@@ -37,11 +48,8 @@ export function SessionGate() {
     );
   }
 
-  return (
-    <View style={styles.container} testID="session-loading">
-      <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading" />
-    </View>
-  );
+  // Carries on from the native splash, so launch reads as one screen.
+  return <SplashView />;
 }
 
 const styles = StyleSheet.create({

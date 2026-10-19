@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionBar } from '../../components/ActionBar';
+import { Avatar } from '../../components/Avatar';
 import { Button } from '../../components/Button';
+import { Icon } from '../../components/Icon';
 import { Input } from '../../components/Input';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
@@ -12,6 +14,7 @@ import {
   layout,
   radius,
   spacing,
+  toneColors,
   typography,
 } from '../../constants/theme';
 import { LocationField } from '../location/LocationField';
@@ -24,16 +27,22 @@ export type TaskFormProps = {
   defaultValues?: Partial<TaskFormValues> & { workerName?: string };
   submitting?: boolean;
   submitError?: string | null;
+  /** Who hears about the change, shown above the form when editing. */
+  notice?: string | null;
   onSubmit: (values: TaskFormValues) => void;
   onDirtyChange?: (dirty: boolean) => void;
 };
 
-/** S-004 Create Task / Edit Task. In edit mode the worker field is hidden. */
+/**
+ * S-004 Create Task / Edit Task. In edit mode the worker is shown but not
+ * changed here: reassigning is its own action with its own confirmation.
+ */
 export function TaskForm({
   mode,
   defaultValues,
   submitting = false,
   submitError = null,
+  notice = null,
   onSubmit,
   onDirtyChange,
 }: TaskFormProps) {
@@ -78,6 +87,15 @@ export function TaskForm({
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={() => onDirtyChange?.(isDirty)}
       >
+        {notice ? (
+          <View style={styles.notice} testID="task-form-notice">
+            <Icon name="notifications-outline" size={18} color={toneColors.warning.text} />
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.noticeText}>
+              {notice}
+            </Text>
+          </View>
+        ) : null}
+
         <Controller
           control={control}
           name="title"
@@ -124,7 +142,7 @@ export function TaskForm({
         {mode === 'create' ? (
           <View style={styles.field}>
             <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
-              Assign to *
+              Assign to
             </Text>
             <Pressable
               onPress={() => setPickerOpen(true)}
@@ -135,22 +153,51 @@ export function TaskForm({
               disabled={submitting}
               style={[styles.select, errors.workerId ? styles.selectError : null]}
             >
-              <Text
-                maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-                style={workerName ? styles.selectValue : styles.selectPlaceholder}
-              >
-                {workerName || 'Select a worker'}
-              </Text>
+              {workerName ? (
+                <Avatar name={workerName} />
+              ) : (
+                <View style={styles.selectEmptyMark}>
+                  <Icon name="person-add-outline" size={20} color={colors.textSecondary} />
+                </View>
+              )}
+              <View style={styles.selectText}>
+                <Text
+                  maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+                  style={workerName ? styles.selectValue : styles.selectPlaceholder}
+                >
+                  {workerName || 'Choose a field worker'}
+                </Text>
+                {workerName ? (
+                  <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.selectHint}>
+                    Field worker
+                  </Text>
+                ) : null}
+              </View>
+              <Icon name="chevron-down" size={22} color={colors.textPrimary} />
             </Pressable>
             {errors.workerId?.message ? (
+              <View style={styles.errorRow} accessibilityRole="alert">
+                <Icon name="alert-circle-outline" size={16} color={colors.errorText} />
+                <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.error}>
+                  {errors.workerId.message}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : workerName ? (
+          <View style={styles.field}>
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
+              Assigned to
+            </Text>
+            <View style={styles.select} accessible accessibilityLabel={`Assigned to ${workerName}`}>
+              <Avatar name={workerName} />
               <Text
                 maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-                style={styles.error}
-                accessibilityRole="alert"
+                style={[styles.selectValue, styles.selectText]}
               >
-                {errors.workerId.message}
+                {workerName}
               </Text>
-            ) : null}
+            </View>
           </View>
         ) : null}
 
@@ -191,7 +238,7 @@ export function TaskForm({
 
       <ActionBar>
         <Button
-          label={mode === 'create' ? 'Create task' : 'Save changes'}
+          label={mode === 'create' ? 'Create and assign' : 'Save changes'}
           testID="task-submit"
           onPress={() => void submit()}
           loading={submitting}
@@ -211,25 +258,43 @@ export function TaskForm({
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  content: { padding: layout.screenPadding, gap: spacing.md },
-  field: { gap: spacing.xs },
-  label: { ...typography.secondary, color: colors.textPrimary },
+  content: { padding: layout.screenPadding, paddingTop: spacing.xs, gap: spacing.mdPlus },
+  notice: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.action,
+    backgroundColor: toneColors.warning.tint,
+  },
+  noticeText: { ...typography.secondary, color: toneColors.warning.text, flex: 1 },
+  field: { gap: spacing.sm },
+  label: { ...typography.secondaryStrong, color: colors.textPrimary },
   textArea: { minHeight: 96, textAlignVertical: 'top' },
   select: {
-    minHeight: layout.inputHeight,
-    justifyContent: 'center',
-    borderWidth: 1,
+    minHeight: layout.inputHeight + spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.control,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  selectError: { borderColor: colors.error },
-  selectValue: { ...typography.body, color: colors.textPrimary },
-  selectPlaceholder: { ...typography.body, color: colors.textSecondary },
-  coordinates: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  coordinatesText: { ...typography.secondary, color: colors.textSecondary, flex: 1 },
-  permission: { gap: spacing.xs },
-  permissionText: { ...typography.secondary, color: colors.textSecondary },
-  error: { ...typography.secondary, color: colors.errorText },
+  selectError: { borderColor: colors.error, borderWidth: 2 },
+  selectEmptyMark: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectText: { flex: 1, gap: 2 },
+  selectValue: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary },
+  selectHint: { ...typography.secondary, color: colors.textSecondary },
+  selectPlaceholder: { ...typography.body, color: colors.textTertiary },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  error: { ...typography.secondary, color: colors.errorText, flex: 1 },
 });

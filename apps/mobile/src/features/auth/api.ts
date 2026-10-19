@@ -8,8 +8,8 @@ export function login(email: string, password: string): Promise<LoginResponse> {
   });
 }
 
-export function getCurrentUser(): Promise<User> {
-  return apiRequest<User>('/users/me', { ignoreUnauthorized: true });
+export function getCurrentUser(signal?: AbortSignal): Promise<User> {
+  return apiRequest<User>('/users/me', { ignoreUnauthorized: true, signal });
 }
 
 export function logout(): Promise<void> {

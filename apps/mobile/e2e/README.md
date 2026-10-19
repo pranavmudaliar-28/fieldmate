@@ -8,7 +8,7 @@ database and storage.
 | Flow                        | Covers                                                                                                                                                                                              |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `critical-flow.yaml`        | The critical path from the spec: manager creates and assigns → worker starts, photographs, adds a note, completes → manager reviews. Also checks that completing is blocked until there is a photo. |
-| `worker-rejects-task.yaml`  | Worker rejects with a required reason → the task leaves their list → the manager sees it under "Needs attention" with the reason → reassigns it to another worker.                                  |
+| `worker-rejects-task.yaml`  | Worker rejects with a required reason → the task leaves their list → the manager sees it under "Needs your attention" and reads the reason on the task → reassigns it to another worker.            |
 | `login.yaml`, `logout.yaml` | Shared steps used by the flows above.                                                                                                                                                               |
 
 ## Prerequisites

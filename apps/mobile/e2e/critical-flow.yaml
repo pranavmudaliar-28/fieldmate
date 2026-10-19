@@ -44,6 +44,8 @@ env:
 - tapOn:
     id: 'task-worker-select'
 - tapOn: 'Priya Nair'
+- tapOn:
+    id: 'worker-picker-confirm'
 
 - tapOn:
     id: 'task-address'
@@ -82,10 +84,10 @@ env:
 - assertVisible: 'Accepted'
 - tapOn:
     id: 'action-depart'
-- assertVisible: 'Going to location'
+- assertVisible: 'On the way'
 - tapOn:
     id: 'action-arrive'
-- assertVisible: 'Reached location'
+- assertVisible: 'Arrived'
 
 # Only now, having confirmed arrival, can the work itself begin.
 - tapOn:
@@ -93,7 +95,7 @@ env:
 - assertVisible: 'In progress'
 
 # Without a photo, completion stays blocked and says why
-- assertVisible: 'At least 1 photo is required to complete this task.'
+- assertVisible: 'Add at least 1 photo to submit for review.'
 
 # Capture evidence with the real camera
 - tapOn:
@@ -104,29 +106,31 @@ env:
     id: 'photo-preview'
 - tapOn:
     id: 'use-photo'
-- assertVisible: 'Photo added'
+- assertVisible: 'Photo saved to task'
 
 # Add a note
+- tapOn:
+    id: 'add-note'
 - tapOn:
     id: 'note-input'
 - inputText: 'Meter replaced; serial visible in the photo.'
 - hideKeyboard
 - tapOn:
-    id: 'add-note'
+    id: 'save-new-note'
 - assertVisible: 'Note added'
 
 # Hand the finished work to the manager
 - tapOn:
     id: 'action-complete'
-- assertVisible: 'Complete task'
+- assertVisible: 'Ready to submit?'
 - tapOn:
     id: 'confirm-complete'
 - assertVisible: 'Sent for review'
-- tapOn: 'Back to task'
+# The success screen leads home, where the task now waits on the manager.
+- tapOn:
+    id: 'back-to-home'
 - assertVisible: 'Awaiting review'
 
-- back
-- back
 - runFlow: logout.yaml
 
 # ---------- Manager: review the finished work ----------
@@ -138,8 +142,8 @@ env:
 
 - tapOn: ${TASK_TITLE}
 - assertVisible: 'Awaiting review'
-- assertVisible: 'Photos (1)'
-- assertVisible: 'Notes (1)'
+- assertVisible: 'Photos · 1'
+- assertVisible: 'Notes · 1'
 - assertVisible: 'Meter replaced; serial visible in the photo.'
 
 # Send it back, then accept it on the second look
@@ -149,11 +153,14 @@ env:
 - hideKeyboard
 - tapOn:
     id: 'submit-request-changes'
-- assertVisible: 'Sent back to the worker'
-- assertVisible: 'In progress'
+- assertVisible: 'Sent back to Priya'
+- assertVisible: 'In progress · Changes requested'
 
+# Completing without a fresh submission lives behind the overflow menu.
+- tapOn:
+    id: 'header-overflow'
 - tapOn:
     id: 'action-complete'
-- tapOn:
-    id: 'confirm-complete'
+- assertVisible: 'Mark as completed without review?'
+- tapOn: 'Mark as completed'
 - assertVisible: 'Completed'

@@ -5,41 +5,45 @@ import {
   FlatList,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppHeader } from '../../../src/components/AppHeader';
+import { Avatar } from '../../../src/components/Avatar';
+import { Badge } from '../../../src/components/Badge';
 import { Button } from '../../../src/components/Button';
-import { Card } from '../../../src/components/Card';
-import { DashboardHeader } from '../../../src/components/DashboardHeader';
-import { InboxBell } from '../../../src/features/notifications/InboxBell';
-import { Input } from '../../../src/components/Input';
+import { FilterChips, type FilterChip } from '../../../src/components/FilterChips';
+import { Icon } from '../../../src/components/Icon';
 import { EmptyState, ErrorState, LoadingState } from '../../../src/components/States';
+import { useTabBarSpacing } from '../../../src/components/TabBar';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
-  fontFamily,
+  elevation,
   layout,
   radius,
   spacing,
-  toneColors,
+  tabularNumbers,
   typography,
 } from '../../../src/constants/theme';
-import { ROLE_LABELS } from '../../../src/features/admin/UserForm';
+import { ActiveMark } from '../../../src/features/admin/ActiveMark';
+import { ROLE_ICONS, ROLE_LABELS } from '../../../src/features/admin/UserForm';
 import { useUserList } from '../../../src/features/admin/hooks';
+import { InboxBell } from '../../../src/features/notifications/InboxBell';
 
-const FILTERS: { label: string; value: Role | null }[] = [
-  { label: 'All', value: null },
-  { label: 'Admins', value: 'ADMIN' },
-  { label: 'Managers', value: 'MANAGER' },
-  { label: 'Workers', value: 'FIELD_WORKER' },
+const FILTERS: FilterChip<Role | null>[] = [
+  { label: 'All', value: null, testID: 'user-filter-ALL' },
+  { label: 'Workers', value: 'FIELD_WORKER', testID: 'user-filter-FIELD_WORKER' },
+  { label: 'Managers', value: 'MANAGER', testID: 'user-filter-MANAGER' },
+  { label: 'Admins', value: 'ADMIN', testID: 'user-filter-ADMIN' },
 ];
 
 /** S-011 Users: the admin's home screen. */
 export default function UsersScreen() {
   const router = useRouter();
+  const tabBarSpacing = useTabBarSpacing();
   const [search, setSearch] = useState('');
   const [role, setRole] = useState<Role | null>(null);
 
@@ -48,65 +52,52 @@ export default function UsersScreen() {
     ...(role ? { role } : {}),
   });
   const users = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const count = query.isSuccess ? `${users.length}${query.hasNextPage ? '+' : ''}` : null;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top']}>
-      <DashboardHeader right={<InboxBell href="/(admin)/notifications" />} />
+    <View style={styles.screen}>
+      <AppHeader
+        size="large"
+        title="Users"
+        right={
+          <View style={styles.headerActions}>
+            <InboxBell href="/(admin)/notifications" />
+            <Button
+              label="Add user"
+              icon="add"
+              size="md"
+              fullWidth={false}
+              testID="add-user"
+              onPress={() => router.push('/(admin)/users/new')}
+            />
+          </View>
+        }
+      />
 
       <View style={styles.controls}>
-        <Input
-          label="Search"
-          testID="user-search"
-          placeholder="Name or email"
-          value={search}
-          onChangeText={setSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chips}
-        >
-          {FILTERS.map((filter) => {
-            const selected = filter.value === role;
-            return (
-              <Pressable
-                key={filter.label}
-                onPress={() => setRole(filter.value)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                testID={`user-filter-${filter.value ?? 'ALL'}`}
-                style={[styles.chip, selected && styles.chipSelected]}
-              >
-                <Text
-                  maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-                  style={[styles.chipLabel, selected && styles.chipLabelSelected]}
-                >
-                  {filter.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        <View style={styles.actions}>
-          <Button
-            label="Add user"
-            testID="add-user"
-            onPress={() => router.push('/(admin)/users/new')}
-            style={styles.action}
+        <View style={styles.search}>
+          <Icon name="search-outline" size={20} color={colors.textSecondary} />
+          <TextInput
+            testID="user-search"
+            placeholder="Search name or email"
+            placeholderTextColor={colors.textTertiary}
+            accessibilityLabel="Search users"
+            value={search}
+            onChangeText={setSearch}
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.searchInput}
           />
-          <Button
-            label="Tasks"
-            variant="secondary"
-            testID="go-to-tasks"
-            onPress={() => router.push('/(manager)/(tabs)')}
-            style={styles.action}
-          />
+          {count ? (
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.count}>
+              {count}
+            </Text>
+          ) : null}
         </View>
       </View>
+
+      <FilterChips options={FILTERS} selected={role} onSelect={setRole} />
 
       {query.isPending ? (
         <View style={styles.padded}>
@@ -115,7 +106,9 @@ export default function UsersScreen() {
       ) : null}
 
       {query.isError ? (
-        <ErrorState message="Couldn't load users." onRetry={() => void query.refetch()} />
+        <View style={styles.padded}>
+          <ErrorState message="Couldn't load users." onRetry={() => void query.refetch()} />
+        </View>
       ) : null}
 
       {query.isSuccess ? (
@@ -123,15 +116,20 @@ export default function UsersScreen() {
           testID="user-list"
           data={users}
           keyExtractor={(user) => user.id}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: tabBarSpacing }]}
           refreshControl={
             <RefreshControl
               refreshing={query.isRefetching}
               onRefresh={() => void query.refetch()}
             />
           }
-          renderItem={({ item }) => (
-            <UserRow user={item} onPress={() => router.push(`/(admin)/users/${item.id}`)} />
+          renderItem={({ item, index }) => (
+            <UserRow
+              user={item}
+              first={index === 0}
+              last={index === users.length - 1}
+              onPress={() => router.push(`/(admin)/users/${item.id}`)}
+            />
           )}
           onEndReachedThreshold={0.4}
           onEndReached={() => {
@@ -140,6 +138,7 @@ export default function UsersScreen() {
           ListFooterComponent={query.isFetchingNextPage ? <LoadingState variant="inline" /> : null}
           ListEmptyComponent={
             <EmptyState
+              icon="people-outline"
               title="No users found"
               message={
                 search || role ? 'Try a different search or filter.' : 'Add your first user.'
@@ -148,69 +147,114 @@ export default function UsersScreen() {
           }
         />
       ) : null}
-    </SafeAreaView>
+    </View>
   );
 }
 
-function UserRow({ user, onPress }: { user: ManagedUser; onPress: () => void }) {
-  const label = `${user.name}, ${ROLE_LABELS[user.role]}${user.isActive ? '' : ', inactive'}`;
+/** One person: who, how to reach them, what they can do, and whether they can sign in. */
+function UserRow({
+  user,
+  first,
+  last,
+  onPress,
+}: {
+  user: ManagedUser;
+  first: boolean;
+  last: boolean;
+  onPress: () => void;
+}) {
+  const label = `${user.name}, ${user.email}, ${ROLE_LABELS[user.role]}, ${
+    user.isActive ? 'active' : 'inactive'
+  }`;
 
   return (
-    <Card onPress={onPress} accessibilityLabel={label} testID={`user-card-${user.id}`}>
-      <View style={styles.rowTop}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID={`user-card-${user.id}`}
+      style={({ pressed }) => [
+        styles.row,
+        first && styles.rowFirst,
+        last && styles.rowLast,
+        !first && styles.rowDivided,
+        pressed && styles.rowPressed,
+      ]}
+    >
+      <Avatar
+        name={user.name}
+        size="md"
+        variant={user.isActive ? 'person' : 'muted'}
+        style={styles.avatar}
+      />
+      <View style={styles.rowText}>
         <Text
           maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-          style={styles.name}
+          style={[styles.name, !user.isActive && styles.nameInactive]}
           numberOfLines={1}
         >
           {user.name}
         </Text>
-        {user.isActive ? null : (
-          <View style={styles.inactiveBadge}>
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.inactiveLabel}>
-              Inactive
-            </Text>
-          </View>
-        )}
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={styles.email}
+          numberOfLines={1}
+        >
+          {user.email}
+        </Text>
+        <View style={styles.tags}>
+          <Badge label={ROLE_LABELS[user.role]} icon={ROLE_ICONS[user.role]} />
+          <ActiveMark active={user.isActive} />
+        </View>
       </View>
-      <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.meta} numberOfLines={1}>
-        {user.email}
-      </Text>
-      <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.meta}>
-        {ROLE_LABELS[user.role]}
-      </Text>
-    </Card>
+      <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  controls: { padding: layout.screenPadding, gap: spacing.sm },
-  chips: { gap: spacing.sm, paddingVertical: spacing.xs },
-  chip: {
-    minHeight: layout.minTouchTarget,
-    justifyContent: 'center',
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  controls: { paddingHorizontal: layout.screenPadding, paddingBottom: spacing.xs },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minHeight: layout.inputHeight,
     paddingHorizontal: spacing.md,
     borderRadius: radius.control,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipLabel: { ...typography.secondary, color: colors.textPrimary },
-  chipLabelSelected: { color: colors.onPrimary, fontFamily: fontFamily.semibold },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  action: { flex: 1 },
-  list: { paddingHorizontal: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.sm },
-  padded: { paddingHorizontal: layout.screenPadding },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  name: { ...typography.bodyStrong, color: colors.textPrimary, flex: 1 },
-  meta: { ...typography.secondary, color: colors.textSecondary },
-  inactiveBadge: {
-    backgroundColor: toneColors.neutral.tint,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+  searchInput: {
+    flex: 1,
+    ...typography.body,
+    color: colors.textPrimary,
+    paddingVertical: spacing.sm,
   },
-  inactiveLabel: { ...typography.caption, color: toneColors.neutral.text },
+  count: { ...typography.mono, ...tabularNumbers, color: colors.textSecondary },
+  list: { paddingHorizontal: layout.screenPadding, paddingTop: spacing.sm, flexGrow: 1 },
+  padded: { paddingHorizontal: layout.screenPadding, paddingTop: spacing.sm },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  rowFirst: { borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card },
+  rowLast: {
+    borderBottomLeftRadius: radius.card,
+    borderBottomRightRadius: radius.card,
+    ...elevation.card,
+  },
+  rowDivided: { borderTopWidth: 1, borderTopColor: colors.border },
+  rowPressed: { backgroundColor: colors.surfaceMuted },
+  avatar: { width: 52, height: 52 },
+  rowText: { flex: 1, gap: 2 },
+  name: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary },
+  nameInactive: { color: colors.textSecondary },
+  email: { ...typography.secondary, color: colors.textSecondary },
+  tags: { flexDirection: 'row', alignItems: 'center', gap: spacing.smPlus, marginTop: spacing.xs },
 });

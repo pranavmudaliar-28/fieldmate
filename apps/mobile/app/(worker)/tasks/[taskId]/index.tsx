@@ -1,18 +1,20 @@
 import {
+  FIELD_LIMITS,
   allowedActions,
   nextWorkerStep,
   type Evidence,
   type Note,
-  type WorkerStep,
 } from '@fieldmate/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionBar } from '../../../../src/components/ActionBar';
 import { AppHeader } from '../../../../src/components/AppHeader';
 import { BottomSheet } from '../../../../src/components/BottomSheet';
 import { Button } from '../../../../src/components/Button';
+import { ChoiceList } from '../../../../src/components/ChoiceList';
 import { ConfirmationDialog } from '../../../../src/components/ConfirmationDialog';
+import { Icon } from '../../../../src/components/Icon';
 import { Input } from '../../../../src/components/Input';
 import { PhotoGrid } from '../../../../src/components/PhotoGrid';
 import { EmptyState, ErrorState, LoadingState } from '../../../../src/components/States';
@@ -23,41 +25,52 @@ import {
   layout,
   radius,
   spacing,
+  statusAppearance,
   toneColors,
   typography,
   type IconName,
 } from '../../../../src/constants/theme';
 import { useAuth } from '../../../../src/features/auth/auth-context';
-import { TaskDetailView } from '../../../../src/features/tasks/TaskDetailView';
-import { WorkerJourney } from '../../../../src/features/tasks/WorkerJourney';
+import { PendingWrites } from '../../../../src/features/offline/PendingWrites';
+import { NoteList, Section, TaskDetailView } from '../../../../src/features/tasks/TaskDetailView';
 import { useTask } from '../../../../src/features/tasks/hooks';
 import {
   useAddNote,
-  useDeleteNote,
-  useUpdateNote,
   useAdvanceTask,
   useDeleteEvidence,
+  useDeleteNote,
   useRejectTask,
   useStepBack,
+  useUpdateNote,
 } from '../../../../src/features/tasks/worker-hooks';
+import { WORKER_STEP_UI } from '../../../../src/features/tasks/worker-steps';
 import { ApiError } from '../../../../src/services/http';
-import { formatDateTime } from '../../../../src/utils/format';
+import { formatTime } from '../../../../src/utils/format';
 
-const EVIDENCE_HINT = 'At least 1 photo is required to complete this task.';
+const EVIDENCE_HINT = 'Add at least 1 photo to submit for review.';
+
+type RejectChoice = 'clash' | 'access' | 'parts' | 'skills' | 'other';
 
 /**
- * The worker's forward steps. A task only becomes "In progress" through
- * `start`, which is offered once they have confirmed arrival — never on
- * assignment and never on acceptance.
+ * The reasons a worker usually has. The API keeps one free-text reason, so
+ * the choice and any details are joined into it.
  */
-const STEPS: Record<WorkerStep, { label: string; icon: IconName; done: string }> = {
-  accept: { label: 'Accept task', icon: 'thumbs-up-outline', done: 'Task accepted' },
-  depart: { label: "I'm on my way", icon: 'car-outline', done: 'On your way' },
-  arrive: { label: "I've arrived", icon: 'location-outline', done: 'Arrival confirmed' },
-  start: { label: 'Start work', icon: 'construct-outline', done: 'Work started' },
-};
+const REJECT_CHOICES: { value: RejectChoice; label: string; testID: string }[] = [
+  { value: 'clash', label: 'Clashes with another job', testID: 'reject-choice-clash' },
+  { value: 'access', label: 'Can’t get access to the site', testID: 'reject-choice-access' },
+  { value: 'parts', label: 'Missing parts or tools', testID: 'reject-choice-parts' },
+  { value: 'skills', label: 'Outside my skills', testID: 'reject-choice-skills' },
+  { value: 'other', label: 'Other', testID: 'reject-choice-other' },
+];
 
-/** S-008 Worker Task Details: start, reject, photos, notes and completion. */
+function rejectionReason(choice: RejectChoice | null, details: string): string {
+  const preset = REJECT_CHOICES.find((option) => option.value === choice && choice !== 'other');
+  const extra = details.trim();
+  if (preset && extra) return `${preset.label}: ${extra}`;
+  return preset?.label ?? extra;
+}
+
+/** S-008 Worker Task Details: the next step, photos, notes and submitting. */
 export default function WorkerTaskDetails() {
   const { taskId } = useLocalSearchParams<{ taskId: string }>();
   const router = useRouter();
@@ -74,8 +87,10 @@ export default function WorkerTaskDetails() {
   const deleteEvidence = useDeleteEvidence(taskId);
 
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [reason, setReason] = useState('');
+  const [rejectChoice, setRejectChoice] = useState<RejectChoice | null>(null);
+  const [rejectDetails, setRejectDetails] = useState('');
   const [confirmReject, setConfirmReject] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState('');
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editDraft, setEditDraft] = useState('');
@@ -96,7 +111,7 @@ export default function WorkerTaskDetails() {
   if (task.isPending) {
     return (
       <View style={styles.screen}>
-        <AppHeader title="Task details" onBack={() => router.back()} />
+        <AppHeader title="" onBack={() => router.back()} />
         <View style={styles.padded}>
           <LoadingState variant="detail" />
         </View>
@@ -108,15 +123,18 @@ export default function WorkerTaskDetails() {
     const gone = task.error instanceof ApiError && [403, 404].includes(task.error.status ?? 0);
     return (
       <View style={styles.screen}>
-        <AppHeader title="Task details" onBack={() => router.back()} />
+        <AppHeader title="" onBack={() => router.back()} />
         {gone ? (
           <EmptyState
+            icon="help-circle-outline"
             title="This task is no longer available"
             message="It may have been reassigned or cancelled."
-            action={{ label: 'Go to dashboard', onPress: () => router.replace('/(worker)/(tabs)') }}
+            action={{ label: 'Go to home', onPress: () => router.replace('/(worker)/(tabs)') }}
           />
         ) : (
-          <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
+          <View style={styles.padded}>
+            <ErrorState message="Couldn't load this task." onRetry={() => void task.refetch()} />
+          </View>
         )}
       </View>
     );
@@ -130,16 +148,54 @@ export default function WorkerTaskDetails() {
   const hasEvidence = detail.evidence.length > 0;
   const step = nextWorkerStep(detail.status);
   const canStepBack = actions.includes('stepBack');
+  const canReject = actions.includes('reject');
+  const canSubmit = actions.includes('submitForReview');
+  const finished = detail.status === 'AWAITING_REVIEW' || detail.status === 'COMPLETED';
   const busy =
     advance.isPending ||
     stepBack.isPending ||
     reject.isPending ||
     addNote.isPending ||
     deleteEvidence.isPending;
+  const reason = rejectionReason(rejectChoice, rejectDetails);
+
+  const takeStep = () => {
+    if (!step) return;
+    advance.mutate(step, {
+      onSuccess: () => {
+        setError(null);
+        showToast(WORKER_STEP_UI[step].done);
+      },
+      onError: fail,
+    });
+  };
+
+  const undo = () =>
+    stepBack.mutate(undefined, {
+      onSuccess: () => {
+        setError(null);
+        showToast('Step undone');
+      },
+      onError: fail,
+    });
+
+  const undoButton = canStepBack ? (
+    <Button
+      label="Undo last step"
+      variant="ghost"
+      size="md"
+      icon="arrow-undo-outline"
+      fullWidth={false}
+      testID="action-step-back"
+      disabled={busy}
+      loading={stepBack.isPending}
+      onPress={undo}
+    />
+  ) : null;
 
   return (
     <View style={styles.screen}>
-      <AppHeader title="Task details" onBack={() => router.back()} />
+      <AppHeader title="" onBack={() => router.back()} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -148,166 +204,259 @@ export default function WorkerTaskDetails() {
           <RefreshControl refreshing={task.isRefetching} onRefresh={() => void task.refetch()} />
         }
       >
+        {/* Above the task itself: what is on this phone and not yet on the
+            server changes how everything below it should be read. */}
+        <PendingWrites taskId={taskId} />
+
         <TaskDetailView
           task={detail}
-          showAssignment={false}
-          showEvidence={false}
-          {...(canEditNotes
-            ? {
-                onEditNote: (target: Note) => {
-                  setEditDraft(target.content);
-                  setEditingNote(target);
-                },
-                onDeleteNote: setDeletingNote,
-              }
-            : {})}
-        />
-
-        <WorkerJourney progress={detail.progress} />
-
-        {canStepBack ? (
-          <Button
-            label="Undo last step"
-            variant="ghost"
-            size="md"
-            icon="arrow-undo-outline"
-            testID="action-step-back"
-            disabled={busy}
-            loading={stepBack.isPending}
-            onPress={() =>
-              stepBack.mutate(undefined, {
-                onSuccess: () => {
-                  setError(null);
-                  showToast('Step undone');
-                },
-                onError: fail,
-              })
-            }
-          />
-        ) : null}
-
-        <View style={styles.section}>
-          <Text
-            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-            style={styles.sectionTitle}
-            accessibilityRole="header"
-          >
-            Your photos
-          </Text>
-          <PhotoGrid
-            photos={detail.evidence}
-            currentUserId={user?.id}
-            {...(inProgress ? { onDelete: setPhotoToDelete } : {})}
-          />
+          perspective="worker"
+          showWork={finished}
+          canSubmit={hasEvidence}
+          notice={
+            <>
+              {detail.status === 'REACHED_LOCATION' ? (
+                <Callout icon="camera-outline" testID="before-photo-tip">
+                  Tip: take a “before” photo once you start work. You need at least one photo to
+                  submit.
+                </Callout>
+              ) : null}
+              {detail.status === 'AWAITING_REVIEW' ? (
+                <Callout
+                  icon="lock-closed-outline"
+                  title="Locked while your manager reviews"
+                  palette={statusAppearance.AWAITING_REVIEW}
+                  testID="awaiting-review-banner"
+                >
+                  Photos and notes can’t be changed. If changes are needed, the task comes back to
+                  you.
+                </Callout>
+              ) : null}
+              {detail.status === 'COMPLETED' ? (
+                <View style={styles.approved} testID="completed-banner">
+                  <View style={styles.approvedMark}>
+                    <Icon name="checkmark" size={22} color={colors.onPrimary} />
+                  </View>
+                  <Text
+                    maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+                    style={styles.approvedText}
+                  >
+                    Your work was approved. Nothing left to do.
+                  </Text>
+                </View>
+              ) : null}
+              {error ? <ErrorState message={error} onRetry={() => void task.refetch()} /> : null}
+            </>
+          }
+        >
           {inProgress ? (
-            <Button
-              label="Add photo"
-              variant="secondary"
-              testID="add-photo"
-              onPress={() => router.push(`/(worker)/tasks/${taskId}/evidence`)}
-            />
+            <>
+              <Section
+                title="Photos"
+                count={detail.evidence.length}
+                action={
+                  hasEvidence ? (
+                    <Button
+                      label="Add photo"
+                      icon="camera-outline"
+                      size="md"
+                      fullWidth={false}
+                      testID="add-photo"
+                      onPress={() => router.push(`/(worker)/tasks/${taskId}/evidence`)}
+                    />
+                  ) : null
+                }
+              >
+                {hasEvidence ? (
+                  <PhotoGrid
+                    photos={detail.evidence}
+                    currentUserId={user?.id}
+                    onDelete={setPhotoToDelete}
+                  />
+                ) : (
+                  <Pressable
+                    onPress={() => router.push(`/(worker)/tasks/${taskId}/evidence`)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add your first photo, from the camera or gallery"
+                    testID="add-photo"
+                    style={({ pressed }) => [
+                      styles.firstPhoto,
+                      pressed && styles.firstPhotoPressed,
+                    ]}
+                  >
+                    <View style={styles.firstPhotoMark}>
+                      <Icon name="camera-outline" size={30} color={colors.onAccent} />
+                    </View>
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+                      style={styles.firstPhotoTitle}
+                    >
+                      Add your first photo
+                    </Text>
+                    <Text
+                      maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+                      style={styles.firstPhotoHint}
+                    >
+                      Camera or gallery
+                    </Text>
+                  </Pressable>
+                )}
+              </Section>
+
+              <Section
+                title="Notes"
+                count={detail.notes.length}
+                action={
+                  <Button
+                    label="Add note"
+                    icon="add"
+                    variant="secondary"
+                    size="md"
+                    fullWidth={false}
+                    testID="add-note"
+                    onPress={() => setNoteOpen(true)}
+                  />
+                }
+              >
+                {detail.notes.length === 0 ? (
+                  <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.quiet}>
+                    No notes yet. Add anything the manager should know.
+                  </Text>
+                ) : (
+                  <NoteList
+                    notes={detail.notes}
+                    {...(canEditNotes
+                      ? {
+                          onEditNote: (target: Note) => {
+                            setEditDraft(target.content);
+                            setEditingNote(target);
+                          },
+                          onDeleteNote: setDeletingNote,
+                        }
+                      : {})}
+                  />
+                )}
+              </Section>
+            </>
           ) : null}
-        </View>
-
-        {inProgress ? (
-          <View style={styles.section}>
-            <Input
-              label="Add a note"
-              testID="note-input"
-              value={note}
-              onChangeText={setNote}
-              multiline
-              numberOfLines={3}
-              style={styles.noteInput}
-              editable={!addNote.isPending}
-            />
-            <Button
-              label="Add note"
-              variant="secondary"
-              size="md"
-              testID="add-note"
-              disabled={note.trim().length === 0}
-              loading={addNote.isPending}
-              onPress={() =>
-                addNote.mutate(note.trim(), {
-                  onSuccess: () => {
-                    setNote('');
-                    setError(null);
-                    showToast('Note added');
-                  },
-                  onError: fail,
-                })
-              }
-            />
-          </View>
-        ) : null}
-
-        {detail.status === 'AWAITING_REVIEW' ? (
-          <View style={styles.reviewBanner} testID="awaiting-review-banner">
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.reviewText}>
-              Sent for review{' '}
-              {detail.review.submittedAt ? formatDateTime(detail.review.submittedAt) : ''}. Your
-              manager will approve it or send it back.
-            </Text>
-          </View>
-        ) : null}
-
-        {detail.status === 'COMPLETED' ? (
-          <View style={styles.completedBanner} testID="completed-banner">
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.completedText}>
-              Approved on {formatDateTime(detail.completedAt ?? detail.updatedAt)}.
-            </Text>
-          </View>
-        ) : null}
-
-        {error ? <ErrorState message={error} onRetry={() => void task.refetch()} /> : null}
+        </TaskDetailView>
       </ScrollView>
 
-      {actions.length > 0 ? (
-        <ActionBar hint={inProgress && !hasEvidence ? EVIDENCE_HINT : undefined}>
-          {actions.includes('reject') ? (
+      {step === 'accept' ? (
+        <ActionBar>
+          {canReject ? (
             <Button
               label="Reject"
-              variant="secondary"
+              variant="destructiveOutline"
               testID="action-reject"
               onPress={() => setRejectOpen(true)}
               disabled={busy}
-              style={styles.action}
+              style={styles.reject}
             />
           ) : null}
+          <Button
+            label={WORKER_STEP_UI.accept.label}
+            icon={WORKER_STEP_UI.accept.icon}
+            variant="signal"
+            testID="action-accept"
+            loading={advance.isPending}
+            disabled={busy}
+            onPress={takeStep}
+            style={styles.grow}
+          />
+        </ActionBar>
+      ) : null}
 
-          {step ? (
+      {step && step !== 'accept' ? (
+        <ActionBar>
+          <View style={styles.stack}>
             <Button
-              label={STEPS[step].label}
-              icon={STEPS[step].icon}
+              label={WORKER_STEP_UI[step].label}
+              icon={WORKER_STEP_UI[step].icon}
+              variant="signal"
               testID={`action-${step}`}
               loading={advance.isPending}
               disabled={busy}
-              onPress={() =>
-                advance.mutate(step, {
-                  onSuccess: () => {
-                    setError(null);
-                    showToast(STEPS[step].done);
-                  },
-                  onError: fail,
-                })
-              }
-              style={styles.action}
+              onPress={takeStep}
             />
-          ) : null}
+            <View style={styles.secondaryRow}>
+              {undoButton ?? <View />}
+              {canReject ? (
+                <Button
+                  label="Reject task"
+                  variant="destructiveGhost"
+                  size="md"
+                  fullWidth={false}
+                  testID="action-reject"
+                  disabled={busy}
+                  onPress={() => setRejectOpen(true)}
+                  style={styles.rejectLink}
+                />
+              ) : null}
+            </View>
+          </View>
+        </ActionBar>
+      ) : null}
 
-          {actions.includes('submitForReview') ? (
+      {canSubmit ? (
+        <ActionBar {...(hasEvidence ? {} : { hint: EVIDENCE_HINT })}>
+          <View style={styles.stack}>
             <Button
-              label="Complete task"
+              label="Submit for review"
+              icon={hasEvidence ? 'send-outline' : 'lock-closed-outline'}
+              variant="signal"
               testID="action-complete"
               disabled={!hasEvidence || busy}
               disabledReason={EVIDENCE_HINT}
               onPress={() => router.push(`/(worker)/tasks/${taskId}/complete`)}
-              style={styles.action}
             />
-          ) : null}
+            {undoButton ? <View style={styles.centerRow}>{undoButton}</View> : null}
+          </View>
         </ActionBar>
       ) : null}
+
+      <BottomSheet
+        visible={noteOpen}
+        title="Add note"
+        onClose={() => setNoteOpen(false)}
+        testID="add-note-sheet"
+      >
+        <View style={styles.sheetContent}>
+          <Input
+            label="Note for your manager"
+            placeholder="What did you find or do?"
+            testID="note-input"
+            value={note}
+            onChangeText={setNote}
+            maxLength={FIELD_LIMITS.note}
+            showCount
+            multiline
+            numberOfLines={4}
+            style={styles.noteInput}
+            editable={!addNote.isPending}
+          />
+          <Button
+            label="Save note"
+            testID="save-new-note"
+            disabled={note.trim().length === 0}
+            loading={addNote.isPending}
+            onPress={() =>
+              addNote.mutate(note.trim(), {
+                onSuccess: () => {
+                  setNote('');
+                  setNoteOpen(false);
+                  setError(null);
+                  showToast('Note added');
+                },
+                onError: (noteError) => {
+                  setNoteOpen(false);
+                  fail(noteError);
+                },
+              })
+            }
+          />
+        </View>
+      </BottomSheet>
 
       <BottomSheet
         visible={editingNote !== null}
@@ -316,21 +465,20 @@ export default function WorkerTaskDetails() {
         testID="edit-note-sheet"
       >
         <View style={styles.sheetContent}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetBody}>
-            Your manager will see that this note was edited.
-          </Text>
           <Input
-            label="Note"
+            label={editingNote ? `Note · added ${formatTime(editingNote.createdAt)}` : 'Note'}
             required
+            helper="Saved changes show an “edited” label to your manager."
             testID="edit-note-input"
             value={editDraft}
             onChangeText={setEditDraft}
+            maxLength={FIELD_LIMITS.note}
             multiline
-            numberOfLines={3}
+            numberOfLines={4}
             style={styles.noteInput}
           />
           <Button
-            label="Save note"
+            label="Save changes"
             testID="save-note"
             loading={updateNote.isPending}
             disabled={editDraft.trim().length === 0}
@@ -357,11 +505,12 @@ export default function WorkerTaskDetails() {
 
       <ConfirmationDialog
         visible={deletingNote !== null}
-        title="Delete note"
-        message="Delete this note? This can't be undone."
-        confirmLabel="Delete"
+        title="Delete this note?"
+        message={deletingNote ? `“${snippet(deletingNote.content)}” This can't be undone.` : ''}
+        confirmLabel="Delete note"
         cancelLabel="Keep note"
         destructive
+        icon="trash-outline"
         loading={deleteNote.isPending}
         onConfirm={() => {
           const target = deletingNote;
@@ -382,29 +531,36 @@ export default function WorkerTaskDetails() {
 
       <BottomSheet
         visible={rejectOpen}
-        title="Reject task"
+        title="Why can’t you take this?"
         onClose={() => setRejectOpen(false)}
         testID="reject-sheet"
       >
         <View style={styles.sheetContent}>
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetBody}>
-            Tell your manager why you can&apos;t do this task.
+            Your manager gets your reason and can reassign the task.
           </Text>
+          <ChoiceList
+            choices={REJECT_CHOICES}
+            selected={rejectChoice}
+            onSelect={setRejectChoice}
+            accessibilityLabel="Reason"
+          />
           <Input
-            label="Reason"
-            required
+            label={rejectChoice === 'other' ? 'Details' : 'Details · optional'}
             testID="reject-reason"
-            value={reason}
-            onChangeText={setReason}
+            value={rejectDetails}
+            onChangeText={setRejectDetails}
+            maxLength={FIELD_LIMITS.rejectionReason}
             multiline
-            numberOfLines={3}
-            style={styles.noteInput}
+            numberOfLines={2}
+            style={styles.detailsInput}
           />
           <Button
-            label="Reject task"
+            label="Reject and hand back"
+            icon="arrow-undo-outline"
             variant="destructive"
             testID="submit-reject"
-            disabled={reason.trim().length === 0}
+            disabled={reason.length === 0}
             onPress={() => {
               setRejectOpen(false);
               setConfirmReject(true);
@@ -420,9 +576,10 @@ export default function WorkerTaskDetails() {
         confirmLabel="Reject task"
         cancelLabel="Keep task"
         destructive
+        icon="arrow-undo-outline"
         loading={reject.isPending}
         onConfirm={() =>
-          reject.mutate(reason.trim(), {
+          reject.mutate(reason, {
             onSuccess: () => {
               setConfirmReject(false);
               showToast('Task rejected');
@@ -444,6 +601,7 @@ export default function WorkerTaskDetails() {
         confirmLabel="Delete"
         cancelLabel="Keep photo"
         destructive
+        icon="trash-outline"
         loading={deleteEvidence.isPending}
         onConfirm={() =>
           photoToDelete &&
@@ -465,26 +623,109 @@ export default function WorkerTaskDetails() {
   );
 }
 
+/** A quiet card with an icon: a tip, or why the task is locked. */
+function Callout({
+  icon,
+  title,
+  palette,
+  children,
+  testID,
+}: {
+  icon: IconName;
+  title?: string;
+  palette?: { text: string };
+  children: string;
+  testID?: string;
+}) {
+  const accent = palette?.text ?? colors.textPrimary;
+  return (
+    <View style={[styles.callout, palette ? { borderColor: accent } : null]} testID={testID}>
+      <Icon name={icon} size={22} color={accent} />
+      <View style={styles.calloutText}>
+        {title ? (
+          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.calloutTitle}>
+            {title}
+          </Text>
+        ) : null}
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={title ? styles.calloutBody : styles.calloutBodyStrong}
+        >
+          {children}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function snippet(text: string): string {
+  return text.length > 80 ? `${text.slice(0, 80).trimEnd()}…` : text;
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: layout.screenPadding, paddingBottom: spacing.xl, gap: spacing.lg },
+  content: { padding: layout.screenPadding, paddingTop: 0, paddingBottom: spacing.xl },
   padded: { flex: 1, padding: layout.screenPadding, backgroundColor: colors.background },
-  section: { gap: spacing.sm },
-  sectionTitle: { ...typography.sectionTitle, color: colors.textPrimary },
-  noteInput: { minHeight: 72, textAlignVertical: 'top' },
-  action: { flex: 1 },
+  quiet: { ...typography.secondary, color: colors.textSecondary },
+  noteInput: { minHeight: 120, textAlignVertical: 'top' },
+  detailsInput: { minHeight: 64, textAlignVertical: 'top' },
+  grow: { flex: 1 },
+  reject: { flex: 0.6 },
+  stack: { flex: 1, gap: spacing.xs },
+  secondaryRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  centerRow: { alignItems: 'center' },
+  rejectLink: { marginRight: -spacing.md },
   sheetContent: { gap: spacing.md, paddingBottom: spacing.md },
   sheetBody: { ...typography.body, color: colors.textSecondary },
-  reviewBanner: {
+  firstPhoto: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xl,
+    borderRadius: radius.card,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+  },
+  firstPhotoPressed: { backgroundColor: colors.surfaceMuted },
+  firstPhotoMark: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.card,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  firstPhotoTitle: { ...typography.cardTitle, color: colors.textPrimary },
+  firstPhotoHint: { ...typography.secondary, color: colors.textSecondary },
+  callout: {
+    flexDirection: 'row',
+    gap: spacing.smPlus,
     padding: spacing.md,
     borderRadius: radius.card,
-    backgroundColor: toneColors.info.tint,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  reviewText: { ...typography.body, color: toneColors.info.text },
-  completedBanner: {
-    backgroundColor: toneColors.success.tint,
+  calloutText: { flex: 1, gap: 2 },
+  calloutTitle: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary },
+  calloutBody: { ...typography.secondary, fontSize: 15, color: colors.textSecondary },
+  calloutBodyStrong: { ...typography.body, color: colors.textPrimary },
+  approved: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
     padding: spacing.md,
-    borderRadius: spacing.sm,
+    borderRadius: radius.card,
+    backgroundColor: toneColors.success.tint,
   },
-  completedText: { ...typography.body, color: toneColors.success.text },
+  approvedMark: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    backgroundColor: toneColors.success.text,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approvedText: { ...typography.bodyStrong, fontSize: 17, color: toneColors.success.text, flex: 1 },
 });

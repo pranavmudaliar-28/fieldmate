@@ -17,6 +17,9 @@ export type AppHeaderProps = {
   eyebrow?: string;
   /** Shown as a back arrow on the left. */
   onBack?: () => void;
+  /** A form that can be abandoned shows a cross instead of the back arrow. */
+  backIcon?: 'back' | 'close';
+  backTestID?: string;
   /** Shown as a close cross on the right, for forms with a discard guard. */
   onClose?: () => void;
   /** Avatar, bell, overflow — whatever the screen owns. */
@@ -35,6 +38,8 @@ export function AppHeader({
   title,
   eyebrow,
   onBack,
+  backIcon = 'back',
+  backTestID = 'header-back',
   onClose,
   right,
   size = 'compact',
@@ -49,12 +54,16 @@ export function AppHeader({
           <Pressable
             onPress={onBack}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
-            testID="header-back"
+            accessibilityLabel={backIcon === 'close' ? 'Close' : 'Go back'}
+            testID={backTestID}
             hitSlop={8}
             style={styles.circle}
           >
-            <Icon name="arrow-back" size={21} color={colors.textPrimary} />
+            <Icon
+              name={backIcon === 'close' ? 'close' : 'chevron-back'}
+              size={26}
+              color={colors.textPrimary}
+            />
           </Pressable>
         ) : null}
 
@@ -64,14 +73,17 @@ export function AppHeader({
               {eyebrow}
             </Text>
           ) : null}
-          <Text
-            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-            style={large ? styles.titleLarge : styles.title}
-            accessibilityRole="header"
-            numberOfLines={large ? 2 : 1}
-          >
-            {title}
-          </Text>
+          {/* Detail screens leave the bar empty and put the title in the page. */}
+          {title ? (
+            <Text
+              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+              style={large ? styles.titleLarge : styles.title}
+              accessibilityRole="header"
+              numberOfLines={large ? 2 : 1}
+            >
+              {title}
+            </Text>
+          ) : null}
         </View>
 
         {right ?? null}
@@ -85,7 +97,7 @@ export function AppHeader({
             hitSlop={8}
             style={styles.circle}
           >
-            <Icon name="close" size={21} color={colors.textPrimary} />
+            <Icon name="close" size={24} color={colors.textPrimary} />
           </Pressable>
         ) : null}
       </View>
@@ -105,14 +117,15 @@ const styles = StyleSheet.create({
   },
   rowLarge: { paddingTop: spacing.md, paddingBottom: spacing.md },
   titleBlock: { flex: 1, gap: spacing.xs },
-  eyebrow: { ...typography.label, color: colors.textDisabled },
+  eyebrow: { ...typography.secondary, fontSize: 15, color: colors.textSecondary },
   title: { ...typography.sectionTitle, color: colors.textPrimary },
   titleLarge: { ...typography.hero, color: colors.textPrimary },
+  /** Bare glyphs on paper; the 48 box is the hit area, pulled into the gutter. */
   circle: {
-    width: 44,
-    height: 44,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
+    marginHorizontal: -spacing.smPlus,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },

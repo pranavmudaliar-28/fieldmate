@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
@@ -7,6 +7,7 @@ import {
   radius,
   spacing,
   typography,
+  type IconName,
 } from '../constants/theme';
 import { Icon } from './Icon';
 
@@ -17,22 +18,44 @@ export type InputProps = TextInputProps & {
   required?: boolean;
   /** Adds a show/hide toggle for passwords. */
   secure?: boolean;
+  /** Decorative mark at the start of the field (mail, lock, search). */
+  icon?: IconName;
+  /** Shows "n / max" under the field once `maxLength` is set. */
+  showCount?: boolean;
+  /** A small control inside the field's right edge, e.g. "Generate". */
+  accessory?: ReactNode;
   testID?: string;
 };
 
 export const Input = forwardRef<TextInput, InputProps>(function Input(
-  { label, error, helper, required = false, secure = false, testID, style, ...inputProps },
+  {
+    label,
+    error,
+    helper,
+    required = false,
+    secure = false,
+    icon,
+    showCount = false,
+    accessory,
+    testID,
+    style,
+    ...inputProps
+  },
   ref,
 ) {
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const invalid = Boolean(error);
+  const counter =
+    showCount && inputProps.maxLength !== undefined
+      ? `${(inputProps.value ?? '').length} / ${inputProps.maxLength}`
+      : null;
 
   return (
     <View style={styles.container}>
+      {/* No asterisk: required is the norm, so the rare optional field says so instead. */}
       <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
         {label}
-        {required ? ' *' : ''}
       </Text>
 
       {/* The ring is a parent rather than a shadow, so it looks the same on
@@ -47,13 +70,18 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             invalid && styles.fieldError,
           ]}
         >
+          {icon ? (
+            <View style={styles.leading}>
+              <Icon name={icon} size={20} color={colors.textSecondary} />
+            </View>
+          ) : null}
           <TextInput
             ref={ref}
             testID={testID}
             // The caller's style is merged, never replaced: dropping flex here
             // collapsed multi-line fields so they could not be tapped.
             style={[styles.input, inputProps.multiline && styles.inputMultiline, style]}
-            placeholderTextColor={colors.textDisabled}
+            placeholderTextColor={colors.textTertiary}
             maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
             accessibilityLabel={label}
             accessibilityState={{ disabled: inputProps.editable === false }}
@@ -70,6 +98,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             }}
             {...inputProps}
           />
+          {accessory ? <View style={styles.accessory}>{accessory}</View> : null}
           {secure ? (
             <Pressable
               onPress={() => setRevealed((value) => !value)}
@@ -81,25 +110,34 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
               <Icon
                 name={revealed ? 'eye-off-outline' : 'eye-outline'}
                 size={22}
-                color={colors.textSecondary}
+                color={colors.textPrimary}
               />
             </Pressable>
           ) : null}
         </View>
       </View>
 
-      {error ? (
-        <View style={styles.message} accessibilityRole="alert">
-          {/* Errors are an icon and text, never a red border alone (docs/04 §8). */}
-          <Icon name="alert-circle" size={15} color={colors.errorText} />
-          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.error}>
-            {error}
-          </Text>
+      {error || helper || counter ? (
+        <View style={styles.footer}>
+          {error ? (
+            <View style={styles.message} accessibilityRole="alert">
+              {/* Errors are an icon and text, never a red border alone. */}
+              <Icon name="alert-circle-outline" size={16} color={colors.errorText} />
+              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.error}>
+                {error}
+              </Text>
+            </View>
+          ) : (
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.helper}>
+              {helper ?? ''}
+            </Text>
+          )}
+          {counter ? (
+            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.counter}>
+              {counter}
+            </Text>
+          ) : null}
         </View>
-      ) : helper ? (
-        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.helper}>
-          {helper}
-        </Text>
       ) : null}
     </View>
   );
@@ -109,14 +147,14 @@ const RING_WIDTH = 3;
 
 const styles = StyleSheet.create({
   container: { gap: spacing.sm },
-  label: { ...typography.label, color: colors.textSecondary },
+  label: { ...typography.secondaryStrong, color: colors.textPrimary },
   ring: {
     padding: RING_WIDTH,
     margin: -RING_WIDTH,
     borderRadius: radius.control + RING_WIDTH,
     backgroundColor: 'transparent',
   },
-  ringFocused: { backgroundColor: 'rgba(214, 242, 75, 0.55)' },
+  ringFocused: { backgroundColor: 'rgba(255, 194, 26, 0.45)' },
   field: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -130,15 +168,19 @@ const styles = StyleSheet.create({
   fieldMultiline: { alignItems: 'stretch' },
   fieldFocused: { borderColor: colors.primary, borderWidth: 2 },
   fieldError: { borderColor: colors.error, borderWidth: 2 },
+  leading: { marginRight: spacing.smPlus, justifyContent: 'center' },
   input: {
     flex: 1,
-    ...typography.bodyStrong,
+    ...typography.body,
     color: colors.textPrimary,
     paddingVertical: spacing.smPlus,
   },
   inputMultiline: { textAlignVertical: 'top' },
   toggle: { minWidth: 48, minHeight: 48, alignItems: 'flex-end', justifyContent: 'center' },
-  message: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
-  error: { ...typography.secondaryStrong, color: colors.errorText, flex: 1 },
-  helper: { ...typography.secondary, color: colors.textSecondary },
+  accessory: { marginLeft: spacing.sm, marginRight: -spacing.sm },
+  footer: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  message: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
+  error: { ...typography.secondary, color: colors.errorText, flex: 1 },
+  helper: { ...typography.caption, color: colors.textSecondary, flex: 1 },
+  counter: { ...typography.mono, color: colors.textTertiary },
 });

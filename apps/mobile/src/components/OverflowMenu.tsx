@@ -58,7 +58,8 @@ export function OverflowMenu({ visible, onClose, actions, testID }: OverflowMenu
                 testID={action.testID}
                 style={({ pressed }) => [
                   styles.item,
-                  index > 0 && styles.itemDivided,
+                  // A destructive action is set apart from the rest by a rule.
+                  index > 0 && action.destructive && styles.itemDivided,
                   pressed && !action.disabled && styles.itemPressed,
                 ]}
               >
@@ -97,9 +98,9 @@ const styles = StyleSheet.create({
   anchor: { alignItems: 'flex-end', paddingHorizontal: layout.screenPadding },
   menu: {
     marginTop: 64,
-    minWidth: 232,
+    minWidth: 260,
     backgroundColor: colors.surface,
-    borderRadius: radius.sheet,
+    borderRadius: radius.card,
     padding: spacing.sm,
     ...elevation.overlay,
   },
@@ -111,9 +112,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.smPlus,
     borderRadius: radius.control,
   },
-  itemDivided: { marginTop: spacing.xs },
+  itemDivided: {
+    marginTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingTop: spacing.sm,
+    minHeight: layout.minTouchTarget + spacing.sm,
+  },
   itemPressed: { backgroundColor: colors.surfaceMuted },
-  label: { ...typography.bodyStrong, color: colors.textPrimary, flex: 1 },
+  label: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary, flex: 1 },
   labelDestructive: { color: colors.errorText },
   labelDisabled: { color: colors.textDisabled },
 });

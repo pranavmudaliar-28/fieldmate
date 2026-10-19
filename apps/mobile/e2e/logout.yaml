@@ -1,8 +1,10 @@
-# Signs the current user out from a dashboard.
+# Signs the current user out from the Profile tab, which every role has.
 appId: com.slasheasy.fieldmate.dev
 ---
+- tapOn:
+    id: 'tab-profile'
 - tapOn:
     id: 'logout-button'
 - assertVisible: 'Log out?'
 - tapOn: 'Log out'
-- assertVisible: 'Welcome back'
+- assertVisible: 'Sign in'

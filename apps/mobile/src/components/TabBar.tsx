@@ -27,9 +27,9 @@ export type FieldTabBarProps = BottomTabBarProps & {
 };
 
 /**
- * A floating pill rather than a full-width bar: it reads as a control rather
- * than a screen edge, and the active tab carries the one accent colour.
- * Replaces navigating by scrolling to a button at the bottom of a page.
+ * A floating ink bar rather than a full-width one: it reads as a control
+ * rather than a screen edge. Every tab keeps its label; the active one sits on
+ * the signal yellow.
  */
 export function FieldTabBar({ state, navigation, tabs, badges }: FieldTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -72,7 +72,7 @@ export function FieldTabBar({ state, navigation, tabs, badges }: FieldTabBarProp
                 <Icon
                   name={focused ? tab.activeIcon : tab.icon}
                   size={22}
-                  color={focused ? colors.onAccent : colors.textOnInverseMuted}
+                  color={focused ? colors.onAccent : colors.textOnInverse}
                 />
                 {badge > 0 ? (
                   <View style={styles.badge}>
@@ -82,11 +82,13 @@ export function FieldTabBar({ state, navigation, tabs, badges }: FieldTabBarProp
                   </View>
                 ) : null}
               </View>
-              {focused ? (
-                <Text maxFontSizeMultiplier={1.3} style={styles.label} numberOfLines={1}>
-                  {tab.label}
-                </Text>
-              ) : null}
+              <Text
+                maxFontSizeMultiplier={1.3}
+                style={[styles.label, focused && styles.labelActive]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -113,24 +115,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: layout.tabBarHeight,
-    borderRadius: radius.pill,
+    borderRadius: radius.sheet,
     backgroundColor: colors.surfaceInverse,
-    padding: spacing.sm + 1,
+    padding: spacing.sm,
     gap: spacing.xs,
-    ...elevation.overlay,
+    ...elevation.floating,
   },
   tab: {
-    minWidth: layout.minTouchTarget,
-    height: layout.minTouchTarget,
-    borderRadius: radius.pill,
-    flexDirection: 'row',
+    flex: 1,
+    alignSelf: 'stretch',
+    minHeight: layout.minTouchTarget,
+    borderRadius: radius.card,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
+    gap: 2,
   },
-  tabActive: { flex: 1, backgroundColor: colors.accent },
-  label: { ...typography.caption, color: colors.onAccent },
+  tabActive: { backgroundColor: colors.accent },
+  label: {
+    ...typography.caption,
+    fontFamily: typography.secondaryStrong.fontFamily,
+    color: colors.textOnInverse,
+  },
+  labelActive: { color: colors.onAccent },
   badge: {
     position: 'absolute',
     top: -6,

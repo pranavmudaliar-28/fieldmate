@@ -1,6 +1,6 @@
 import { render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import LoginScreen from '../../app/(auth)/login';
-import { SESSION_EXPIRED_MESSAGE, useAuth } from '../features/auth/auth-context';
+import { useAuth } from '../features/auth/auth-context';
 import { useIsOnline } from '../hooks/use-network-status';
 import { ApiError } from '../services/http';
 
@@ -51,10 +51,11 @@ beforeEach(() => {
 });
 
 describe('Login screen (S-001)', () => {
-  it('shows the app name, welcome text and both fields', async () => {
+  it('shows the app name, the sign-in title and both fields', async () => {
     await render(<LoginScreen />);
     expect(screen.getByRole('header', { name: 'FieldMate' })).toBeTruthy();
-    expect(screen.getByText('Welcome back')).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.getByText(/Accounts are created by your admin/)).toBeTruthy();
     expect(screen.getByTestId('login-email')).toBeTruthy();
     expect(screen.getByTestId('login-password')).toBeTruthy();
   });
@@ -95,6 +96,7 @@ describe('Login screen (S-001)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('login-error')).toHaveTextContent('Incorrect email or password.'),
     );
+    expect(screen.getByText(/Ask your admin if you’ve forgotten your password/)).toBeTruthy();
   });
 
   it('shows a readable message when the request cannot reach the server', async () => {
@@ -115,7 +117,7 @@ describe('Login screen (S-001)', () => {
     mockUseIsOnline.mockReturnValue(false);
     await render(<LoginScreen />);
 
-    expect(screen.getByText('Connect to the internet to log in.')).toBeTruthy();
+    expect(screen.getByText('Connect to the internet to sign in.')).toBeTruthy();
     await userEvent.setup().press(screen.getByTestId('login-submit'));
     expect(signIn).not.toHaveBeenCalled();
   });
@@ -124,6 +126,7 @@ describe('Login screen (S-001)', () => {
     mockUseAuth.mockReturnValue(authState({ sessionExpired: true }));
     await render(<LoginScreen />);
 
-    expect(screen.getByTestId('login-error')).toHaveTextContent(SESSION_EXPIRED_MESSAGE);
+    expect(screen.getByTestId('login-error')).toHaveTextContent('Session expired');
+    expect(screen.getByText('Sign in again to keep working.')).toBeTruthy();
   });
 });

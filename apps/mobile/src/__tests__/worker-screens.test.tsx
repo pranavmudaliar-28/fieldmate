@@ -5,6 +5,7 @@ import WorkerDashboard from '../../app/(worker)/(tabs)/index';
 import MyTasks from '../../app/(worker)/(tabs)/tasks';
 import CompleteTaskScreen from '../../app/(worker)/tasks/[taskId]/complete';
 import { ToastProvider } from '../components/Toast';
+import { OfflineQueueProvider } from '../features/offline/offline-queue';
 import { useAuth } from '../features/auth/auth-context';
 import * as tasksApi from '../features/tasks/api';
 import { ApiError } from '../services/http';
@@ -96,7 +97,9 @@ async function renderScreen(ui: React.ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await render(
     <QueryClientProvider client={client}>
-      <ToastProvider>{ui}</ToastProvider>
+      <OfflineQueueProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </OfflineQueueProvider>
     </QueryClientProvider>,
   );
 }
@@ -125,19 +128,29 @@ describe('Worker dashboard (S-006)', () => {
 
     await waitFor(() => expect(screen.getByText('Started task')).toBeTruthy());
     expect(screen.getByRole('header', { name: 'Hello, Priya' })).toBeTruthy();
-    // The live job is raised out of the list into its own card, labelled with
-    // whichever step it has reached.
+    // The live job is raised out of the list into its own card, with its
+    // status and the next thing to do.
     expect(screen.getByTestId('current-job-t1')).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'In progress' })).toBeTruthy();
-    expect(screen.getByRole('header', { name: 'New assignments' })).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'Current task' })).toBeTruthy();
+    expect(screen.getByLabelText('Status: In progress')).toBeTruthy();
+    expect(screen.getByTestId('hero-add-photo')).toBeTruthy();
+    expect(screen.getByRole('header', { name: 'New assignments, 1' })).toBeTruthy();
+  });
+
+  it('offers the next journey step on the current job', async () => {
+    respondByStatus({ ACCEPTED: [listItem('t1', 'Accepted task', 'ACCEPTED')] });
+    await renderScreen(<WorkerDashboard />);
+
+    await waitFor(() => expect(screen.getByTestId('hero-action-depart')).toBeTruthy());
+    expect(screen.getByText('Next: tell your manager you’re on your way')).toBeTruthy();
   });
 
   it('says there is nothing to do when both sections are empty', async () => {
     respondByStatus({});
     await renderScreen(<WorkerDashboard />);
 
-    await waitFor(() => expect(screen.getByText('No tasks right now')).toBeTruthy());
-    expect(screen.getByText('New tasks assigned to you will appear here.')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('You’re all clear')).toBeTruthy());
+    expect(screen.getByText(/No tasks right now\. When your manager assigns you one/)).toBeTruthy();
   });
 
   it('opens a task from the dashboard', async () => {
@@ -172,6 +185,17 @@ describe('My tasks (S-007)', () => {
     expect(screen.getByText('Finished task')).toBeTruthy();
   });
 
+  it('keeps work waiting on the manager apart from active work', async () => {
+    respondByStatus({
+      IN_PROGRESS: [listItem('t1', 'Started task', 'IN_PROGRESS')],
+      AWAITING_REVIEW: [listItem('t4', 'Submitted task', 'AWAITING_REVIEW')],
+    });
+    await renderScreen(<MyTasks />);
+
+    await waitFor(() => expect(screen.getByText('Submitted task')).toBeTruthy());
+    expect(screen.getByRole('header', { name: 'Awaiting review' })).toBeTruthy();
+  });
+
   it('explains each empty section', async () => {
     respondByStatus({});
     await renderScreen(<MyTasks />);
@@ -199,13 +223,12 @@ describe('Task completion (S-010)', () => {
     );
     await renderScreen(<CompleteTaskScreen />);
 
-    await waitFor(() => expect(screen.getByTestId('summary-photos')).toHaveTextContent('1'));
-    expect(screen.getByTestId('summary-notes')).toHaveTextContent('1');
-    expect(
-      screen.getByText(
-        /you won't be able to add or delete photos or notes until a manager hands it back/,
-      ),
-    ).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('1 photo')).toBeTruthy());
+    expect(screen.getByText('1 from camera, 0 from gallery')).toBeTruthy();
+    expect(screen.getByTestId('summary-photos')).toHaveTextContent('Done');
+    expect(screen.getByText('1 note')).toBeTruthy();
+    expect(screen.getByTestId('summary-notes')).toHaveTextContent('Done');
+    expect(screen.getByText(/After you submit, photos and notes are locked/)).toBeTruthy();
   });
 
   it('marks photos as required and blocks completion when there are none', async () => {
@@ -213,8 +236,9 @@ describe('Task completion (S-010)', () => {
     await renderScreen(<CompleteTaskScreen />);
 
     await waitFor(() => expect(screen.getByTestId('summary-photos')).toHaveTextContent('Required'));
+    expect(screen.getByTestId('summary-notes')).toHaveTextContent('Optional');
     expect(screen.getByTestId('confirm-complete')).toBeDisabled();
-    expect(screen.getByText('At least 1 photo is required to complete this task.')).toBeTruthy();
+    expect(screen.getByText('Add at least 1 photo to submit for review.')).toBeTruthy();
   });
 
   it('hands the work to the manager rather than closing the task', async () => {
@@ -230,7 +254,7 @@ describe('Task completion (S-010)', () => {
     // It is not finished, and the wording must not pretend otherwise.
     expect(screen.getByText('Sent for review')).toBeTruthy();
     expect(
-      screen.getByText('Your manager will check the work and either approve it or send it back.'),
+      screen.getByText(/We’ll let you know when they approve it or ask for changes/),
     ).toBeTruthy();
   });
 

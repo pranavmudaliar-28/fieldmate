@@ -35,7 +35,7 @@ export function NotificationBell({ unread, onPress, testID }: NotificationBellPr
       testID={testID ?? 'notification-bell'}
       style={styles.button}
     >
-      <Icon name={has ? 'notifications' : 'notifications-outline'} size={24} />
+      <Icon name="notifications-outline" size={24} />
       {has ? (
         <View style={styles.badge} pointerEvents="none" testID="notification-badge">
           <Text
@@ -53,17 +53,21 @@ export function NotificationBell({ unread, onPress, testID }: NotificationBellPr
 
 const styles = StyleSheet.create({
   button: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
+    width: layout.minTouchTarget + 8,
+    height: layout.minTouchTarget + 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badge: {
     position: 'absolute',
-    top: 4,
-    right: 2,
-    minWidth: 18,
-    height: 18,
+    top: -spacing.xs,
+    right: -spacing.xs,
+    minWidth: 24,
+    height: 24,
     paddingHorizontal: spacing.xs,
     borderRadius: radius.pill,
     backgroundColor: colors.error,
@@ -71,7 +75,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     // Separates the badge from whatever the icon is sitting on.
     borderWidth: 2,
-    borderColor: colors.background,
+    borderColor: colors.surface,
   },
-  count: { ...typography.caption, color: colors.surface, fontSize: 11, lineHeight: 13 },
+  count: {
+    // Caption is the floor the system sets: nothing below 13px, including
+    // a count a worker reads at arm's length in sunlight.
+    ...typography.caption,
+    fontFamily: typography.secondaryStrong.fontFamily,
+    color: colors.onPrimary,
+  },
 });

@@ -2,7 +2,7 @@
 appId: com.slasheasy.fieldmate.dev
 ---
 - assertVisible: 'FieldMate'
-- assertVisible: 'Welcome back'
+- assertVisible: 'Sign in'
 - tapOn:
     id: 'login-email'
 - inputText: ${EMAIL}

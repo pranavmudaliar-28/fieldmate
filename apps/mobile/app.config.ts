@@ -32,7 +32,8 @@ const config: ExpoConfig = {
   android: {
     package: variant.id,
     adaptiveIcon: {
-      backgroundColor: '#2563EB',
+      // Signal yellow behind the ink pin, as in the iOS icon.
+      backgroundColor: '#FFC21A',
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
@@ -53,7 +54,17 @@ const config: ExpoConfig = {
     'expo-font',
     'expo-notifications',
     'expo-secure-store',
-    'expo-splash-screen',
+    [
+      'expo-splash-screen',
+      {
+        // The logo tile on ink. The app then draws the full splash (rings,
+        // wordmark, tagline) at the same place while the session is checked.
+        image: './assets/splash-icon.png',
+        imageWidth: 136,
+        resizeMode: 'contain',
+        backgroundColor: '#0F1115',
+      },
+    ],
   ],
   web: {
     bundler: 'metro',

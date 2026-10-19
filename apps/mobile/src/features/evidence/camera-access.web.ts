@@ -15,7 +15,7 @@ export function unavailableReason(): string | null {
  * `Linking.openSettings`, so offering the button would throw.
  */
 export const deniedHelp: { body: string; action: string | null } = {
-  body: 'Camera access is blocked for this site. Allow it from the padlock in the address bar, then reload.',
+  body: 'Camera access is blocked for this site. Allow it from the padlock in the address bar and reload, or add a photo from your gallery.',
   action: null,
 };
 

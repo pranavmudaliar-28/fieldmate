@@ -31,6 +31,8 @@ env:
     id: 'task-worker-select'
 - tapOn: 'Priya Nair'
 - tapOn:
+    id: 'worker-picker-confirm'
+- tapOn:
     id: 'task-address'
 - inputText: '9 Depot Lane'
 - hideKeyboard
@@ -49,7 +51,7 @@ env:
 - tapOn: ${TASK_TITLE}
 - tapOn:
     id: 'action-reject'
-- assertVisible: "Tell your manager why you can't do this task."
+- assertVisible: 'Your manager gets your reason and can reassign the task.'
 
 # The reason is required
 - assertVisible:
@@ -69,21 +71,23 @@ env:
 - assertNotVisible: ${TASK_TITLE}
 - runFlow: logout.yaml
 
-# The manager sees it under "Needs attention", with the reason
+# The manager sees it under "Needs your attention", and the reason on the task
 - runFlow:
     file: login.yaml
     env:
       EMAIL: ${MANAGER_EMAIL}
       PASSWORD: ${PASSWORD}
-- assertVisible: 'Needs attention'
-- assertVisible: ${REASON}
+- assertVisible: 'Needs your attention'
 - tapOn: ${TASK_TITLE}
 - assertVisible: 'Rejected'
+- assertVisible: '.*${REASON}.*'
 
 # The manager hands it to someone else
 - tapOn:
     id: 'action-reassign'
 - tapOn: 'Sam Lee'
+- tapOn:
+    id: 'worker-picker-confirm'
 - assertVisible: 'Reassign to Sam Lee?'
 - tapOn: 'Reassign'
 - assertVisible: 'Sam Lee'

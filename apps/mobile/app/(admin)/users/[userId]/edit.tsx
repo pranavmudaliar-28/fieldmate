@@ -1,10 +1,11 @@
 import type { CreateUserInput } from '@fieldmate/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { AppHeader } from '../../../../src/components/AppHeader';
 import { ErrorState, LoadingState } from '../../../../src/components/States';
 import { useToast } from '../../../../src/components/Toast';
-import { layout } from '../../../../src/constants/theme';
+import { colors, layout } from '../../../../src/constants/theme';
 import { UserForm } from '../../../../src/features/admin/UserForm';
 import { useUpdateUser, useUser } from '../../../../src/features/admin/hooks';
 import { ApiError } from '../../../../src/services/http';
@@ -37,17 +38,19 @@ export default function EditUserScreen() {
   };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: true, title: 'Edit user' }} />
+    <View style={styles.screen}>
+      <AppHeader title="Edit user" onBack={() => router.back()} backIcon="close" />
 
       {user.isPending ? (
-        <View style={{ padding: layout.screenPadding }}>
+        <View style={styles.padded}>
           <LoadingState variant="detail" />
         </View>
       ) : null}
 
       {user.isError ? (
-        <ErrorState message="Couldn't load this user." onRetry={() => void user.refetch()} />
+        <View style={styles.padded}>
+          <ErrorState message="Couldn't load this user." onRetry={() => void user.refetch()} />
+        </View>
       ) : null}
 
       {user.data ? (
@@ -63,6 +66,11 @@ export default function EditUserScreen() {
           onSubmit={submit}
         />
       ) : null}
-    </>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  padded: { padding: layout.screenPadding },
+});
