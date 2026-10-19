@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     top: -6,
     right: -10,
     minWidth: 18,
-    height: 18,
+    minHeight: 18,
     borderRadius: radius.pill,
     backgroundColor: colors.error,
     borderWidth: 2,
@@ -152,5 +152,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  badgeText: { ...typography.caption, fontSize: 10, lineHeight: 13, color: colors.onPrimary },
+  badgeText: {
+    ...typography.caption,
+    fontSize: 10,
+    lineHeight: 12,
+    color: colors.onPrimary,
+    includeFontPadding: false,
+  },
 });
