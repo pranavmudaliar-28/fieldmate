@@ -241,9 +241,11 @@ export default function ManagerTaskDetails() {
             <Button
               label="Reopen task"
               icon="refresh"
+              variant="secondary"
               testID="action-reopen"
               onPress={() => setPending('reopen')}
               disabled={busy}
+              style={styles.barAction}
             />
           ) : null}
           {primary === 'reassign' ? (
@@ -253,6 +255,7 @@ export default function ManagerTaskDetails() {
               testID="action-reassign"
               onPress={() => setPickerOpen(true)}
               disabled={busy}
+              style={styles.barAction}
             />
           ) : null}
         </ActionBar>
@@ -430,6 +433,8 @@ export default function ManagerTaskDetails() {
 }
 
 const styles = StyleSheet.create({
+  /** The action bar is a row: a lone button needs flex to span it. */
+  barAction: { flex: 1 },
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: layout.screenPadding, paddingTop: 0, paddingBottom: spacing.xl },
   padded: { flex: 1, padding: layout.screenPadding },

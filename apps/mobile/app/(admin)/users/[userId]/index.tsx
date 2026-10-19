@@ -271,6 +271,7 @@ export default function UserDetailsScreen() {
             testID="edit-user"
             onPress={() => router.push(`/(admin)/users/${managed.id}/edit`)}
             disabled={busy}
+            style={styles.barAction}
           />
         ) : (
           <Button
@@ -279,6 +280,7 @@ export default function UserDetailsScreen() {
             testID="activate-user"
             disabled={busy}
             onPress={() => setPending('activate')}
+            style={styles.barAction}
           />
         )}
       </ActionBar>
@@ -544,6 +546,8 @@ function ActionRow({
 }
 
 const styles = StyleSheet.create({
+  /** The action bar is a row: a lone button needs flex to span it. */
+  barAction: { flex: 1 },
   screen: { flex: 1, backgroundColor: colors.background },
   content: {
     padding: layout.screenPadding,

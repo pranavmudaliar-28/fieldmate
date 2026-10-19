@@ -243,6 +243,7 @@ export function TaskForm({
           onPress={() => void submit()}
           loading={submitting}
           disabled={mode === 'edit' && !isDirty}
+          style={styles.barAction}
         />
       </ActionBar>
 
@@ -257,6 +258,8 @@ export function TaskForm({
 }
 
 const styles = StyleSheet.create({
+  /** The action bar is a row: a lone button needs flex to span it. */
+  barAction: { flex: 1 },
   flex: { flex: 1, backgroundColor: colors.background },
   content: { padding: layout.screenPadding, paddingTop: spacing.xs, gap: spacing.mdPlus },
   notice: {
