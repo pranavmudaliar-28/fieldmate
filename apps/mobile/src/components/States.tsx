@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     minHeight: layout.minTouchTarget,
   },
   sectionTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  sectionTitle: { ...typography.sectionTitle, color: colors.textPrimary, flexShrink: 1 },
+  sectionTitle: { ...typography.sectionHeading, color: colors.textPrimary, flexShrink: 1 },
   count: {
     minWidth: 28,
     height: 28,

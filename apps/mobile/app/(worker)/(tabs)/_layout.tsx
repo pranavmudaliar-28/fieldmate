@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import { FieldTabBar, type TabConfig } from '../../../src/components/TabBar';
 
 const TABS: TabConfig[] = [
-  { name: 'index', label: 'Today', icon: 'home-outline', activeIcon: 'home' },
+  { name: 'index', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
   { name: 'tasks', label: 'My tasks', icon: 'list-outline', activeIcon: 'list' },
   { name: 'profile', label: 'Profile', icon: 'person-outline', activeIcon: 'person' },
 ];

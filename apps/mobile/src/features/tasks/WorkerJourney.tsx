@@ -142,6 +142,8 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: colors.textSecondary,
     textAlign: 'center',
+    // Keeps a gap between neighbouring labels that each just fit their column.
+    paddingHorizontal: 2,
   },
   labelStrong: { color: colors.textPrimary, fontFamily: typography.secondaryStrong.fontFamily },
 });

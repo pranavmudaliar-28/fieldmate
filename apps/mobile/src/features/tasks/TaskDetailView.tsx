@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     minHeight: layout.minTouchTarget,
   },
-  sectionTitle: { ...typography.cardTitle, fontSize: 20, color: colors.textPrimary, flexShrink: 1 },
+  sectionTitle: { ...typography.groupTitle, color: colors.textPrimary, flexShrink: 1 },
   sectionCount: { color: colors.textSecondary, ...tabularNumbers },
   body: { ...typography.body, color: colors.textPrimary },
   quiet: { ...typography.secondary, color: colors.textSecondary },

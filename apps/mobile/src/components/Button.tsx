@@ -13,6 +13,7 @@ import {
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  fontFamily,
   layout,
   motion,
   radius,
@@ -105,6 +106,7 @@ export function Button({
           styles.base,
           size === 'lg' ? styles.large : styles.medium,
           appearance.container,
+          variant === 'signal' && size === 'lg' && styles.signalLarge,
           pressed && !isInactive && appearance.pressed,
           disabled && !isGhost && styles.disabled,
         ]}
@@ -120,6 +122,7 @@ export function Button({
                 size === 'lg' ? typography.button : typography.buttonMedium,
                 styles.label,
                 appearance.label,
+                variant === 'signal' && size === 'lg' && styles.signalLabel,
                 disabled && [styles.disabledLabel, { color: disabledColor }],
               ]}
             >
@@ -149,6 +152,9 @@ const styles = StyleSheet.create({
   content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   /** A label that has to wrap, in a half-width button or at a large text size, stays centred. */
   label: { textAlign: 'center', flexShrink: 1 },
+  /** The worker's next step is the one thing on the screen, so it is a size up. */
+  signalLarge: { minHeight: 60, borderRadius: 16 },
+  signalLabel: { fontSize: 18, lineHeight: 22, fontFamily: fontFamily.bold },
   disabled: { backgroundColor: colors.border, borderColor: colors.border },
   disabledLabel: { textDecorationLine: 'none' },
 });
