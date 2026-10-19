@@ -97,6 +97,9 @@ export function WorkerJourney({ task, perspective, canSubmit = true }: WorkerJou
               <Text
                 maxFontSizeMultiplier={1.3}
                 numberOfLines={2}
+                // On a narrow phone "Submitted" is wider than its column. A
+                // hyphen at the break reads as one word; a bare split does not.
+                android_hyphenationFrequency="normal"
                 style={[styles.label, done || isCurrent ? styles.labelStrong : null]}
               >
                 {step.label}
