@@ -36,7 +36,14 @@ import { ApiError } from '../../src/services/http';
 
 const OFFLINE_HINT = 'Connect to the internet to sign in.';
 
-type Notice = { title: string; body?: string; tone: Tone; icon: IconName };
+type Notice = {
+  title: string;
+  body?: string;
+  tone: Tone;
+  icon: IconName;
+  /** The password field is marked too, since that is the usual culprit. */
+  wrongCredentials?: boolean;
+};
 
 const SESSION_EXPIRED: Notice = {
   title: 'Session expired',
@@ -193,6 +200,7 @@ export default function LoginScreen() {
                   onChangeText={onChange}
                   onBlur={onBlur}
                   {...(errors.password?.message ? { error: errors.password.message } : {})}
+                  invalid={formError?.wrongCredentials === true}
                   secure
                   autoCapitalize="none"
                   autoComplete="current-password"
@@ -243,8 +251,9 @@ function noticeFor(error: unknown): Notice {
   if (error instanceof ApiError) {
     if (error.code === 'INVALID_CREDENTIALS') {
       return {
-        title: error.message,
+        title: 'Email or password is incorrect',
         body: 'Check both and try again. Ask your admin if you’ve forgotten your password.',
+        wrongCredentials: true,
         tone: 'error',
         icon: 'alert-circle-outline',
       };

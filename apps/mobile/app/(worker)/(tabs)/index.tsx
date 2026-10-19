@@ -33,7 +33,7 @@ import { useAuth } from '../../../src/features/auth/auth-context';
 import { InboxBell } from '../../../src/features/notifications/InboxBell';
 import { NotificationPrompt } from '../../../src/features/notifications/NotificationPrompt';
 import { useTaskList } from '../../../src/features/tasks/hooks';
-import { useAdvanceTask } from '../../../src/features/tasks/worker-hooks';
+import { useAdvanceTask, useStepBack } from '../../../src/features/tasks/worker-hooks';
 import { WORKER_STEP_UI } from '../../../src/features/tasks/worker-steps';
 import { ApiError } from '../../../src/services/http';
 import { formatDayHeading } from '../../../src/utils/format';
@@ -165,6 +165,7 @@ function CurrentJobCard({ task }: { task: TaskListItem }) {
   const router = useRouter();
   const { showToast } = useToast();
   const advance = useAdvanceTask(task.id);
+  const stepBack = useStepBack(task.id);
   const open = () => router.push(`/(worker)/tasks/${task.id}`);
 
   const appearance = statusAppearance[task.status];
@@ -231,7 +232,15 @@ function CurrentJobCard({ task }: { task: TaskListItem }) {
           loading={advance.isPending}
           onPress={() =>
             advance.mutate(step, {
-              onSuccess: () => showToast(WORKER_STEP_UI[step].done),
+              onSuccess: () =>
+                showToast(WORKER_STEP_UI[step].done, 'success', {
+                  label: 'Undo',
+                  onPress: () =>
+                    stepBack.mutate(undefined, {
+                      onError: () =>
+                        showToast('Couldn’t undo. Open the task to try again.', 'error'),
+                    }),
+                }),
               onError: (error) =>
                 showToast(
                   error instanceof ApiError

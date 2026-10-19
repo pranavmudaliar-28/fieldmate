@@ -15,6 +15,8 @@ import { Icon } from './Icon';
 export type InputProps = TextInputProps & {
   label: string;
   error?: string;
+  /** Marks the field as wrong when the message is shown elsewhere, such as a form-level notice. */
+  invalid?: boolean;
   helper?: string;
   required?: boolean;
   /** Adds a show/hide toggle for passwords. */
@@ -32,6 +34,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   {
     label,
     error,
+    invalid: markedInvalid = false,
     helper,
     required = false,
     secure = false,
@@ -46,7 +49,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
 ) {
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const invalid = Boolean(error);
+  const invalid = Boolean(error) || markedInvalid;
   const counter =
     showCount && inputProps.maxLength !== undefined
       ? `${(inputProps.value ?? '').length} / ${inputProps.maxLength}`
@@ -89,6 +92,9 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             aria-required={required}
             aria-invalid={invalid}
             secureTextEntry={secure && !revealed}
+            {...inputProps}
+            // After the spread: a caller's onBlur (every form field has one)
+            // used to replace this one, and the field then stayed focused.
             onFocus={(e) => {
               setFocused(true);
               inputProps.onFocus?.(e);
@@ -97,7 +103,6 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
               setFocused(false);
               inputProps.onBlur?.(e);
             }}
-            {...inputProps}
           />
           {accessory ? <View style={styles.accessory}>{accessory}</View> : null}
           {secure ? (
@@ -149,13 +154,14 @@ const RING_WIDTH = 4;
 const styles = StyleSheet.create({
   container: { gap: spacing.sm },
   label: { ...typography.secondaryStrong, color: colors.textPrimary },
+  /** A border rather than a padded fill: Android drew the fill with square corners. */
   ring: {
-    padding: RING_WIDTH,
+    borderWidth: RING_WIDTH,
     margin: -RING_WIDTH,
     borderRadius: radius.control + RING_WIDTH,
-    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
-  ringFocused: { backgroundColor: 'rgba(255, 194, 26, 0.45)' },
+  ringFocused: { borderColor: 'rgba(255, 194, 26, 0.45)' },
   field: {
     flexDirection: 'row',
     alignItems: 'center',

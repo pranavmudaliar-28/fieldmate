@@ -8,12 +8,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { AccessibilityInfo, Animated, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
   elevation,
+  fontFamily,
   layout,
   motion,
   radius,
@@ -24,15 +25,20 @@ import {
 import { useReduceMotion } from '../hooks/use-reduce-motion';
 import { Icon } from './Icon';
 
-type Toast = { message: string; tone: 'success' | 'error' };
+/** One way back from what the toast confirms, such as Undo. */
+export type ToastAction = { label: string; onPress: () => void };
+
+type Toast = { message: string; tone: 'success' | 'error'; action?: ToastAction };
 
 type ToastContextValue = {
-  showToast: (message: string, tone?: Toast['tone']) => void;
+  showToast: (message: string, tone?: Toast['tone'], action?: ToastAction) => void;
 };
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const VISIBLE_MS = 3000;
+/** Long enough to read the message and still reach the action. */
+const VISIBLE_WITH_ACTION_MS = 6000;
 
 /** Short confirmations; anything needing a decision uses a dialog instead. */
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -40,12 +46,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const enter = useRef(new Animated.Value(0)).current;
+  // Each toast owns the timer that hides it, so a newer toast is never cut
+  // short by the one it replaced.
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string, tone: Toast['tone'] = 'success') => {
-    setToast({ message, tone });
-    AccessibilityInfo.announceForAccessibility(message);
-    setTimeout(() => setToast(null), VISIBLE_MS);
-  }, []);
+  const showToast = useCallback(
+    (message: string, tone: Toast['tone'] = 'success', action?: ToastAction) => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      setToast(action ? { message, tone, action } : { message, tone });
+      AccessibilityInfo.announceForAccessibility(
+        action ? `${message}. ${action.label} is available.` : message,
+      );
+      hideTimer.current = setTimeout(
+        () => setToast(null),
+        action ? VISIBLE_WITH_ACTION_MS : VISIBLE_MS,
+      );
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     enter.setValue(toast ? 0 : 0);
@@ -80,7 +105,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           ]}
           accessibilityLiveRegion="polite"
           testID="toast"
-          pointerEvents="none"
+          pointerEvents={toast.action ? 'box-none' : 'none'}
         >
           <View style={[styles.emblem, { backgroundColor: palette }]}>
             <Icon
@@ -92,6 +117,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.message}>
             {toast.message}
           </Text>
+          {toast.action ? (
+            <Pressable
+              onPress={() => {
+                if (hideTimer.current) clearTimeout(hideTimer.current);
+                setToast(null);
+                toast.action?.onPress();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={toast.action.label}
+              hitSlop={4}
+              style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+              testID="toast-action"
+            >
+              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.actionLabel}>
+                {toast.action.label}
+              </Text>
+            </Pressable>
+          ) : null}
         </Animated.View>
       ) : null}
     </ToastContext.Provider>
@@ -115,7 +158,7 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingVertical: spacing.smPlus,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.action,
+    borderRadius: radius.toast,
     backgroundColor: colors.surfaceInverse,
     ...elevation.overlay,
   },
@@ -126,5 +169,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  message: { ...typography.bodyStrong, color: colors.textOnInverse, flex: 1 },
+  message: {
+    ...typography.bodyStrong,
+    fontSize: 15,
+    lineHeight: 20,
+    color: colors.textOnInverse,
+    flex: 1,
+  },
+  action: {
+    minHeight: 44,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.badge,
+    justifyContent: 'center',
+  },
+  actionPressed: { backgroundColor: colors.surfaceInverseRaised },
+  /** Yellow is allowed as text here: it sits on ink, never on paper. */
+  actionLabel: {
+    ...typography.bodyStrong,
+    fontSize: 15,
+    lineHeight: 20,
+    fontFamily: fontFamily.bold,
+    color: colors.accent,
+  },
 });

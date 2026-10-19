@@ -20,6 +20,7 @@ import {
   toneColors,
   typography,
 } from '../../../../src/constants/theme';
+import { useOfflineQueue } from '../../../../src/features/offline/offline-queue';
 import { useTask, useTaskAction, useTaskList } from '../../../../src/features/tasks/hooks';
 import { ApiError } from '../../../../src/services/http';
 import { formatTime } from '../../../../src/utils/format';
@@ -34,6 +35,7 @@ export default function CompleteTaskScreen() {
   const router = useRouter();
   const task = useTask(taskId);
   const complete = useTaskAction(taskId, 'complete');
+  const queue = useOfflineQueue();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -66,6 +68,8 @@ export default function CompleteTaskScreen() {
   const fromGallery = detail.evidence.filter((photo) => photo.source === 'GALLERY').length;
   const lastNote = detail.notes[detail.notes.length - 1];
   const canComplete = photoCount > 0 && detail.status === 'IN_PROGRESS';
+  // Submitting is still allowed: the queue sends the photos before the submit.
+  const photosWaiting = queue.photosPendingFor(taskId);
 
   return (
     <View style={styles.screen}>
@@ -106,6 +110,23 @@ export default function CompleteTaskScreen() {
             detail={lastNote ? `Last added ${formatTime(lastNote.createdAt)}` : 'Optional'}
             status={detail.notes.length > 0 ? 'Done' : 'Optional'}
             testID="summary-notes"
+          />
+          <View style={styles.divider} />
+          <CheckRow
+            ok={photosWaiting === 0}
+            waiting={photosWaiting > 0}
+            title={
+              photosWaiting === 0
+                ? 'All photos uploaded'
+                : `${plural(photosWaiting, 'photo')} waiting to upload`
+            }
+            detail={
+              photosWaiting === 0
+                ? 'Your manager will see every photo'
+                : 'They send as soon as you have signal'
+            }
+            status={photosWaiting === 0 ? 'Done' : 'Waiting'}
+            testID="summary-uploads"
           />
         </View>
 
@@ -171,6 +192,7 @@ export default function CompleteTaskScreen() {
 function CheckRow({
   ok,
   optional = false,
+  waiting = false,
   title,
   detail,
   status,
@@ -178,6 +200,8 @@ function CheckRow({
 }: {
   ok: boolean;
   optional?: boolean;
+  /** Not done yet, but nothing for the worker to do about it. */
+  waiting?: boolean;
   title: string;
   detail: string;
   status: string;
@@ -185,14 +209,26 @@ function CheckRow({
 }) {
   const mark = ok
     ? { background: toneColors.success.text, icon: 'checkmark' as const, color: colors.onPrimary }
-    : optional
-      ? { background: colors.surfaceMuted, icon: 'remove' as const, color: colors.textSecondary }
-      : { background: toneColors.error.tint, icon: 'close' as const, color: toneColors.error.text };
+    : waiting
+      ? {
+          background: toneColors.warning.tint,
+          icon: 'cloud-upload-outline' as const,
+          color: toneColors.warning.text,
+        }
+      : optional
+        ? { background: colors.surfaceMuted, icon: 'remove' as const, color: colors.textSecondary }
+        : {
+            background: toneColors.error.tint,
+            icon: 'close' as const,
+            color: toneColors.error.text,
+          };
   const statusColor = ok
     ? toneColors.success.text
-    : optional
-      ? colors.textSecondary
-      : toneColors.error.text;
+    : waiting
+      ? toneColors.warning.text
+      : optional
+        ? colors.textSecondary
+        : toneColors.error.text;
 
   return (
     <View style={styles.checkRow} accessible accessibilityLabel={`${title}, ${detail}, ${status}`}>

@@ -22,8 +22,15 @@ export type PhotoGridProps = {
   currentUserId?: string;
 };
 
+const COLUMNS = 3;
+const GAP = spacing.sm;
+
 export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
   const [viewing, setViewing] = useState<Evidence | null>(null);
+  // Measured rather than a percentage: three percentage widths plus two gaps
+  // came to a fraction of a point over the width on most phones, and the
+  // third photo wrapped onto the next row.
+  const [cellSize, setCellSize] = useState<number | null>(null);
 
   if (photos.length === 0) {
     return (
@@ -35,7 +42,13 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
 
   return (
     <>
-      <View style={styles.grid}>
+      <View
+        style={styles.grid}
+        onLayout={(event) => {
+          const width = event.nativeEvent.layout.width;
+          setCellSize(Math.floor((width - GAP * (COLUMNS - 1)) / COLUMNS));
+        }}
+      >
         {photos.map((photo) => {
           const mine = currentUserId !== undefined && photo.uploadedBy.id === currentUserId;
           const picked = photo.source === 'GALLERY';
@@ -45,7 +58,10 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
             mine ? 'you' : photo.uploadedBy.name
           }, ${formatDateTime(photo.createdAt)}`;
           return (
-            <View key={photo.id} style={styles.cell}>
+            <View
+              key={photo.id}
+              style={[styles.cell, cellSize === null ? styles.cellUnmeasured : { width: cellSize }]}
+            >
               <Pressable
                 onPress={() => setViewing(photo)}
                 accessibilityRole="imagebutton"
@@ -111,9 +127,11 @@ export function PhotoGrid({ photos, onDelete, currentUserId }: PhotoGridProps) {
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   /** Three across, whatever the width of the card holding them. */
-  cell: { width: '31.9%', aspectRatio: 1 },
+  cell: { aspectRatio: 1 },
+  /** Before the first layout pass: safely under a third, so nothing wraps. */
+  cellUnmeasured: { width: '30%' },
   thumbnailWrapper: { flex: 1, borderRadius: radius.action, overflow: 'hidden' },
   thumbnail: { width: '100%', height: '100%', backgroundColor: colors.surfaceMuted },
   /**

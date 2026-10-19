@@ -86,7 +86,7 @@ describe('Login screen (S-001)', () => {
     );
   });
 
-  it('shows the server message for wrong credentials', async () => {
+  it('says the email or password is wrong and marks the password field', async () => {
     signIn.mockRejectedValue(
       new ApiError('INVALID_CREDENTIALS', 'Incorrect email or password.', 401),
     );
@@ -94,9 +94,10 @@ describe('Login screen (S-001)', () => {
     await fillAndSubmit('worker1@fieldmate.dev', 'wrong-password');
 
     await waitFor(() =>
-      expect(screen.getByTestId('login-error')).toHaveTextContent('Incorrect email or password.'),
+      expect(screen.getByTestId('login-error')).toHaveTextContent('Email or password is incorrect'),
     );
     expect(screen.getByText(/Ask your admin if you’ve forgotten your password/)).toBeTruthy();
+    expect(screen.getByTestId('login-password')).toHaveProp('aria-invalid', true);
   });
 
   it('shows a readable message when the request cannot reach the server', async () => {

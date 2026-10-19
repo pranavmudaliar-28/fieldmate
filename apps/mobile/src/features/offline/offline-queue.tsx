@@ -32,6 +32,8 @@ type OfflineQueue = {
   pending: number;
   /** Writes waiting for this particular task. */
   pendingFor(taskId: string): number;
+  /** Photos for this task that are on the phone but have not reached the server. */
+  photosPendingFor(taskId: string): number;
   blockedFor(taskId: string): QueueBlock | undefined;
   /** Puts a write in the queue. The photo file, if any, is copied first. */
   add(taskId: string, action: QueuedAction, photoUri?: string): Promise<void>;
@@ -125,6 +127,8 @@ export function OfflineQueueProvider({ children }: PropsWithChildren) {
       supported: isQueueSupported,
       pending: pendingCount(state),
       pendingFor: (taskId) => entriesFor(state, taskId).length,
+      photosPendingFor: (taskId) =>
+        entriesFor(state, taskId).filter((entry) => entry.action.kind === 'photo').length,
       blockedFor: (taskId) => blockFor(state, taskId),
       add,
       discard: async (taskId) => {

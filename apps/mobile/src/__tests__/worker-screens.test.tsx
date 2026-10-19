@@ -5,6 +5,7 @@ import WorkerDashboard from '../../app/(worker)/(tabs)/index';
 import MyTasks from '../../app/(worker)/(tabs)/tasks';
 import CompleteTaskScreen from '../../app/(worker)/tasks/[taskId]/complete';
 import { ToastProvider } from '../components/Toast';
+import * as offlineQueue from '../features/offline/offline-queue';
 import { OfflineQueueProvider } from '../features/offline/offline-queue';
 import { useAuth } from '../features/auth/auth-context';
 import * as tasksApi from '../features/tasks/api';
@@ -228,7 +229,23 @@ describe('Task completion (S-010)', () => {
     expect(screen.getByTestId('summary-photos')).toHaveTextContent('Done');
     expect(screen.getByText('1 note')).toBeTruthy();
     expect(screen.getByTestId('summary-notes')).toHaveTextContent('Done');
+    expect(screen.getByText('All photos uploaded')).toBeTruthy();
+    expect(screen.getByTestId('summary-uploads')).toHaveTextContent('Done');
     expect(screen.getByText(/After you submit, photos and notes are locked/)).toBeTruthy();
+  });
+
+  it('says photos are still waiting to upload, without blocking the submit', async () => {
+    const real = offlineQueue.useOfflineQueue;
+    const spy = jest
+      .spyOn(offlineQueue, 'useOfflineQueue')
+      .mockImplementation(() => ({ ...real(), photosPendingFor: () => 2 }));
+    api.fetchTask.mockResolvedValue(detail({ evidence: [photo] }));
+    await renderScreen(<CompleteTaskScreen />);
+
+    await waitFor(() => expect(screen.getByTestId('summary-uploads')).toHaveTextContent('Waiting'));
+    expect(screen.getByText('2 photos waiting to upload')).toBeTruthy();
+    expect(screen.getByTestId('confirm-complete')).toBeEnabled();
+    spy.mockRestore();
   });
 
   it('marks photos as required and blocks completion when there are none', async () => {

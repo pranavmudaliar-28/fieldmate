@@ -1,4 +1,4 @@
-import { render, screen, userEvent } from '@testing-library/react-native';
+import { fireEvent, render, screen, userEvent } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { Input } from './Input';
 
@@ -14,6 +14,21 @@ describe('Input', () => {
     expect(screen.getByText('Title')).toBeTruthy();
     await userEvent.setup().type(screen.getByTestId('field'), 'Hello');
     expect(onChangeText).toHaveBeenCalled();
+  });
+
+  it('loses its focus styling on blur even when the caller handles onBlur too', async () => {
+    const onBlur = jest.fn();
+    await render(<Input label="Email" testID="field" onBlur={onBlur} />);
+    const field = screen.getByTestId('field');
+    // The bordered box that wraps the TextInput.
+    const box = () => flatten(screen.getByTestId('field').parent?.props.style);
+
+    await fireEvent(field, 'focus');
+    expect(box().borderWidth).toBe(2);
+
+    await fireEvent(field, 'blur');
+    expect(onBlur).toHaveBeenCalled();
+    expect(box().borderWidth).toBe(1.5);
   });
 
   it('marks a required field for screen readers, without a visual asterisk', async () => {
