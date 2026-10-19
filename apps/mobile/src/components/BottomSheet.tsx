@@ -67,7 +67,7 @@ export function BottomSheet({ visible, title, onClose, children, testID }: Botto
               hitSlop={8}
               style={styles.close}
             >
-              <Icon name="close" size={20} color={colors.textPrimary} />
+              <Icon name="close" size={18} color={colors.textPrimary} />
             </Pressable>
           </View>
           <View style={styles.content}>{children}</View>
@@ -89,12 +89,12 @@ const styles = StyleSheet.create({
     ...elevation.overlay,
   },
   handle: {
-    width: 44,
+    width: 40,
     height: 5,
     borderRadius: radius.pill,
-    backgroundColor: colors.border,
+    backgroundColor: colors.controlBorder,
     alignSelf: 'center',
-    marginTop: spacing.smPlus,
+    marginTop: 10,
   },
   header: {
     flexDirection: 'row',
@@ -110,9 +110,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     flex: 1,
   },
+  /** Drawn at 44; its hitSlop keeps the touch area well over 48. */
   close: {
-    width: layout.minTouchTarget,
-    height: layout.minTouchTarget,
+    width: 44,
+    height: 44,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceMuted,
     alignItems: 'center',

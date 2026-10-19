@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } fro
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  fontFamily,
   layout,
   radius,
   spacing,
@@ -143,7 +144,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
   );
 });
 
-const RING_WIDTH = 3;
+const RING_WIDTH = 4;
 
 const styles = StyleSheet.create({
   container: { gap: spacing.sm },
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: layout.inputHeight,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: colors.controlBorder,
     borderRadius: radius.control,
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
@@ -168,7 +169,7 @@ const styles = StyleSheet.create({
   fieldMultiline: { alignItems: 'stretch' },
   fieldFocused: { borderColor: colors.primary, borderWidth: 2 },
   fieldError: { borderColor: colors.error, borderWidth: 2 },
-  leading: { marginRight: spacing.smPlus, justifyContent: 'center' },
+  leading: { marginRight: 10, justifyContent: 'center' },
   input: {
     flex: 1,
     ...typography.body,
@@ -180,7 +181,12 @@ const styles = StyleSheet.create({
   accessory: { marginLeft: spacing.sm, marginRight: -spacing.sm },
   footer: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   message: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 2 },
-  error: { ...typography.secondary, color: colors.errorText, flex: 1 },
+  error: {
+    ...typography.secondary,
+    fontFamily: fontFamily.medium,
+    color: colors.errorText,
+    flex: 1,
+  },
   helper: { ...typography.caption, color: colors.textSecondary, flex: 1 },
   counter: { ...typography.mono, color: colors.textTertiary },
 });

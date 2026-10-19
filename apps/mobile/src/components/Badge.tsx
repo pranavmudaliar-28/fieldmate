@@ -23,6 +23,8 @@ export type BadgeProps = {
   icon?: IconName;
   /** Ink fill instead of a tint, for badges that must outrank a status. */
   emphasis?: 'tint' | 'inverse';
+  /** `detail` is the larger badge at the top of a task; `list` sits in rows and cards. */
+  size?: 'list' | 'detail';
   accessibilityLabel?: string;
   testID?: string;
   style?: StyleProp<ViewStyle>;
@@ -36,6 +38,7 @@ export function Badge({
   dot = false,
   icon,
   emphasis = 'tint',
+  size = 'list',
   accessibilityLabel,
   testID,
   style,
@@ -49,6 +52,7 @@ export function Badge({
     <View
       style={[
         styles.badge,
+        size === 'detail' ? styles.detail : styles.list,
         { backgroundColor: inverse ? colors.surfaceInverse : fill.tint },
         palette?.outline ? [styles.outlined, { borderColor: palette.outline }] : null,
         style,
@@ -60,10 +64,10 @@ export function Badge({
       {dot ? (
         <View style={[styles.dot, { backgroundColor: inverse ? colors.accent : toneColor.dot }]} />
       ) : null}
-      {icon ? <Icon name={icon} size={14} color={foreground} /> : null}
+      {icon ? <Icon name={icon} size={16} color={foreground} /> : null}
       <Text
         maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-        style={[styles.label, { color: foreground }]}
+        style={[size === 'detail' ? styles.detailLabel : styles.label, { color: foreground }]}
       >
         {label}
       </Text>
@@ -78,10 +82,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.xs + 2,
     borderRadius: radius.badge,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: 2,
   },
+  list: { minHeight: 28, paddingLeft: spacing.sm, paddingRight: 10 },
+  detail: { minHeight: 30, paddingLeft: 10, paddingRight: spacing.smPlus },
   outlined: { borderWidth: 1, borderStyle: 'dashed' },
   dot: { width: 8, height: 8, borderRadius: radius.pill },
   label: { ...typography.caption, fontFamily: typography.secondaryStrong.fontFamily },
+  detailLabel: { ...typography.secondaryStrong },
 });

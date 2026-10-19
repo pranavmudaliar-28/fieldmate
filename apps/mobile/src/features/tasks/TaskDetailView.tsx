@@ -71,6 +71,7 @@ export function TaskDetailView({
       <View style={styles.headerBlock}>
         <StatusBadge
           status={task.status}
+          size="detail"
           {...(changesRequested ? { label: 'In progress · Changes requested' } : {})}
         />
         <Text
@@ -206,7 +207,7 @@ export function NoteList({
   return (
     <View style={styles.notes}>
       {notes.map((note) => (
-        <Card key={note.id} style={styles.note} testID={`note-${note.id}`}>
+        <Card key={note.id} flat style={styles.note} testID={`note-${note.id}`}>
           <View style={styles.noteRow}>
             <View style={styles.noteText}>
               <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.body}>
@@ -281,7 +282,7 @@ function LocationCard({ task }: { task: TaskDetail }) {
   const hasPin = task.location.latitude !== null && task.location.longitude !== null;
 
   return (
-    <Card style={styles.location}>
+    <Card flat style={styles.location}>
       <View style={styles.locationRow}>
         <Icon name="location-outline" size={22} color={colors.textPrimary} />
         <View style={styles.locationText}>

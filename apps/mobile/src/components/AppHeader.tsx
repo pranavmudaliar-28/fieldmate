@@ -77,7 +77,7 @@ export function AppHeader({
           {title ? (
             <Text
               maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={large ? styles.titleLarge : styles.title}
+              style={large ? (eyebrow ? styles.greeting : styles.titleLarge) : styles.title}
               accessibilityRole="header"
               numberOfLines={large ? 2 : 1}
             >
@@ -119,7 +119,10 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, gap: spacing.xs },
   eyebrow: { ...typography.secondary, fontSize: 15, color: colors.textSecondary },
   title: { ...typography.sectionTitle, color: colors.textPrimary },
-  titleLarge: { ...typography.hero, color: colors.textPrimary },
+  /** A tab root's title. */
+  titleLarge: { ...typography.pageTitle, color: colors.textPrimary },
+  /** A dashboard's greeting sits under its date, so it is a step smaller than a page title. */
+  greeting: { ...typography.display, color: colors.textPrimary },
   /** Bare glyphs on paper; the 48 box is the hit area, pulled into the gutter. */
   circle: {
     width: layout.minTouchTarget,

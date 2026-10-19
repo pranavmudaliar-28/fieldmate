@@ -6,7 +6,15 @@ import { Badge } from './Badge';
  * Icon plus the word on the status's own tint, so status survives sunlight,
  * colour blindness and a greyscale screenshot.
  */
-export function StatusBadge({ status, label }: { status: TaskStatus; label?: string }) {
+export function StatusBadge({
+  status,
+  label,
+  size,
+}: {
+  status: TaskStatus;
+  label?: string;
+  size?: 'list' | 'detail';
+}) {
   const appearance = statusAppearance[status];
   const text = label ?? appearance.label;
 
@@ -15,6 +23,7 @@ export function StatusBadge({ status, label }: { status: TaskStatus; label?: str
       label={text}
       palette={appearance}
       icon={appearance.icon}
+      {...(size ? { size } : {})}
       accessibilityLabel={`Status: ${text}`}
       testID={`status-badge-${status}`}
     />

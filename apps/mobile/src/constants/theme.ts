@@ -47,12 +47,16 @@ export const colors = {
   /** Ink 3: timestamps and hints only, never key information. */
   textTertiary: '#686D76',
   textDisabled: '#8D9199',
-  textOnInverse: '#FFFFFF',
-  textOnInverseMuted: '#A9ADB4',
+  /** The label on a disabled button's grey fill, where the fill already says "disabled". */
+  onDisabledFill: '#6B7079',
+  textOnInverse: '#F3F2EE',
+  textOnInverseMuted: '#C9CCD1',
 
   /** Line. */
   border: '#DEDBD3',
   borderStrong: '#B9B5AB',
+  /** The edge of something you can operate: inputs, sheet handles, an unreached step. */
+  controlBorder: '#CFCBC1',
   borderInverse: '#2A2D33',
 
   /** Solid destructive fill: dark enough to carry white text at AA. */
@@ -63,8 +67,8 @@ export const colors = {
   /** Controls floating over a photo or a map. */
   scrim: 'rgba(15, 17, 21, 0.55)',
   /** The offline banner: a dark amber that still reads as a warning at night. */
-  offline: '#3B2E06',
-  onOffline: '#FFD873',
+  offline: '#3D2E00',
+  onOffline: '#FFE7A3',
 
   // Accessible text-on-tint pairs.
   successText: '#1B6B3A',
@@ -190,7 +194,9 @@ export const fontFamily = {
 
 export const typography = {
   /** Display: the dashboard greeting. */
-  hero: { fontSize: 34, lineHeight: 40, fontFamily: fontFamily.bold, letterSpacing: -1 },
+  hero: { fontSize: 34, lineHeight: 40, fontFamily: fontFamily.bold, letterSpacing: -0.8 },
+  /** The title of a tab or an inbox. */
+  pageTitle: { fontSize: 32, lineHeight: 38, fontFamily: fontFamily.bold, letterSpacing: -0.8 },
   /** Title 1. */
   display: { fontSize: 28, lineHeight: 34, fontFamily: fontFamily.bold, letterSpacing: -0.7 },
   screenTitle: { fontSize: 28, lineHeight: 34, fontFamily: fontFamily.bold, letterSpacing: -0.7 },
@@ -199,10 +205,19 @@ export const typography = {
     fontSize: 22,
     lineHeight: 28,
     fontFamily: fontFamily.semibold,
-    letterSpacing: -0.4,
+    letterSpacing: -0.3,
   },
+  /** A group of cards on a dashboard. */
+  sectionHeading: {
+    fontSize: 20,
+    lineHeight: 26,
+    fontFamily: fontFamily.bold,
+    letterSpacing: -0.3,
+  },
+  /** A section inside one task or user. */
+  groupTitle: { fontSize: 17, lineHeight: 22, fontFamily: fontFamily.bold },
   /** Headline. */
-  cardTitle: { fontSize: 18, lineHeight: 24, fontFamily: fontFamily.semibold, letterSpacing: -0.2 },
+  cardTitle: { fontSize: 18, lineHeight: 24, fontFamily: fontFamily.semibold },
   body: { fontSize: 16, lineHeight: 24, fontFamily: fontFamily.regular },
   bodyStrong: { fontSize: 16, lineHeight: 24, fontFamily: fontFamily.semibold },
   secondary: { fontSize: 14, lineHeight: 20, fontFamily: fontFamily.regular },
@@ -219,8 +234,8 @@ export const typography = {
     textTransform: 'uppercase',
   },
   /** Times, counts and IDs. */
-  mono: { fontSize: 13, lineHeight: 18, fontFamily: fontFamily.mono },
-  button: { fontSize: 17, lineHeight: 22, fontFamily: fontFamily.semibold, letterSpacing: -0.2 },
+  mono: { fontSize: 13, lineHeight: 18, fontFamily: fontFamily.mono, letterSpacing: 0.4 },
+  button: { fontSize: 17, lineHeight: 22, fontFamily: fontFamily.semibold },
   buttonMedium: { fontSize: 16, lineHeight: 20, fontFamily: fontFamily.semibold },
 } as const satisfies Record<string, TextStyle>;
 
@@ -251,7 +266,7 @@ export const layout = {
   minTouchTarget: 48,
   buttonHeightLarge: 56,
   buttonHeightMedium: 48,
-  inputHeight: 56,
+  inputHeight: 52,
   /** Chips draw at 40 and keep a 48 hit area. */
   chipHeight: 40,
   /**
@@ -264,7 +279,7 @@ export const layout = {
   maxFormWidth: 420,
   /** Floating tab bar, plus the gap it leaves above the safe area. */
   tabBarHeight: 72,
-  tabBarInset: spacing.mdPlus,
+  tabBarInset: spacing.md,
 } as const;
 
 export const radius = {
@@ -273,37 +288,31 @@ export const radius = {
   control: 12,
   /** Buttons and the action bar. */
   action: 14,
+  /** Toasts and compact list cards. */
+  toast: 16,
+  /** Stat tiles, tabs, menus. */
+  tile: 18,
   card: 20,
+  /** Dialogs and the floating tab bar. */
+  dialog: 24,
   sheet: 28,
   pill: 999,
 } as const;
 
 /**
- * E1â€“E3. Wide and soft, never dark: a tight black shadow reads as a rendering
- * bug in sunlight. Lists sit flat on a line (E0) and need no token.
+ * E1â€“E3. Low-contrast, never dark: a heavy black shadow reads as a rendering
+ * bug in sunlight. Lists, and cards that sit inside a screen's flow, are flat
+ * on a 1px line (E0) and need no token.
  */
 export const elevation = {
-  card: {
-    shadowColor: '#0F1115',
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
-  },
-  floating: {
-    shadowColor: '#0F1115',
-    shadowOpacity: 0.14,
-    shadowRadius: 28,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-  },
-  overlay: {
-    shadowColor: '#0F1115',
-    shadowOpacity: 0.22,
-    shadowRadius: 48,
-    shadowOffset: { width: 0, height: 20 },
-    elevation: 16,
-  },
+  /** E1: tight and two-layered, so a card lifts without a grey halo. */
+  card: { boxShadow: '0 1px 2px rgba(15, 17, 21, 0.06), 0 2px 8px rgba(15, 17, 21, 0.06)' },
+  /** E2: the ink hero card, menus. */
+  floating: { boxShadow: '0 6px 20px rgba(15, 17, 21, 0.12)' },
+  /** The floating tab bar sits over content and needs a heavier shadow than E2. */
+  tabBar: { boxShadow: '0 8px 24px rgba(15, 17, 21, 0.25)' },
+  /** E3: dialogs, sheets, toasts. */
+  overlay: { boxShadow: '0 16px 48px rgba(15, 17, 21, 0.22)' },
 } as const satisfies Record<string, ViewStyle>;
 
 /** Durations in ms. Reduce Motion swaps movement for a cross-fade. */

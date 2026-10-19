@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   colors,
   elevation,
+  fontFamily,
   layout,
   radius,
   spacing,
@@ -72,7 +73,7 @@ export function FieldTabBar({ state, navigation, tabs, badges }: FieldTabBarProp
                 <Icon
                   name={focused ? tab.activeIcon : tab.icon}
                   size={22}
-                  color={focused ? colors.onAccent : colors.textOnInverse}
+                  color={focused ? colors.onAccent : colors.textOnInverseMuted}
                 />
                 {badge > 0 ? (
                   <View style={styles.badge}>
@@ -115,17 +116,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: layout.tabBarHeight,
-    borderRadius: radius.sheet,
+    borderRadius: radius.dialog,
     backgroundColor: colors.surfaceInverse,
     padding: spacing.sm,
     gap: spacing.xs,
-    ...elevation.floating,
+    ...elevation.tabBar,
   },
   tab: {
     flex: 1,
     alignSelf: 'stretch',
     minHeight: layout.minTouchTarget,
-    borderRadius: radius.card,
+    borderRadius: radius.tile,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
@@ -134,9 +135,9 @@ const styles = StyleSheet.create({
   label: {
     ...typography.caption,
     fontFamily: typography.secondaryStrong.fontFamily,
-    color: colors.textOnInverse,
+    color: colors.textOnInverseMuted,
   },
-  labelActive: { color: colors.onAccent },
+  labelActive: { color: colors.onAccent, fontFamily: fontFamily.bold },
   badge: {
     position: 'absolute',
     top: -6,

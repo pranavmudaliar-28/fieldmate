@@ -35,7 +35,7 @@ export function NotificationBell({ unread, onPress, testID }: NotificationBellPr
       testID={testID ?? 'notification-bell'}
       style={styles.button}
     >
-      <Icon name="notifications-outline" size={24} />
+      <Icon name="notifications-outline" size={22} />
       {has ? (
         <View style={styles.badge} pointerEvents="none" testID="notification-badge">
           <Text
@@ -53,8 +53,8 @@ export function NotificationBell({ unread, onPress, testID }: NotificationBellPr
 
 const styles = StyleSheet.create({
   button: {
-    width: layout.minTouchTarget + 8,
-    height: layout.minTouchTarget + 8,
+    width: layout.minTouchTarget,
+    height: layout.minTouchTarget,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -64,10 +64,10 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -spacing.xs,
+    top: -2,
     right: -spacing.xs,
-    minWidth: 24,
-    height: 24,
+    minWidth: 20,
+    height: 20,
     paddingHorizontal: spacing.xs,
     borderRadius: radius.pill,
     backgroundColor: colors.error,
@@ -75,7 +75,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     // Separates the badge from whatever the icon is sitting on.
     borderWidth: 2,
-    borderColor: colors.surface,
+    // The page colour, since the bell sits on the page rather than on a card.
+    borderColor: colors.background,
   },
   count: {
     // Caption is the floor the system sets: nothing below 13px, including

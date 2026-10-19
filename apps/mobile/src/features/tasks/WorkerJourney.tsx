@@ -44,7 +44,7 @@ export function WorkerJourney({ task, perspective, canSubmit = true }: WorkerJou
     .join(', ');
 
   return (
-    <Card style={styles.card} testID="worker-journey">
+    <Card flat style={styles.card} testID="worker-journey">
       <View style={styles.row} accessible accessibilityLabel={`Progress: ${summary}`}>
         {steps.map((step, index) => {
           const done = step.at !== null;

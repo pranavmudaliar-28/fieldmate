@@ -7,6 +7,8 @@ export type CardProps = {
   onPress?: () => void;
   /** Ink surface, for the one card on a screen that outranks the rest. */
   variant?: 'surface' | 'inverse';
+  /** Flat on a 1px line (E0), for a card that is part of a screen's flow rather than lifted off it. */
+  flat?: boolean;
   /** Removes the inner padding so the child can run to the edges. */
   bleed?: boolean;
   accessibilityLabel?: string;
@@ -23,6 +25,7 @@ export function Card({
   children,
   onPress,
   variant = 'surface',
+  flat = false,
   bleed = false,
   accessibilityLabel,
   testID,
@@ -30,7 +33,7 @@ export function Card({
 }: CardProps) {
   const base = [
     styles.card,
-    variant === 'inverse' ? styles.inverse : styles.surface,
+    variant === 'inverse' ? styles.inverse : flat ? styles.flat : styles.surface,
     bleed ? styles.bleed : null,
     style,
   ];
@@ -63,6 +66,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   surface: { backgroundColor: colors.surface, ...elevation.card },
+  flat: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   inverse: { backgroundColor: colors.surfaceInverse, ...elevation.floating },
   bleed: { padding: 0, overflow: 'hidden' },
   pressed: { opacity: 0.9, transform: [{ scale: 0.995 }] },

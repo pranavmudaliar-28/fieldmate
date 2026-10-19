@@ -84,7 +84,8 @@ export function Button({
   const appearance = variantStyles[variant];
   const isGhost = variant === 'ghost' || variant === 'destructiveGhost';
   const iconSize = size === 'lg' ? 20 : 18;
-  const iconColor = disabled ? colors.textDisabled : appearance.label.color;
+  const disabledColor = isGhost ? colors.textDisabled : colors.onDisabledFill;
+  const iconColor = disabled ? disabledColor : appearance.label.color;
 
   return (
     <Animated.View
@@ -118,7 +119,7 @@ export function Button({
               style={[
                 size === 'lg' ? typography.button : typography.buttonMedium,
                 appearance.label,
-                disabled && styles.disabledLabel,
+                disabled && [styles.disabledLabel, { color: disabledColor }],
               ]}
             >
               {label}
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
   hugContent: { alignSelf: 'flex-start' },
   content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   disabled: { backgroundColor: colors.border, borderColor: colors.border },
-  disabledLabel: { color: colors.textDisabled, textDecorationLine: 'none' },
+  disabledLabel: { textDecorationLine: 'none' },
 });
 
 type Appearance = {
