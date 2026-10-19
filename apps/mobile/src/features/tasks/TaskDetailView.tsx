@@ -11,6 +11,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import {
   MAX_FONT_SIZE_MULTIPLIER,
   colors,
+  fontFamily,
   layout,
   radius,
   spacing,
@@ -155,18 +156,11 @@ export function TaskDetailView({
       {children}
 
       {showWork ? (
-        <>
-          <Section title="Photos" count={task.evidence.length}>
-            <PhotoGrid photos={task.evidence} />
-          </Section>
-          <Section title="Notes" count={task.notes.length}>
-            <NoteList
-              notes={task.notes}
-              {...(onEditNote ? { onEditNote } : {})}
-              {...(onDeleteNote ? { onDeleteNote } : {})}
-            />
-          </Section>
-        </>
+        <WorkCard
+          task={task}
+          {...(onEditNote ? { onEditNote } : {})}
+          {...(onDeleteNote ? { onDeleteNote } : {})}
+        />
       ) : null}
 
       <LocationCard task={task} />
@@ -187,15 +181,61 @@ export function TaskDetailView({
   );
 }
 
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/**
+ * The worker's photos and notes as one piece of work, the way a reviewer reads
+ * them (M-Detail-Review): what was handed in, then what was said about it.
+ */
+function WorkCard({
+  task,
+  onEditNote,
+  onDeleteNote,
+}: {
+  task: TaskDetail;
+  onEditNote?: (note: Note) => void;
+  onDeleteNote?: (note: Note) => void;
+}) {
+  const submitted = task.status === 'AWAITING_REVIEW' || task.status === 'COMPLETED';
+  const title = submitted ? 'Submitted work' : 'Work so far';
+
+  return (
+    <Card style={styles.work} testID="work-card">
+      <View style={styles.workHead}>
+        <Text
+          maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+          style={styles.sectionTitle}
+          accessibilityRole="header"
+        >
+          {title}
+        </Text>
+        <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.workCount}>
+          {plural(task.evidence.length, 'photo')} · {plural(task.notes.length, 'note')}
+        </Text>
+      </View>
+      <PhotoGrid photos={task.evidence} />
+      <NoteList
+        notes={task.notes}
+        variant="bubble"
+        {...(onEditNote ? { onEditNote } : {})}
+        {...(onDeleteNote ? { onDeleteNote } : {})}
+      />
+    </Card>
+  );
+}
+
 /** Notes as cards: the words first, then who and when, and "edited" if so. */
 export function NoteList({
   notes,
   onEditNote,
   onDeleteNote,
+  variant = 'card',
 }: {
   notes: Note[];
   onEditNote?: (note: Note) => void;
   onDeleteNote?: (note: Note) => void;
+  /** `bubble` sits inside another card, so it is a tint rather than a second card. */
+  variant?: 'card' | 'bubble';
 }) {
   if (notes.length === 0) {
     return (
@@ -208,7 +248,12 @@ export function NoteList({
   return (
     <View style={styles.notes}>
       {notes.map((note) => (
-        <Card key={note.id} flat style={styles.note} testID={`note-${note.id}`}>
+        <Card
+          key={note.id}
+          flat
+          style={[styles.note, variant === 'bubble' && styles.noteBubble]}
+          testID={`note-${note.id}`}
+        >
           <View style={styles.noteRow}>
             <View style={styles.noteText}>
               <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.body}>
@@ -217,7 +262,8 @@ export function NoteList({
               <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.noteMeta}>
                 {firstName(note.createdBy.name)} · {formatTime(note.createdAt)}
                 {/* An edit is never silent: notes were append-only for this. */}
-                {note.updatedAt ? ' · edited' : ''}
+                {note.updatedAt ? ' · ' : ''}
+                {note.updatedAt ? <Text style={styles.noteEdited}>edited</Text> : null}
               </Text>
             </View>
             {onEditNote ? (
@@ -438,9 +484,29 @@ const styles = StyleSheet.create({
   footnote: { ...typography.caption, color: colors.textTertiary },
   notes: { gap: spacing.smPlus },
   note: { paddingVertical: spacing.smPlus },
+  noteBubble: {
+    backgroundColor: colors.background,
+    borderWidth: 0,
+    borderRadius: 14,
+    paddingVertical: spacing.smPlus,
+    paddingHorizontal: 14,
+  },
+  noteEdited: { fontFamily: fontFamily.semibold },
+  work: { gap: 14 },
+  workHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+  },
+  workCount: {
+    ...typography.caption,
+    fontFamily: fontFamily.semibold,
+    color: colors.textSecondary,
+  },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
   noteText: { flex: 1, gap: spacing.xs },
-  noteMeta: { ...typography.mono, color: colors.textSecondary },
+  noteMeta: { ...typography.caption, fontFamily: fontFamily.regular, color: colors.textSecondary },
   noteAction: {
     width: layout.minTouchTarget,
     height: layout.minTouchTarget,

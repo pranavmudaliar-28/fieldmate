@@ -76,6 +76,9 @@ describe('Manager task details (S-005)', () => {
     expect(screen.getByText('Assigned')).toBeTruthy();
     expect(screen.getByText('14 Harbour Rd')).toBeTruthy();
     expect(screen.getByText('No photos yet.')).toBeTruthy();
+    // Photos and notes are one piece of work, under one heading.
+    expect(screen.getByText('Work so far')).toBeTruthy();
+    expect(screen.getByText('0 photos · 0 notes')).toBeTruthy();
   });
 
   it('offers edit, reassign and cancel for an assigned task', async () => {
