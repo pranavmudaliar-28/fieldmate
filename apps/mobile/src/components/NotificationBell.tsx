@@ -1,11 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import {
-  colors,
-  layout,
-  radius,
-  spacing,
-  typography,
-} from '../constants/theme';
+import { colors, layout, radius, spacing, typography } from '../constants/theme';
 import { Icon } from './Icon';
 
 /** Above this the exact number stops being useful and starts breaking the pill. */
