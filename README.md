@@ -111,6 +111,28 @@ npm run lint
 npm run format:check
 ```
 
+`tsc` is the source of truth. If the editor shows type errors that these
+commands do not, the editor is wrong — see below.
+
+### If the editor reports errors that `npm run typecheck` does not
+
+Usually two at once, and the second is a symptom of the first:
+
+```
+tsconfig.json    File 'expo/tsconfig.base' not found.
+app.config.ts    Property 'includes' does not exist on type 'string[]'.
+```
+
+`apps/mobile/tsconfig.json` inherits its compiler options through
+`node_modules`, so when that lookup fails the editor falls back to a default
+`lib` and everything newer than ES5 disappears with it — `includes` among
+them. VS Code caches a failed module lookup and keeps it, so this outlives the
+few seconds during `npm install` when the package really was missing.
+
+Fix it with **Ctrl+Shift+P → "TypeScript: Restart TS Server"**. Saving
+`apps/mobile/tsconfig.json` also works, because it makes the editor re-read
+the file. Nothing in the repository needs changing.
+
 ## Accounts
 
 There is no self-registration. Accounts are created from the command line:
