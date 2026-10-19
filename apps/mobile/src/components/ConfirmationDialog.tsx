@@ -60,6 +60,9 @@ export function ConfirmationDialog({
     <Modal
       visible={visible}
       transparent
+      // The dim covers the whole screen on Android, system bars included.
+      statusBarTranslucent
+      navigationBarTranslucent
       animationType="fade"
       // Destructive dialogs must be dismissed with an explicit choice.
       onRequestClose={destructive ? () => {} : onCancel}
@@ -91,12 +94,19 @@ export function ConfirmationDialog({
           <View style={styles.actions}>
             <Button
               label={confirmLabel}
+              testID="dialog-confirm"
               variant={destructive ? 'destructive' : 'primary'}
               onPress={onConfirm}
               loading={loading}
               {...(confirmIcon ? { icon: confirmIcon } : {})}
             />
-            <Button label={cancelLabel} variant="secondary" onPress={onCancel} disabled={loading} />
+            <Button
+              label={cancelLabel}
+              variant="secondary"
+              onPress={onCancel}
+              disabled={loading}
+              testID="dialog-cancel"
+            />
           </View>
         </View>
       </View>

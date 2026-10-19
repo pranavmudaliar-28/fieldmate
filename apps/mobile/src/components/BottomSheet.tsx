@@ -44,6 +44,9 @@ export function BottomSheet({ visible, title, onClose, children, testID }: Botto
     <Modal
       visible={visible}
       transparent
+      // The dim covers the whole screen on Android, system bars included.
+      statusBarTranslucent
+      navigationBarTranslucent
       animationType={reduceMotion ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >

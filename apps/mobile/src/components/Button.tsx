@@ -118,6 +118,7 @@ export function Button({
               maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
               style={[
                 size === 'lg' ? typography.button : typography.buttonMedium,
+                styles.label,
                 appearance.label,
                 disabled && [styles.disabledLabel, { color: disabledColor }],
               ]}
@@ -137,7 +138,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radius.action,
-    paddingHorizontal: spacing.mdPlus,
+    paddingHorizontal: spacing.md,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
@@ -146,6 +147,8 @@ const styles = StyleSheet.create({
   fullWidth: { alignSelf: 'stretch' },
   hugContent: { alignSelf: 'flex-start' },
   content: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  /** A label that has to wrap, in a half-width button or at a large text size, stays centred. */
+  label: { textAlign: 'center', flexShrink: 1 },
   disabled: { backgroundColor: colors.border, borderColor: colors.border },
   disabledLabel: { textDecorationLine: 'none' },
 });

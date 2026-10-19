@@ -36,7 +36,15 @@ export type OverflowMenuProps = {
  */
 export function OverflowMenu({ visible, onClose, actions, testID }: OverflowMenuProps) {
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      // The dim covers the whole screen on Android, system bars included.
+      statusBarTranslucent
+      navigationBarTranslucent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close menu">
         <SafeAreaView edges={['top']} style={styles.anchor}>
           {/* Stops a tap inside the card from closing the menu. */}
