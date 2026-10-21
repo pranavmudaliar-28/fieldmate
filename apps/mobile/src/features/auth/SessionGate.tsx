@@ -43,7 +43,7 @@ export function SessionGate() {
         <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.message}>
           {bootstrapError ?? 'We could not check your session.'}
         </Text>
-        <Button label="Try again" onPress={retryBootstrap} fullWidth={false} />
+        <Button label="Try again" onPress={retryBootstrap} fullWidth={false} style={styles.retry} />
       </View>
     );
   }
@@ -53,6 +53,8 @@ export function SessionGate() {
 }
 
 const styles = StyleSheet.create({
+  /** Centred under the message, like the rest of the screen. */
+  retry: { alignSelf: 'center' },
   container: {
     flex: 1,
     alignItems: 'center',

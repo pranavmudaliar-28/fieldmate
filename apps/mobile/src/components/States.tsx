@@ -127,6 +127,8 @@ export function EmptyState({
           variant="secondary"
           onPress={action.onPress}
           fullWidth={false}
+          // A label-width button starts at the left; here it sits under centred text.
+          style={styles.centeredAction}
         />
       ) : null}
     </View>
@@ -212,6 +214,7 @@ export function SectionHeader({
 }
 
 const styles = StyleSheet.create({
+  centeredAction: { alignSelf: 'center' },
   inline: { paddingVertical: spacing.md, alignItems: 'center' },
   skeletonGroup: { gap: spacing.smPlus },
   skeleton: { backgroundColor: colors.surfaceMuted, borderRadius: radius.control },
