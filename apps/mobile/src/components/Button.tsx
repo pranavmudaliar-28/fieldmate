@@ -55,6 +55,8 @@ export type ButtonProps = {
   fullWidth?: boolean;
   /** The 60dp size of the worker's next step; on by default for a large signal button. */
   prominent?: boolean;
+  /** A text button is underlined unless an icon already says it can be tapped. */
+  underline?: boolean;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 };
@@ -71,6 +73,7 @@ export function Button({
   disabledReason,
   fullWidth = true,
   prominent: prominentProp,
+  underline = true,
   testID,
   style,
 }: ButtonProps) {
@@ -127,6 +130,7 @@ export function Button({
                 styles.label,
                 appearance.label,
                 variant === 'signal' && size === 'lg' && styles.signalLabel,
+                !underline && styles.noUnderline,
                 disabled && [styles.disabledLabel, { color: disabledColor }],
               ]}
             >
@@ -158,6 +162,7 @@ const styles = StyleSheet.create({
   label: { textAlign: 'center', flexShrink: 1 },
   /** The worker's next step is the one thing on the screen, so it is a size up. */
   prominent: { minHeight: 60, borderRadius: 16 },
+  noUnderline: { textDecorationLine: 'none' },
   signalLabel: { fontSize: 18, lineHeight: 22, fontFamily: fontFamily.bold },
   disabled: { backgroundColor: colors.border, borderColor: colors.border },
   disabledLabel: { textDecorationLine: 'none' },

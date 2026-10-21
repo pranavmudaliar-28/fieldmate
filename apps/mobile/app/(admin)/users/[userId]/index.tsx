@@ -209,24 +209,29 @@ export default function UserDetailsScreen() {
               chevron
             />
           ) : null}
-          <ActionRow
-            icon="lock-closed-outline"
-            label="Set password"
-            testID="open-set-password"
-            disabled={busy}
-            onPress={() => setPasswordOpen(true)}
-            chevron
-            divided={!managed.isActive}
-          />
-          <ActionRow
-            icon="log-out-outline"
-            label="Force sign-out"
-            detail="Signs out of all devices now"
-            testID="force-signout"
-            disabled={busy}
-            onPress={() => setPending('revoke')}
-            divided
-          />
+          {/* An inactive user cannot sign in, so passwords, sessions and deletion
+              wait until they are reactivated (A-Reactivate). */}
+          {managed.isActive ? (
+            <>
+              <ActionRow
+                icon="lock-closed-outline"
+                label="Set password"
+                testID="open-set-password"
+                disabled={busy}
+                onPress={() => setPasswordOpen(true)}
+                chevron
+              />
+              <ActionRow
+                icon="log-out-outline"
+                label="Force sign-out"
+                detail="Signs out of all devices now"
+                testID="force-signout"
+                disabled={busy}
+                onPress={() => setPending('revoke')}
+                divided
+              />
+            </>
+          ) : null}
           {managed.isActive ? (
             <ActionRow
               icon="ban-outline"
@@ -245,16 +250,18 @@ export default function UserDetailsScreen() {
           ) : null}
         </View>
 
-        <Button
-          label="Delete permanently"
-          icon="trash-outline"
-          variant="destructiveOutline"
-          testID="delete-user"
-          disabled={busy || isSelf}
-          disabledReason="You cannot delete your own account."
-          // A user with history is not refused silently: the dialog explains why.
-          onPress={() => setPending(managed.hasHistory ? 'cantDelete' : 'delete')}
-        />
+        {managed.isActive ? (
+          <Button
+            label="Delete permanently"
+            icon="trash-outline"
+            variant="destructiveOutline"
+            testID="delete-user"
+            disabled={busy || isSelf}
+            disabledReason="You cannot delete your own account."
+            // A user with history is not refused silently: the dialog explains why.
+            onPress={() => setPending(managed.hasHistory ? 'cantDelete' : 'delete')}
+          />
+        ) : null}
 
         {error ? <ErrorState message={error} onRetry={() => void user.refetch()} /> : null}
       </ScrollView>

@@ -160,6 +160,11 @@ describe('User details (S-012)', () => {
 
     await waitFor(() => expect(screen.getByTestId('activate-user')).toBeTruthy());
     expect(screen.queryByTestId('deactivate-user')).toBeNull();
+    // Nothing that needs a working sign-in until they are back (A-Reactivate).
+    expect(screen.getByTestId('edit-user')).toBeTruthy();
+    expect(screen.queryByTestId('open-set-password')).toBeNull();
+    expect(screen.queryByTestId('force-signout')).toBeNull();
+    expect(screen.queryByTestId('delete-user')).toBeNull();
   });
 
   it('explains why a user with task history cannot be deleted, and offers deactivation', async () => {

@@ -185,6 +185,7 @@ export default function WorkerTaskDetails() {
       variant="ghost"
       size="md"
       icon="arrow-undo-outline"
+      underline={false}
       fullWidth={false}
       testID="action-step-back"
       disabled={busy}
