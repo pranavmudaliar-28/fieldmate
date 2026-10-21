@@ -96,8 +96,13 @@ export function LocationField({
 
   return (
     <View style={styles.container}>
-      <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
-        Customer location *
+      {/* Like every other field: no visual asterisk, "required" for screen readers. */}
+      <Text
+        maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+        style={styles.label}
+        accessibilityLabel="Customer location, required"
+      >
+        Customer location
       </Text>
 
       {searchOpen ? (
@@ -253,7 +258,7 @@ export function LocationField({
 
 const styles = StyleSheet.create({
   container: { gap: spacing.sm },
-  label: { ...typography.secondary, color: colors.textPrimary },
+  label: { ...typography.secondaryStrong, color: colors.textPrimary },
   addressInput: { minHeight: 64 },
   searching: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   hint: { ...typography.caption, color: colors.textSecondary },
