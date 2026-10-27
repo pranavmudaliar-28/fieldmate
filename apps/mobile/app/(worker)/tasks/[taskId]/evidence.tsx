@@ -23,7 +23,7 @@ import {
   type IconName,
 } from '../../../../src/constants/theme';
 import { uploadEvidence } from '../../../../src/features/evidence/api';
-import { localId } from '../../../../src/features/offline/id';
+import { uuid } from '../../../../src/features/offline/id';
 import {
   isQueueSupported as queueSupported,
   queuedPhotoUri,
@@ -133,7 +133,7 @@ export default function FieldEvidenceScreen() {
     setError(null);
     setProgress(0);
     try {
-      const photoId = localId('photo');
+      const photoId = uuid();
       const queued = await write({
         action: {
           kind: 'photo',
@@ -144,7 +144,7 @@ export default function FieldEvidenceScreen() {
           source: photo.source,
         },
         photoUri: photo.uri,
-        online: () => uploadEvidence(taskId, photo, setProgress),
+        online: () => uploadEvidence(taskId, { ...photo, id: photoId }, setProgress),
       });
 
       await queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });

@@ -27,7 +27,10 @@ export async function sendQueued(entry: QueueEntry): Promise<void> {
       await apiRequest(`/tasks/${taskId}/${STEP_PATHS[action.step]}`, { method: 'POST' });
       return;
     case 'stepBack':
-      await apiRequest(`/tasks/${taskId}/step-back`, { method: 'POST' });
+      await apiRequest(`/tasks/${taskId}/step-back`, {
+        method: 'POST',
+        body: { from: action.from },
+      });
       return;
     case 'reject':
       await apiRequest(`/tasks/${taskId}/reject`, {
@@ -41,7 +44,7 @@ export async function sendQueued(entry: QueueEntry): Promise<void> {
     case 'note.add':
       await apiRequest(`/tasks/${taskId}/notes`, {
         method: 'POST',
-        body: { content: action.content },
+        body: { id: action.noteId, content: action.content },
       });
       return;
     case 'note.edit':
@@ -55,6 +58,7 @@ export async function sendQueued(entry: QueueEntry): Promise<void> {
       return;
     case 'photo':
       await uploadEvidence(taskId, {
+        id: action.photoId,
         uri: queuedPhotoUri(action.photoId),
         mimeType: action.mimeType,
         size: action.size,

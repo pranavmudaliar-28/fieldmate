@@ -171,7 +171,7 @@ export default function WorkerTaskDetails() {
   };
 
   const undo = () =>
-    stepBack.mutate(undefined, {
+    stepBack.mutate(detail.status, {
       onSuccess: () => {
         setError(null);
         showToast('Step undone');

@@ -7,6 +7,10 @@ import { OfflineQueueProvider } from '../features/offline/offline-queue';
 import * as tasksApi from '../features/tasks/api';
 
 jest.mock('../features/tasks/api');
+// The offline queue asks who is signed in; a manager never queues anything.
+jest.mock('../features/auth/auth-context', () => ({
+  useAuth: () => ({ status: 'signedOut', user: null }),
+}));
 // The map is a web view; a stand-in keeps the location card renderable here.
 jest.mock('../features/location/MapPicker', () => {
   const { View } = jest.requireActual('react-native');

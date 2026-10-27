@@ -1,4 +1,4 @@
-import type { EvidenceSource, WorkerStep } from '@fieldmate/shared';
+import type { EvidenceSource, TaskStatus, WorkerStep } from '@fieldmate/shared';
 
 /**
  * A write the worker made while the device could not reach the server.
@@ -10,10 +10,12 @@ import type { EvidenceSource, WorkerStep } from '@fieldmate/shared';
  */
 export type QueuedAction =
   | { kind: 'step'; step: WorkerStep }
-  | { kind: 'stepBack' }
+  /** `from` is missing only on entries queued before it was stored. */
+  | { kind: 'stepBack'; from?: TaskStatus }
   | { kind: 'reject'; reason: string }
   | { kind: 'complete' }
-  | { kind: 'note.add'; content: string }
+  /** `noteId` is missing only on entries queued before ids came from the device. */
+  | { kind: 'note.add'; noteId?: string; content: string }
   | { kind: 'note.edit'; noteId: string; content: string }
   | { kind: 'note.delete'; noteId: string }
   | {
@@ -33,6 +35,11 @@ export type QueuedAction =
 export type QueueEntry = {
   id: string;
   taskId: string;
+  /**
+   * Who queued it, so a shared phone never sends one worker's writes under
+   * another's session. Missing only on entries queued before this was stored.
+   */
+  userId?: string;
   /** ISO, so a queue read back after a restart still orders correctly. */
   queuedAt: string;
   action: QueuedAction;

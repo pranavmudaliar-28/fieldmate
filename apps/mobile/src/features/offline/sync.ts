@@ -10,7 +10,11 @@ export type SyncPort = {
   send(entry: QueueEntry): Promise<void>;
   /** Called after an accepted write so its photo file can be removed. */
   forgetPhoto(photoId: string): void;
-  save(state: QueueState): Promise<void>;
+  /**
+   * Stores a change rather than a whole queue, so a write the worker queues
+   * while a replay is running is not overwritten by the replay's older copy.
+   */
+  save(change: (state: QueueState) => QueueState): Promise<void>;
 };
 
 /**
@@ -25,13 +29,12 @@ function movedOn(error: unknown): string | null {
   if (error.status === 404) {
     return 'This task is no longer assigned to you, so your offline changes were not sent.';
   }
-  // 409 is the lifecycle refusing the step: already completed, cancelled, or
-  // sent back. The server's wording is written for the worker, so it is used.
-  if (error.status === 409) return error.message;
-  if (error.status === 403) return error.message;
-  // A rejected photo or an empty note is the worker's own write being invalid,
-  // which replaying again will not fix either.
-  if (error.status === 422) return error.message;
+  // Any other refusal — the lifecycle refusing a step, an invalid note, a photo
+  // a proxy found too large — will be refused again however often it is sent,
+  // and the server's wording is written for the worker. A session that lapsed
+  // or a server asking us to slow down is worth trying again.
+  const status = error.status ?? 0;
+  if (status >= 400 && status < 500 && ![401, 408, 429].includes(status)) return error.message;
   return null;
 }
 
@@ -57,9 +60,10 @@ export async function replay(state: QueueState, port: SyncPort): Promise<SyncOut
       try {
         await port.send(entry);
         if (entry.action.kind === 'photo') port.forgetPhoto(entry.action.photoId);
-        current = removeEntry(current, entry.id);
+        const change = (s: QueueState) => removeEntry(s, entry.id);
+        current = change(current);
         sent += 1;
-        await port.save(current);
+        await port.save(change);
       } catch (error) {
         const reason = movedOn(error);
         if (reason === null) {
@@ -70,9 +74,10 @@ export async function replay(state: QueueState, port: SyncPort): Promise<SyncOut
         }
 
         const record = { taskId, reason, blockedAt: new Date().toISOString() };
-        current = block(current, record);
+        const change = (s: QueueState) => block(s, record);
+        current = change(current);
         blocked.push(record);
-        await port.save(current);
+        await port.save(change);
         break;
       }
     }

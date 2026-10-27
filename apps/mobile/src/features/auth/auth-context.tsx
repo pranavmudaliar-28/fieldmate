@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { ApiError, configureHttp } from '../../services/http';
+import { ApiError, NETWORK_ERROR_MESSAGE, configureHttp } from '../../services/http';
 import * as authApi from './api';
 import { clearToken, loadToken, saveToken } from './token-storage';
 
@@ -93,12 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const user = await Promise.race([authApi.getCurrentUser(controller.signal), timedOut]);
       setState({ status: 'signedIn', user, bootstrapError: null });
     } catch (error) {
-      if (error instanceof ApiError && error.isNetworkError) {
-        // Keep the stored token: the session may still be valid once back online.
-        setState({ status: 'bootstrapFailed', user: null, bootstrapError: error.message });
+      // Only the server saying the session is gone ends it. Anything else — no
+      // signal, or a 502 while the API is being deployed — keeps the stored
+      // token, which may still be valid on the next try.
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        await forgetSession();
         return;
       }
-      await forgetSession();
+      setState({
+        status: 'bootstrapFailed',
+        user: null,
+        bootstrapError: error instanceof ApiError ? error.message : NETWORK_ERROR_MESSAGE,
+      });
     } finally {
       clearTimeout(timer);
     }

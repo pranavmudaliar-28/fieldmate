@@ -5,6 +5,7 @@ import {
   reassignTaskSchema,
   rejectTaskSchema,
   requestChangesSchema,
+  stepBackSchema,
   updateTaskSchema,
 } from '@fieldmate/shared';
 import { Router, type RequestHandler } from 'express';
@@ -115,7 +116,13 @@ export function createTaskRouter(deps: {
   workerStep('/:taskId/depart', controller.depart);
   workerStep('/:taskId/arrive', controller.arrive);
   workerStep('/:taskId/start', controller.start);
-  workerStep('/:taskId/step-back', controller.stepBack);
+  router.post(
+    '/:taskId/step-back',
+    requireRole('FIELD_WORKER'),
+    withTaskId,
+    validate(stepBackSchema),
+    controller.stepBack,
+  );
   router.post(
     '/:taskId/reject',
     requireRole('FIELD_WORKER'),

@@ -150,7 +150,10 @@ describe('Worker task details (S-008)', () => {
     await userEvent.setup().press(screen.getByTestId('action-step-back'));
 
     await waitFor(() =>
-      expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/step-back', { method: 'POST' }),
+      expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/step-back', {
+        method: 'POST',
+        body: { from: 'REACHED_LOCATION' },
+      }),
     );
   });
 
@@ -290,7 +293,7 @@ describe('Worker task details (S-008)', () => {
     await waitFor(() =>
       expect(mockApiRequest).toHaveBeenCalledWith('/tasks/task-1/notes', {
         method: 'POST',
-        body: { content: 'Replaced valve.' },
+        body: { id: expect.any(String), content: 'Replaced valve.' },
       }),
     );
   });

@@ -1,7 +1,8 @@
 import type { ListManagedUsersQuery, Role } from '@fieldmate/shared';
-import { and, asc, count, eq, ilike, or, sql } from 'drizzle-orm';
+import { and, asc, eq, ilike, or, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { taskAssignments, taskEvidence, taskNotes, tasks, users } from '../../db/schema.js';
+import type { TaskWriter } from '../tasks/task.repository.js';
 
 export type ManagedUserRow = {
   id: string;
@@ -76,8 +77,9 @@ export function createAdminUserRepository(db: Database) {
     async update(
       userId: string,
       fields: Partial<{ name: string; email: string; role: Role; isActive: boolean }>,
+      tx: TaskWriter = db,
     ): Promise<ManagedUserRow | undefined> {
-      const [user] = await db
+      const [user] = await tx
         .update(users)
         .set({ ...fields, updatedAt: new Date() })
         .where(eq(users.id, userId))
@@ -97,17 +99,22 @@ export function createAdminUserRepository(db: Database) {
         .where(eq(users.id, userId));
     },
 
-    async delete(userId: string): Promise<void> {
-      await db.delete(users).where(eq(users.id, userId));
+    async delete(userId: string, tx: TaskWriter = db): Promise<void> {
+      await tx.delete(users).where(eq(users.id, userId));
     },
 
-    /** How many active admins exist, used to keep at least one (docs/07 §2). */
-    async countActiveAdmins(): Promise<number> {
-      const [row] = await db
-        .select({ value: count() })
+    /**
+     * How many active admins exist, used to keep at least one (docs/07 §2).
+     * Their rows stay locked until `tx` ends, so two admins removing each
+     * other at once are counted one after the other, not both as two.
+     */
+    async lockActiveAdmins(tx: TaskWriter): Promise<number> {
+      const rows = await tx
+        .select({ id: users.id })
         .from(users)
-        .where(and(eq(users.role, 'ADMIN'), eq(users.isActive, true)));
-      return row?.value ?? 0;
+        .where(and(eq(users.role, 'ADMIN'), eq(users.isActive, true)))
+        .for('update');
+      return rows.length;
     },
 
     /**

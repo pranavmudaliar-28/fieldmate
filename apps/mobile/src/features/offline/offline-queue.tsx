@@ -10,6 +10,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import { useIsOnline } from '../../hooks/use-network-status';
+import { useAuth } from '../auth/auth-context';
 import { localId } from './id';
 import { taskKeys } from '../tasks/constants';
 import {
@@ -50,61 +51,87 @@ const OfflineQueueContext = createContext<OfflineQueue | null>(null);
  * Holds the worker's unsent writes and replays them when the signal comes
  * back (docs/02 §10).
  *
- * The queue is read once at start-up and kept in state from then on; every
+ * The queue is read once at start-up and kept in a ref from then on; every
  * change is written through to disk immediately, because the next thing that
  * happens to a phone in a basement may be its battery running out.
+ *
+ * Every change goes through `save`, one at a time and after the first read,
+ * so a photo queued while a replay is running, or before the file was read,
+ * is never overwritten by an older copy of the queue.
+ *
+ * The queue holds every worker's writes who has used this phone, but only the
+ * signed-in worker's are counted or sent.
  */
 export function OfflineQueueProvider({ children }: PropsWithChildren) {
   const isOnline = useIsOnline();
   const queryClient = useQueryClient();
+  const { status, user } = useAuth();
+  const userId = status === 'signedIn' ? (user?.id ?? null) : null;
   const [state, setState] = useState<QueueState>(EMPTY_QUEUE);
   const [syncing, setSyncing] = useState(false);
   // Guards against a second run starting while the first is still going: the
   // network listener fires more than once on a flaky connection.
   const running = useRef(false);
+  const latest = useRef<QueueState>(EMPTY_QUEUE);
+  const writes = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     if (!isQueueSupported) return;
-    void readQueue().then(setState);
+    writes.current = readQueue().then((read) => {
+      latest.current = read;
+      setState(read);
+    });
   }, []);
 
-  const save = useCallback(async (next: QueueState) => {
-    setState(next);
-    await writeQueue(next);
+  const save = useCallback((change: (state: QueueState) => QueueState) => {
+    const run = writes.current.then(async () => {
+      latest.current = change(latest.current);
+      setState(latest.current);
+      await writeQueue(latest.current);
+    });
+    writes.current = run.catch(() => undefined);
+    return run;
   }, []);
+
+  // shortcut: entries queued before userId was stored belong to whoever signs in next; drop once old builds are gone.
+  const mine = useCallback(
+    (s: QueueState): QueueState => ({
+      ...s,
+      entries: s.entries.filter((entry) => !entry.userId || entry.userId === userId),
+    }),
+    [userId],
+  );
+  const own = useMemo(() => mine(state), [mine, state]);
 
   const add = useCallback<OfflineQueue['add']>(
     async (taskId, action, photoUri) => {
       const entry = {
         id: localId('q'),
         taskId,
+        ...(userId ? { userId } : {}),
         queuedAt: new Date().toISOString(),
         action,
       };
       // The file is kept before the entry is, so the queue never points at a
       // photo that was never copied.
       if (action.kind === 'photo' && photoUri) await keepPhoto(photoUri, action.photoId);
-      await save(enqueue(state, entry));
+      await save((s) => enqueue(s, entry));
     },
-    [state, save],
+    [userId, save],
   );
 
   const sync = useCallback(async () => {
-    if (running.current) return;
+    // Nobody to send as yet: replaying before the session is restored would
+    // be refused, and a 401 signs the worker out.
+    if (running.current || !userId) return;
     running.current = true;
     setSyncing(true);
     try {
-      const latest = await readQueue();
-      if (latest.entries.length === 0) return;
+      await writes.current;
+      const pending = mine(latest.current);
+      if (pending.entries.length === 0) return;
 
-      const outcome = await replay(latest, {
-        send: sendQueued,
-        forgetPhoto,
-        save: async (next) => {
-          setState(next);
-          await writeQueue(next);
-        },
-      });
+      const outcome = await replay(pending, { send: sendQueued, forgetPhoto, save });
 
       // Anything that reached the server changed a task, so the screens
       // showing those tasks are now out of date.
@@ -115,7 +142,7 @@ export function OfflineQueueProvider({ children }: PropsWithChildren) {
       running.current = false;
       setSyncing(false);
     }
-  }, [queryClient]);
+  }, [queryClient, userId, mine, save]);
 
   useEffect(() => {
     if (!isQueueSupported || !isOnline) return;
@@ -125,24 +152,28 @@ export function OfflineQueueProvider({ children }: PropsWithChildren) {
   const value = useMemo<OfflineQueue>(
     () => ({
       supported: isQueueSupported,
-      pending: pendingCount(state),
-      pendingFor: (taskId) => entriesFor(state, taskId).length,
+      pending: pendingCount(own),
+      pendingFor: (taskId) => entriesFor(own, taskId).length,
       photosPendingFor: (taskId) =>
-        entriesFor(state, taskId).filter((entry) => entry.action.kind === 'photo').length,
-      blockedFor: (taskId) => blockFor(state, taskId),
+        entriesFor(own, taskId).filter((entry) => entry.action.kind === 'photo').length,
+      blockedFor: (taskId) => blockFor(own, taskId),
       add,
       discard: async (taskId) => {
-        const { state: next, photoIds } = discardTask(state)(taskId);
-        for (const photoId of photoIds) forgetPhoto(photoId);
-        await save(next);
+        let going: string[] = [];
+        await save((s) => {
+          const { state: next, photoIds } = discardTask(s)(taskId);
+          going = photoIds;
+          return next;
+        });
+        for (const photoId of going) forgetPhoto(photoId);
       },
       retry: async (taskId) => {
-        await save(unblock(state, taskId));
+        await save((s) => unblock(s, taskId));
         await sync();
       },
       syncing,
     }),
-    [state, add, save, sync, syncing],
+    [own, mine, add, save, sync, syncing],
   );
 
   return <OfflineQueueContext.Provider value={value}>{children}</OfflineQueueContext.Provider>;

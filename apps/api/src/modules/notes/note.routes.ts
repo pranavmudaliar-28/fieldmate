@@ -24,8 +24,8 @@ export function createNoteRouter(deps: { repository: TaskRepository }): Router {
     validated<{ noteId: string }>(req, 'params').noteId;
 
   const create: RequestHandler = async (req, res) => {
-    const { content } = validated<CreateNoteInput>(req);
-    const note = await service.create(actor(req), taskIdOf(req), content);
+    const { content, id } = validated<CreateNoteInput>(req);
+    const note = await service.create(actor(req), taskIdOf(req), content, id);
     res.status(201).json(note);
   };
 

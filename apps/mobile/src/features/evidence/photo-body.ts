@@ -5,6 +5,8 @@ export type PhotoBody = {
   name: string;
   /** Camera or gallery; the server will not accept a photo without it. */
   source: string;
+  /** The id the server stores it under, so a resent upload is not kept twice. */
+  id?: string;
 };
 
 /**
@@ -15,6 +17,7 @@ export type PhotoBody = {
 export async function photoFormData(photo: PhotoBody): Promise<FormData> {
   const form = new FormData();
   form.append('source', photo.source);
+  if (photo.id) form.append('id', photo.id);
   form.append('photo', {
     uri: photo.uri,
     name: photo.name,

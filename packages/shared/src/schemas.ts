@@ -101,14 +101,29 @@ export const requestChangesSchema = z.strictObject({
 });
 export type RequestChangesInput = z.input<typeof requestChangesSchema>;
 
-export const createNoteSchema = z.strictObject({
+/**
+ * Names the status being undone, so an undo the offline queue sends twice
+ * undoes one step, not two. Optional, and the body too: older apps send none.
+ */
+export const stepBackSchema = z
+  .strictObject({ from: z.enum(TASK_STATUSES, 'Invalid status.').optional() })
+  .default({});
+export type StepBackInput = z.output<typeof stepBackSchema>;
+
+/** An edit replaces the whole note. */
+export const updateNoteSchema = z.strictObject({
   content: requiredText(FIELD_LIMITS.note, 'Note'),
 });
-export type CreateNoteInput = z.input<typeof createNoteSchema>;
-
-/** Same shape as writing one: an edit replaces the whole note. */
-export const updateNoteSchema = createNoteSchema;
 export type UpdateNoteInput = z.input<typeof updateNoteSchema>;
+
+/**
+ * The app names a new note itself, so a note replayed from the offline queue
+ * after its response was lost is recognised instead of stored twice.
+ */
+const clientId = z.uuid('Invalid id.').optional();
+
+export const createNoteSchema = updateNoteSchema.extend({ id: clientId });
+export type CreateNoteInput = z.input<typeof createNoteSchema>;
 
 /**
  * The upload says where the photo came from. Required rather than defaulted:
@@ -117,6 +132,7 @@ export type UpdateNoteInput = z.input<typeof updateNoteSchema>;
  */
 export const evidenceSourceSchema = z.strictObject({
   source: z.enum(EVIDENCE_SOURCES, 'Say whether this photo came from the camera or the gallery.'),
+  id: clientId,
 });
 export type EvidenceSourceInput = z.input<typeof evidenceSourceSchema>;
 

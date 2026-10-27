@@ -162,7 +162,19 @@ describe('manager review (F-008)', () => {
       .field('source', 'CAMERA')
       .attach('photo', JPEG, 'photo.jpg');
     expect(photo.status).toBe(409);
-    expect((await post(worker, taskId, 'complete')).status).toBe(409);
+  });
+
+  it('answers a hand-over sent again without handing it over twice', async () => {
+    const taskId = await submitted();
+    const first = await request(app)
+      .get(`/api/v1/tasks/${taskId}`)
+      .auth(manager.token, { type: 'bearer' });
+
+    const again = await post(worker, taskId, 'complete');
+
+    expect(again.status).toBe(200);
+    expect(again.body.status).toBe(first.body.status);
+    expect(again.body.review.submittedAt).toBe(first.body.review.submittedAt);
   });
 
   it('lets a manager finish the work themselves without a review', async () => {

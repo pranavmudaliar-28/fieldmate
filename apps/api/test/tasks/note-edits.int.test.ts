@@ -56,6 +56,53 @@ beforeEach(async () => {
 afterAll(closeTestDb);
 
 describe('editing and deleting notes (F-007)', () => {
+  it('keeps a note sent twice under the same id only once', async () => {
+    const taskId = await inProgressTask(worker);
+    const id = '0b6e1c9a-2f43-4d1e-9a6b-5c7d8e9f0a1b';
+    const send = () =>
+      request(app)
+        .post(`/api/v1/tasks/${taskId}/notes`)
+        .auth(worker.token, { type: 'bearer' })
+        .send({ id, content: 'Meter replaced.' });
+
+    expect((await send()).status).toBe(201);
+    const again = await send();
+
+    expect(again.status).toBe(201);
+    expect(again.body.id).toBe(id);
+    expect(await notesOf(taskId)).toHaveLength(1);
+  });
+
+  it('edits a note by the id the app gave it, as an offline edit does', async () => {
+    const taskId = await inProgressTask(worker);
+    const id = '0b6e1c9a-2f43-4d1e-9a6b-5c7d8e9f0a1c';
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/notes`)
+      .auth(worker.token, { type: 'bearer' })
+      .send({ id, content: 'Meter replaced.' });
+
+    const res = await editNote(worker, taskId, id, 'Meter and valve replaced.');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('will not let another worker reuse a note id', async () => {
+    const taskId = await inProgressTask(worker);
+    const otherTask = await inProgressTask(otherWorker);
+    const id = '0b6e1c9a-2f43-4d1e-9a6b-5c7d8e9f0a1d';
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/notes`)
+      .auth(worker.token, { type: 'bearer' })
+      .send({ id, content: 'Mine.' });
+
+    const res = await request(app)
+      .post(`/api/v1/tasks/${otherTask}/notes`)
+      .auth(otherWorker.token, { type: 'bearer' })
+      .send({ id, content: 'Theirs.' });
+
+    expect(res.status).toBe(400);
+  });
+
   it('leaves a new note marked as never edited', async () => {
     const taskId = await inProgressTask(worker);
 

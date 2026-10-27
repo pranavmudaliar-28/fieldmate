@@ -11,7 +11,7 @@ const BASE_ID = 'com.slasheasy.fieldmate';
 
 const variants: Record<AppEnv, { name: string; id: string; scheme: string }> = {
   development: { name: 'FieldMate Dev', id: `${BASE_ID}.dev`, scheme: 'fieldmate-dev' },
-  staging: { name: 'FieldMate Staging', id: `${BASE_ID}.staging`, scheme: 'fieldmate-staging' },
+  staging: { name: 'FieldMate', id: `${BASE_ID}.staging`, scheme: 'fieldmate-staging' },
   production: { name: 'FieldMate', id: BASE_ID, scheme: 'fieldmate' },
 };
 
@@ -52,7 +52,15 @@ const config: ExpoConfig = {
       },
     ],
     'expo-font',
-    'expo-notifications',
+    [
+      'expo-notifications',
+      {
+        // Android draws the status-bar icon from alpha only, so the full-colour
+        // app icon would show as a grey square: the white pin glyph is used.
+        icon: './assets/android-icon-monochrome.png',
+        color: '#0F1115',
+      },
+    ],
     'expo-secure-store',
     [
       'expo-splash-screen',

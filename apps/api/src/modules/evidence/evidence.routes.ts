@@ -29,12 +29,13 @@ export function createEvidenceRouter(deps: {
 
   const upload: RequestHandler = async (req, res) => {
     // Multipart, so the field arrives as a string alongside the file.
-    const { source } = validated<EvidenceSourceInput>(req);
+    const { source, id } = validated<EvidenceSourceInput>(req);
     const evidence = await service.upload(
       actor(req),
       taskIdOf(req),
       req.file,
       source as EvidenceSource,
+      id,
     );
     res.status(201).json(evidence);
   };

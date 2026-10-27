@@ -6,6 +6,8 @@ import { photoFormData } from './photo-body';
 export const PHOTO_TOO_LARGE_MESSAGE = 'This photo is too large. Take it again.';
 export const PHOTO_UNREADABLE_MESSAGE = "Couldn't read that photo. Take it again.";
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export type UploadProgress = (fraction: number) => void;
 
 /**
@@ -15,6 +17,8 @@ export type UploadProgress = (fraction: number) => void;
 export function uploadEvidence(
   taskId: string,
   photo: {
+    /** Photos queued before ids were UUIDs carry an id the server would refuse, so it is left out. */
+    id?: string;
     uri: string;
     mimeType: 'image/jpeg' | 'image/png';
     size: number;
@@ -71,6 +75,7 @@ export function uploadEvidence(
       mimeType: photo.mimeType,
       name: photo.mimeType === 'image/png' ? 'photo.png' : 'photo.jpg',
       source: photo.source,
+      ...(photo.id && UUID.test(photo.id) ? { id: photo.id } : {}),
     }).then(
       (form) => request.send(form),
       () => reject(new ApiError('INVALID_FILE', PHOTO_UNREADABLE_MESSAGE)),

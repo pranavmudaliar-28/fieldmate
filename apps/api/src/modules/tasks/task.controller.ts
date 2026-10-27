@@ -4,6 +4,7 @@ import type {
   ReassignTaskInput,
   RejectTaskInput,
   RequestChangesInput,
+  StepBackInput,
   UpdateTaskInput,
   WorkerStep,
 } from '@fieldmate/shared';
@@ -82,7 +83,8 @@ export function createTaskController(service: TaskService) {
   };
 
   const stepBack: RequestHandler = async (req, res) => {
-    res.json(await service.stepBack(actor(req), taskId(req)));
+    const { from } = validated<StepBackInput>(req);
+    res.json(await service.stepBack(actor(req), taskId(req), from));
   };
 
   const reject: RequestHandler = async (req, res) => {

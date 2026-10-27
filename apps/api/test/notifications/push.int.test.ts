@@ -1,9 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
-import { devicePushTokens } from '../../src/db/schema.js';
+import { devicePushTokens, users } from '../../src/db/schema.js';
 import { createTestApp, testPush } from '../helpers/app.js';
-import { createManager, createWorker, type TestActor } from '../helpers/auth.js';
+import { createActor, createManager, createWorker, type TestActor } from '../helpers/auth.js';
 import { closeTestDb, forceStatus, testDb, truncateAll } from '../helpers/db.js';
 
 const app = createTestApp();
@@ -190,6 +190,42 @@ describe('push triggers', () => {
     await settle();
 
     expect(testPush.sent).toHaveLength(0);
+  });
+
+  it('tells the manager who assigned it about each step, not the worker who took it', async () => {
+    const taskId = await createTask();
+    testPush.reset();
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/accept`)
+      .auth(worker.token, { type: 'bearer' });
+    await settle();
+
+    expect(testPush.sent).toHaveLength(1);
+    expect(testPush.sent[0]).toMatchObject({
+      userIds: [manager.id],
+      message: { type: 'TASK_UPDATED' },
+    });
+  });
+
+  it('tells admins, but not deactivated managers, when work is ready for review', async () => {
+    const admin = await createActor('ADMIN', { name: 'Root Admin' });
+    await db.update(users).set({ isActive: false }).where(eq(users.id, otherManager.id));
+    const taskId = await createTask();
+    await forceStatus(taskId, 'IN_PROGRESS');
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/evidence`)
+      .auth(worker.token, { type: 'bearer' })
+      .field('source', 'CAMERA')
+      .attach('photo', JPEG, 'photo.jpg');
+    testPush.reset();
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/complete`)
+      .auth(worker.token, { type: 'bearer' });
+    await settle();
+
+    expect(testPush.sent[0]?.userIds.sort()).toEqual([manager.id, admin.id].sort());
   });
 
   it('tells every other manager when a worker hands work over for review', async () => {

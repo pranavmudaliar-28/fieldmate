@@ -158,24 +158,26 @@ export function createTaskService(deps: {
       const changed = await repository.withLockedTask(taskId, async (tx, task) => {
         assertCanPerform('edit', actor, { status: task.status, currentWorkerId: task.workerId });
 
-        const current = await repository.findDetail(taskId);
+        // Read through `tx`: asking the pool for a second connection while
+        // this one is held can leave every connection waiting on another.
+        const current = await repository.findEditable(tx, taskId);
         if (!current) throw taskNotFound();
 
         const fields: { title?: string; description?: string } = {};
-        if (input.title !== undefined && input.title !== current.task.title) {
+        if (input.title !== undefined && input.title !== current.title) {
           fields.title = input.title;
         }
-        if (input.description !== undefined && input.description !== current.task.description) {
+        if (input.description !== undefined && input.description !== current.description) {
           fields.description = input.description;
         }
 
         const newLocation = input.location;
         const locationChanged =
           newLocation !== undefined &&
-          (newLocation.address !== current.task.address ||
-            (newLocation.addressDetails ?? null) !== current.task.addressDetails ||
-            (newLocation.latitude ?? null) !== current.task.latitude ||
-            (newLocation.longitude ?? null) !== current.task.longitude);
+          (newLocation.address !== current.address ||
+            (newLocation.addressDetails ?? null) !== current.addressDetails ||
+            (newLocation.latitude ?? null) !== current.latitude ||
+            (newLocation.longitude ?? null) !== current.longitude);
 
         if (Object.keys(fields).length === 0 && !locationChanged) return false;
 
@@ -243,24 +245,37 @@ export function createTaskService(deps: {
      */
     async advance(actor: Actor, taskId: string, step: WorkerStep): Promise<TaskDetail> {
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
-        assertCanPerform(step, actor, { status: task.status, currentWorkerId: task.workerId });
         const status = nextStatus(step);
+        // The same step replayed from the offline queue after its response
+        // was lost: it is already done, so it is answered, not refused.
+        if (status && task.status === status && task.workerId === actor.id) return null;
+        assertCanPerform(step, actor, { status: task.status, currentWorkerId: task.workerId });
         if (!status) throw new AppError('INVALID_STATUS_TRANSITION', 'That step is not available.');
         await repository.advance(tx, taskId, status, STEP_STAMPS[step]);
-        return true;
+        return task.createdBy;
       });
 
       if (result === undefined) throw taskNotFound();
 
       const task = await detail(taskId);
-      // The manager follows the journey, so each step is worth a push.
-      notify([task.assignment.worker.id], taskId, pushMessages.taskUpdated(taskId, task.title));
+      // The manager who assigned it follows the journey, so each step is worth a push.
+      if (result) notify([result], taskId, pushMessages.taskUpdated(taskId, task.title));
       return task;
     },
 
-    /** Undoes one mistapped step, clearing the stamp it set. */
-    async stepBack(actor: Actor, taskId: string): Promise<TaskDetail> {
+    /**
+     * Undoes one mistapped step, clearing the stamp it set. `from` is the
+     * status the worker saw: an undo already done is answered, and one aimed
+     * at a different step is refused rather than undoing that step instead.
+     */
+    async stepBack(actor: Actor, taskId: string, from?: TaskStatus): Promise<TaskDetail> {
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        if (from && task.status === previousStatus(from) && task.workerId === actor.id) {
+          return true;
+        }
+        if (from && task.status !== from) {
+          throw new AppError('INVALID_STATUS_TRANSITION', 'There is no step to undo.');
+        }
         assertCanPerform('stepBack', actor, {
           status: task.status,
           currentWorkerId: task.workerId,
@@ -340,6 +355,14 @@ export function createTaskService(deps: {
       const forReview = actor.role === 'FIELD_WORKER';
 
       const result = await repository.withLockedTask(taskId, async (tx, task) => {
+        // Handed over already, and this is the offline queue sending it again.
+        if (
+          forReview &&
+          task.status === nextStatus('submitForReview') &&
+          task.workerId === actor.id
+        ) {
+          return false;
+        }
         assertCanPerform(forReview ? 'submitForReview' : 'complete', actor, {
           status: task.status,
           currentWorkerId: task.workerId,
@@ -361,6 +384,7 @@ export function createTaskService(deps: {
       if (result === undefined) throw taskNotFound();
 
       const task = await detail(taskId);
+      if (!result) return task;
       // Everyone who manages the work hears about it, except whoever did it.
       const managerIds = (await tokens.listManagerIds()).filter((id) => id !== actor.id);
       notify(

@@ -27,9 +27,9 @@ import {
 export type Point = { latitude: number; longitude: number };
 
 /**
- * Leaflet with OpenStreetMap tiles inside a web view: free, no API key, and it
- * runs in Expo Go. The OSM tile policy requires the attribution Leaflet shows,
- * and forbids bulk or offline tile fetching, which this never does.
+ * MapLibre GL with CARTO's vector basemap (mapcn's default) inside a web
+ * view: no API key, and it runs in Expo Go. See map-html.ts for the
+ * attribution and licence notes.
  *
  * The pin is fixed to the centre and the map moves underneath it. Dragging a
  * marker meant aiming at a 25x41px icon inside a web view nested in the form's

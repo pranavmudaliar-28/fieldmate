@@ -11,6 +11,7 @@ import { AppError } from '../../utils/app-error.js';
 import { hashPassword } from '../../utils/password.js';
 import { createAuthRepository } from '../auth/auth.repository.js';
 import type { Database } from '../../db/client.js';
+import type { TaskWriter } from '../tasks/task.repository.js';
 import {
   createAdminUserRepository,
   type ManagedUserRow,
@@ -67,9 +68,9 @@ export function createAdminUserService(db: Database) {
     }
   }
 
-  async function assertNotLastAdmin(user: ManagedUserRow): Promise<void> {
+  async function assertNotLastAdmin(tx: TaskWriter, user: ManagedUserRow): Promise<void> {
     if (user.role !== 'ADMIN' || !user.isActive) return;
-    if ((await repository.countActiveAdmins()) <= 1) {
+    if ((await repository.lockActiveAdmins(tx)) <= 1) {
       throw new AppError('LAST_ADMIN', 'There must always be at least one active admin.');
     }
   }
@@ -118,14 +119,15 @@ export function createAdminUserService(db: Database) {
     async update(actorId: string, userId: string, input: UpdateUserInput): Promise<ManagedUser> {
       const user = await load(userId);
 
+      let leavesAdmins = false;
       if (input.role !== undefined && input.role !== user.role) {
         assertNotSelf(actorId, userId, 'change the role of');
-        if (user.role === 'ADMIN') await assertNotLastAdmin(user);
+        leavesAdmins = true;
       }
 
       if (input.isActive === false && user.isActive) {
         assertNotSelf(actorId, userId, 'deactivate');
-        await assertNotLastAdmin(user);
+        leavesAdmins = true;
       }
 
       if (input.email !== undefined) {
@@ -139,7 +141,10 @@ export function createAdminUserService(db: Database) {
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       };
 
-      const updated = await repository.update(userId, fields);
+      const updated = await db.transaction(async (tx) => {
+        if (leavesAdmins) await assertNotLastAdmin(tx, user);
+        return repository.update(userId, fields, tx);
+      });
       if (!updated) throw userNotFound();
 
       // Losing access or changing role ends existing sessions immediately.
@@ -153,6 +158,8 @@ export function createAdminUserService(db: Database) {
     async setPassword(userId: string, input: SetPasswordInput): Promise<void> {
       await load(userId);
       await repository.setPassword(userId, await hashPassword(input.password));
+      // Also drops the push tokens, so a lost phone stops showing task details.
+      await auth.revokeSessions(userId);
     },
 
     async revokeSessions(userId: string): Promise<void> {
@@ -163,7 +170,6 @@ export function createAdminUserService(db: Database) {
     async remove(actorId: string, userId: string): Promise<void> {
       const user = await load(userId);
       assertNotSelf(actorId, userId, 'delete');
-      await assertNotLastAdmin(user);
 
       if (await repository.hasHistory(userId)) {
         throw new AppError(
@@ -172,7 +178,10 @@ export function createAdminUserService(db: Database) {
         );
       }
 
-      await repository.delete(userId);
+      await db.transaction(async (tx) => {
+        await assertNotLastAdmin(tx, user);
+        await repository.delete(userId, tx);
+      });
     },
   };
 }

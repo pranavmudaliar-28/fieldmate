@@ -28,7 +28,7 @@ export type Point = { latitude: number; longitude: number };
  * The browser build of the map picker.
  *
  * `react-native-webview` has no web implementation — it renders "React Native
- * WebView does not support this platform" — so the same Leaflet document is
+ * WebView does not support this platform" — so the same MapLibre document is
  * embedded in an iframe instead, and the map talks back with `postMessage`
  * rather than the web view bridge. The behaviour is identical: the pin is fixed
  * to the centre and the map moves underneath it.

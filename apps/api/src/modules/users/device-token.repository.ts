@@ -1,5 +1,5 @@
-import type { PushPlatform } from '@fieldmate/shared';
-import { eq, inArray } from 'drizzle-orm';
+import { TASK_MANAGING_ROLES, type PushPlatform } from '@fieldmate/shared';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { devicePushTokens, users } from '../../db/schema.js';
 
@@ -32,9 +32,12 @@ export function createDeviceTokenRepository(db: Database) {
       await db.delete(devicePushTokens).where(inArray(devicePushTokens.token, tokens));
     },
 
-    /** Recipients of the "task completed" push. */
+    /** Recipients of the "task completed" push: everyone active who manages tasks. */
     async listManagerIds(): Promise<string[]> {
-      const rows = await db.select({ id: users.id }).from(users).where(eq(users.role, 'MANAGER'));
+      const rows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(inArray(users.role, [...TASK_MANAGING_ROLES]), eq(users.isActive, true)));
       return rows.map((row) => row.id);
     },
   };

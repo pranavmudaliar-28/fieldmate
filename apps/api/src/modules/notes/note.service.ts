@@ -12,7 +12,7 @@ export function createNoteService(deps: { repository: TaskRepository }) {
 
   return {
     /** A note can only be added while the task is in progress. */
-    async create(actor: Actor, taskId: string, content: string): Promise<Note> {
+    async create(actor: Actor, taskId: string, content: string, id?: string): Promise<Note> {
       const created = await repository.withLockedTask(taskId, async (tx, task) => {
         assertCanPerform('addNote', actor, {
           status: task.status,
@@ -21,9 +21,25 @@ export function createNoteService(deps: { repository: TaskRepository }) {
 
         const [row] = await tx
           .insert(taskNotes)
-          .values({ taskId, createdBy: actor.id, content })
+          .values({ ...(id ? { id } : {}), taskId, createdBy: actor.id, content })
+          .onConflictDoNothing({ target: taskNotes.id })
           .returning({ id: taskNotes.id, createdAt: taskNotes.createdAt });
-        if (!row) throw new Error('Failed to create note');
+        if (!row) {
+          // The same note sent again: answer as the first time did. Only a
+          // client-chosen id can clash, so `id` is set here.
+          const [sent] = await tx
+            .select({ id: taskNotes.id, createdAt: taskNotes.createdAt })
+            .from(taskNotes)
+            .where(
+              and(
+                eq(taskNotes.id, id!),
+                eq(taskNotes.taskId, taskId),
+                eq(taskNotes.createdBy, actor.id),
+              ),
+            );
+          if (!sent) throw new AppError('INVALID_REQUEST', 'That note id is already in use.');
+          return sent;
+        }
 
         await repository.touchTask(tx, taskId);
         return row;

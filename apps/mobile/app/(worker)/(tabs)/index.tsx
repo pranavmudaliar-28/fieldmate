@@ -1,5 +1,6 @@
 import {
   WORKER_PROGRESS_STATUSES,
+  nextStatus,
   nextWorkerStep,
   type TaskListItem,
   type TaskStatus,
@@ -236,7 +237,7 @@ function CurrentJobCard({ task }: { task: TaskListItem }) {
                 showToast(WORKER_STEP_UI[step].done, 'success', {
                   label: 'Undo',
                   onPress: () =>
-                    stepBack.mutate(undefined, {
+                    stepBack.mutate(nextStatus(step) ?? undefined, {
                       onError: () =>
                         showToast('Couldn’t undo. Open the task to try again.', 'error'),
                     }),

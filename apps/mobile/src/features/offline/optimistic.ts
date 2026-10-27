@@ -46,8 +46,9 @@ export function applyLocally(
         notes: [
           ...task.notes,
           {
-            // A local id, replaced by the server's when the task is refetched.
-            id: localId('note'),
+            // The id the server will store it under, so an edit or delete
+            // queued behind it names a note the server will know.
+            id: action.noteId ?? localId('note'),
             content: action.content,
             createdBy: author,
             createdAt: now,

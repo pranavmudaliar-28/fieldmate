@@ -60,6 +60,17 @@ describe('AuthProvider bootstrap', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('signedIn:MANAGER'));
   });
 
+  it('keeps the token when the server errors during a deploy', async () => {
+    storage.loadToken.mockResolvedValue('stored-token');
+    api.getCurrentUser.mockRejectedValue(new ApiError('INTERNAL_ERROR', 'Bad gateway', 502));
+    await renderAuth();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status')).toHaveTextContent('bootstrapFailed:none'),
+    );
+    expect(storage.clearToken).not.toHaveBeenCalled();
+  });
+
   it('clears a token the server rejects', async () => {
     storage.loadToken.mockResolvedValue('revoked-token');
     api.getCurrentUser.mockRejectedValue(new ApiError('UNAUTHENTICATED', 'nope', 401));

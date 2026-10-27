@@ -197,6 +197,24 @@ export function createTaskRepository(db: Database) {
     return row?.value ?? 0;
   };
 
+  /** The fields an edit can change, read inside the edit's own transaction. */
+  const findEditable = async (tx: TaskWriter, taskId: string) => {
+    const [row] = await tx
+      .select({
+        title: tasks.title,
+        description: tasks.description,
+        address: taskLocations.address,
+        addressDetails: taskLocations.addressDetails,
+        latitude: taskLocations.latitude,
+        longitude: taskLocations.longitude,
+      })
+      .from(tasks)
+      .innerJoin(taskLocations, eq(taskLocations.taskId, tasks.id))
+      .where(eq(tasks.id, taskId))
+      .limit(1);
+    return row;
+  };
+
   const findDetail = async (taskId: string): Promise<TaskDetailRows | undefined> => {
     const [task] = await db
       .select({
@@ -282,6 +300,7 @@ export function createTaskRepository(db: Database) {
     listTasks,
     findTaskHeader,
     findDetail,
+    findEditable,
     findFieldWorker,
     lockTask,
     countEvidence,

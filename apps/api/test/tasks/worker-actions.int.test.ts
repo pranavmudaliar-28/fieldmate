@@ -137,6 +137,31 @@ describe('the worker lifecycle', () => {
     expect(res.body.progress.departedAt).not.toBeNull();
   });
 
+  it('undoes one step only, when the same undo is sent twice', async () => {
+    const taskId = await taskAt('REACHED_LOCATION');
+    const undo = () =>
+      request(app)
+        .post(`/api/v1/tasks/${taskId}/step-back`)
+        .auth(worker.token, { type: 'bearer' })
+        .send({ from: 'REACHED_LOCATION' });
+
+    await undo();
+    const again = await undo();
+
+    expect(again.status).toBe(200);
+    expect(again.body.status).toBe('GOING_TO_LOCATION');
+  });
+
+  it('refuses an undo aimed at a step the task is no longer on', async () => {
+    const taskId = await taskAt('ACCEPTED');
+    const res = await request(app)
+      .post(`/api/v1/tasks/${taskId}/step-back`)
+      .auth(worker.token, { type: 'bearer' })
+      .send({ from: 'REACHED_LOCATION' });
+
+    expect(res.status).toBe(409);
+  });
+
   it('cannot undo once the work has started', async () => {
     const taskId = await taskAt('IN_PROGRESS');
     const res = await request(app)
@@ -147,10 +172,20 @@ describe('the worker lifecycle', () => {
     expect(res.body.error.code).toBe('INVALID_STATUS_TRANSITION');
   });
 
-  it('cannot start twice', async () => {
+  it('answers a step sent again, as the offline queue does after a lost response', async () => {
     const taskId = await startedTask();
     const res = await request(app)
       .post(`/api/v1/tasks/${taskId}/start`)
+      .auth(worker.token, { type: 'bearer' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('IN_PROGRESS');
+  });
+
+  it('still refuses a step that is behind the task, not just repeated', async () => {
+    const taskId = await startedTask();
+    const res = await request(app)
+      .post(`/api/v1/tasks/${taskId}/accept`)
       .auth(worker.token, { type: 'bearer' });
 
     expect(res.status).toBe(409);
@@ -246,6 +281,46 @@ describe('POST /tasks/:id/evidence', () => {
     expect(res.body.url).toContain('https://storage.test/');
     expect(JSON.stringify(res.body)).not.toContain('fileKey');
     expect(testStorage.objects.size).toBe(1);
+  });
+
+  it('keeps a photo sent twice under the same id only once', async () => {
+    const taskId = await startedTask();
+    const id = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b';
+    const send = () => uploadPhoto(worker, taskId).field('id', id);
+
+    const first = await send();
+    const again = await send();
+
+    expect(first.status).toBe(201);
+    expect(again.status).toBe(201);
+    expect(again.body.id).toBe(id);
+    const rows = await db.select().from(taskEvidence).where(eq(taskEvidence.taskId, taskId));
+    expect(rows).toHaveLength(1);
+  });
+
+  it('will not let another worker reuse a photo id, or overwrite its file', async () => {
+    const taskId = await startedTask();
+    const id = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4c';
+    await uploadPhoto(worker, taskId).field('id', id);
+    const before = [...testStorage.objects.values()];
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/assignment`)
+      .auth(manager.token, { type: 'bearer' })
+      .send({ workerId: otherWorker.id });
+    await forceStatus(taskId, 'IN_PROGRESS');
+    const res = await uploadPhoto(otherWorker, taskId, PNG, 'photo.png').field('id', id);
+
+    expect(res.status).toBe(400);
+    expect([...testStorage.objects.values()]).toEqual(before);
+  });
+
+  it('stores nothing for a photo the task will not take', async () => {
+    const taskId = await createTask();
+    const res = await uploadPhoto(worker, taskId);
+
+    expect(res.status).toBe(409);
+    expect(testStorage.objects.size).toBe(0);
   });
 
   it('accepts a PNG', async () => {

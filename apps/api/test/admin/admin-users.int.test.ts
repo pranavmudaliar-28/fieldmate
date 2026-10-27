@@ -1,7 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
-import { users } from '../../src/db/schema.js';
+import { devicePushTokens, users } from '../../src/db/schema.js';
+import { createAdminUserService } from '../../src/modules/admin/admin-user.service.js';
 import { createTestApp } from '../helpers/app.js';
 import {
   createActor,
@@ -264,6 +265,26 @@ describe('guardrails', () => {
     expect(['SELF_ACTION', 'LAST_ADMIN']).toContain(lastOne.body.error.code);
   });
 
+  it('keeps one admin when the last two deactivate each other at once', async () => {
+    const second = await createActor('ADMIN', { name: 'Second Admin' });
+
+    // Straight to the service: over HTTP the loser can fail at sign-in instead,
+    // and the test would pass without the lock it is here to check.
+    // Repeated because a single try often runs the two one after the other.
+    const service = createAdminUserService(db);
+    for (let round = 0; round < 20; round += 1) {
+      await db.update(users).set({ isActive: true }).where(eq(users.role, 'ADMIN'));
+      const results = await Promise.allSettled([
+        service.update(admin.id, second.id, { isActive: false }),
+        service.update(second.id, admin.id, { isActive: false }),
+      ]);
+
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+      const refused = results.find((result) => result.status === 'rejected');
+      expect((refused as PromiseRejectedResult).reason).toMatchObject({ code: 'LAST_ADMIN' });
+    }
+  });
+
   it('refuses to delete a user who appears in task history', async () => {
     await request(app)
       .post('/api/v1/tasks')
@@ -315,6 +336,23 @@ describe('passwords and sessions', () => {
       .post('/api/v1/auth/login')
       .send({ email: worker.email, password: 'BrandNewPassword9' });
     expect(newPassword.status).toBe(200);
+  });
+
+  it('stops pushes to the old devices when the password is reset', async () => {
+    await request(app)
+      .post('/api/v1/users/me/push-tokens')
+      .auth(worker.token, { type: 'bearer' })
+      .send({ token: 'ExponentPushToken[lost-phone]', platform: 'android' });
+
+    await asAdmin('post', `/api/v1/admin/users/${worker.id}/password`).send({
+      password: 'BrandNewPassword9',
+    });
+
+    const tokens = await db
+      .select()
+      .from(devicePushTokens)
+      .where(eq(devicePushTokens.userId, worker.id));
+    expect(tokens).toHaveLength(0);
   });
 
   it('rejects a weak password', async () => {

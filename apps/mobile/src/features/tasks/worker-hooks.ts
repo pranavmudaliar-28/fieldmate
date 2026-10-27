@@ -1,6 +1,7 @@
-import type { Note, TaskDetail, WorkerStep } from '@fieldmate/shared';
+import type { Note, TaskDetail, TaskStatus, WorkerStep } from '@fieldmate/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '../../services/http';
+import { uuid } from '../offline/id';
 import { useQueuedWrite } from '../offline/use-queued-write';
 import { taskKeys } from './hooks';
 
@@ -16,16 +17,16 @@ function advanceTask(taskId: string, step: WorkerStep): Promise<TaskDetail> {
   return apiRequest<TaskDetail>(`/tasks/${taskId}/${STEP_PATHS[step]}`, { method: 'POST' });
 }
 
-function stepBackTask(taskId: string): Promise<TaskDetail> {
-  return apiRequest<TaskDetail>(`/tasks/${taskId}/step-back`, { method: 'POST' });
+function stepBackTask(taskId: string, from?: TaskStatus): Promise<TaskDetail> {
+  return apiRequest<TaskDetail>(`/tasks/${taskId}/step-back`, { method: 'POST', body: { from } });
 }
 
 function rejectTask(taskId: string, reason: string): Promise<void> {
   return apiRequest<void>(`/tasks/${taskId}/reject`, { method: 'POST', body: { reason } });
 }
 
-function addNote(taskId: string, content: string): Promise<Note> {
-  return apiRequest<Note>(`/tasks/${taskId}/notes`, { method: 'POST', body: { content } });
+function addNote(taskId: string, id: string, content: string): Promise<Note> {
+  return apiRequest<Note>(`/tasks/${taskId}/notes`, { method: 'POST', body: { id, content } });
 }
 
 function updateNote(taskId: string, noteId: string, content: string): Promise<Note> {
@@ -62,7 +63,9 @@ export function useStepBack(taskId: string) {
   const queryClient = useQueryClient();
   const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: () => write({ action: { kind: 'stepBack' }, online: () => stepBackTask(taskId) }),
+    /** `from` is the status being undone, so a resent undo cannot undo a second step. */
+    mutationFn: (from?: TaskStatus) =>
+      write({ action: { kind: 'stepBack', from }, online: () => stepBackTask(taskId, from) }),
     onSuccess: (task) => {
       if (task) queryClient.setQueryData(taskKeys.detail(taskId), task);
       void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
@@ -88,8 +91,13 @@ export function useAddNote(taskId: string) {
   const queryClient = useQueryClient();
   const write = useQueuedWrite(taskId);
   return useMutation({
-    mutationFn: (content: string) =>
-      write({ action: { kind: 'note.add', content }, online: () => addNote(taskId, content) }),
+    mutationFn: (content: string) => {
+      const noteId = uuid();
+      return write({
+        action: { kind: 'note.add', noteId, content },
+        online: () => addNote(taskId, noteId, content),
+      });
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
     },

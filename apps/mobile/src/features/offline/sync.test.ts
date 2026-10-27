@@ -22,7 +22,7 @@ const entry = (taskId: string, action: QueuedAction): QueueEntry => ({
 
 const queueOf = (...entries: QueueEntry[]): QueueState => entries.reduce(enqueue, EMPTY_QUEUE);
 
-function portThat(behaviour: (entry: QueueEntry) => void | never) {
+function portThat(behaviour: (entry: QueueEntry) => void | never, initial = EMPTY_QUEUE) {
   const saved: QueueState[] = [];
   const sent: QueueEntry[] = [];
   const forgotten: string[] = [];
@@ -32,14 +32,14 @@ function portThat(behaviour: (entry: QueueEntry) => void | never) {
       sent.push(e);
     },
     forgetPhoto: (id) => forgotten.push(id),
-    save: async (state) => {
-      saved.push(state);
+    save: async (change) => {
+      saved.push(change(saved.at(-1) ?? initial));
     },
   };
   return { port, saved, sent, forgotten };
 }
 
-const accepts = () => portThat(() => undefined);
+const accepts = (initial?: QueueState) => portThat(() => undefined, initial);
 
 beforeEach(() => {
   counter = 0;
@@ -95,7 +95,7 @@ describe('replaying what was queued offline', () => {
       entry('t1', { kind: 'step', step: 'accept' }),
       entry('t1', { kind: 'note.add', content: 'Done' }),
     );
-    const { port, saved, sent } = accepts();
+    const { port, saved, sent } = accepts(state);
 
     const outcome = await replay(state, port);
 
@@ -196,6 +196,51 @@ describe('replaying what was queued offline', () => {
     expect(outcome.blocked.map((b) => b.taskId)).toEqual(['stale']);
   });
 
+  it('stops a task on a refusal it has no special wording for, such as a 413', async () => {
+    const state = queueOf(
+      entry('big', { kind: 'step', step: 'accept' }),
+      entry('fine', { kind: 'note.add', content: 'Done' }),
+    );
+    const { port, sent } = portThat((e) => {
+      if (e.taskId === 'big') throw new ApiError('INTERNAL_ERROR', 'Too large.', 413);
+    });
+
+    const outcome = await replay(state, port);
+
+    expect(outcome.blocked.map((b) => b.taskId)).toEqual(['big']);
+    expect(sent.map((e) => e.taskId)).toEqual(['fine']);
+  });
+
+  it.each([401, 408, 429, 503])('keeps everything queued on a %i', async (status) => {
+    const state = queueOf(entry('t1', { kind: 'step', step: 'accept' }));
+    const { port } = portThat(() => {
+      throw new ApiError('INTERNAL_ERROR', 'Try later.', status);
+    });
+
+    const outcome = await replay(state, port);
+
+    expect(outcome).toMatchObject({ blocked: [], interrupted: true });
+  });
+
+  it('keeps a write queued while it ran, rather than saving over it', async () => {
+    const state = queueOf(entry('t1', { kind: 'step', step: 'accept' }));
+    const late = entry('t2', { kind: 'note.add', content: 'Queued mid-sync' });
+    let stored = state;
+    const port: SyncPort = {
+      send: async () => {
+        stored = enqueue(stored, late);
+      },
+      forgetPhoto: () => undefined,
+      save: async (change) => {
+        stored = change(stored);
+      },
+    };
+
+    await replay(state, port);
+
+    expect(stored.entries).toEqual([late]);
+  });
+
   it('stops the whole run when the connection goes again', async () => {
     const state = queueOf(
       entry('t1', { kind: 'step', step: 'accept' }),
@@ -215,7 +260,7 @@ describe('replaying what was queued offline', () => {
     let state = queueOf(entry('t1', { kind: 'step', step: 'accept' }));
     const refusing = portThat(() => {
       throw new ApiError('INVALID_STATUS_TRANSITION', 'Already cancelled.', 409);
-    });
+    }, state);
     await replay(state, refusing.port);
     state = refusing.saved.at(-1)!;
     expect(blockFor(state, 't1')).toBeDefined();
@@ -231,7 +276,7 @@ describe('replaying what was queued offline', () => {
     const blocked = queueOf(entry('t1', { kind: 'step', step: 'accept' }));
     const refusing = portThat(() => {
       throw new ApiError('INVALID_STATUS_TRANSITION', 'Already cancelled.', 409);
-    });
+    }, blocked);
     await replay(blocked, refusing.port);
 
     const retried = unblock(refusing.saved.at(-1)!, 't1');
@@ -246,7 +291,7 @@ describe('replaying what was queued offline', () => {
       entry('t1', { kind: 'step', step: 'accept' }),
       entry('t1', { kind: 'step', step: 'depart' }),
     );
-    const { port, saved } = accepts();
+    const { port, saved } = accepts(state);
 
     await replay(state, port);
 
