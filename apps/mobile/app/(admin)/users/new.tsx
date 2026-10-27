@@ -9,7 +9,10 @@ import { UserForm } from '../../../src/features/admin/UserForm';
 import { useCreateUser } from '../../../src/features/admin/hooks';
 import { ApiError } from '../../../src/services/http';
 
-/** S-013 Add user. */
+/**
+ * S-013 Add user, by invitation. If the email fails the account is still made
+ * (pending), and sending again from this form resends the invitation.
+ */
 export default function AddUserScreen() {
   const router = useRouter();
   const { showToast } = useToast();
@@ -20,7 +23,7 @@ export default function AddUserScreen() {
     setError(null);
     createUser.mutate(values, {
       onSuccess: (user) => {
-        showToast(`${user.name} added`);
+        showToast(`Invitation sent to ${user.email}`);
         router.replace(`/(admin)/users/${user.id}`);
       },
       onError: (err) => {
@@ -31,7 +34,7 @@ export default function AddUserScreen() {
 
   return (
     <View style={styles.screen}>
-      <AppHeader title="New user" onBack={() => router.back()} backIcon="close" />
+      <AppHeader title="Invite user" onBack={() => router.back()} backIcon="close" />
       <UserForm
         mode="create"
         submitting={createUser.isPending}

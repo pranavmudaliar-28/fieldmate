@@ -5,11 +5,9 @@ import { ActionBar } from '../../../../src/components/ActionBar';
 import { AppHeader } from '../../../../src/components/AppHeader';
 import { Avatar } from '../../../../src/components/Avatar';
 import { Badge } from '../../../../src/components/Badge';
-import { BottomSheet } from '../../../../src/components/BottomSheet';
 import { Button } from '../../../../src/components/Button';
 import { ConfirmationDialog } from '../../../../src/components/ConfirmationDialog';
 import { Icon } from '../../../../src/components/Icon';
-import { Input } from '../../../../src/components/Input';
 import { EmptyState, ErrorState, LoadingState } from '../../../../src/components/States';
 import { useToast } from '../../../../src/components/Toast';
 import {
@@ -27,18 +25,16 @@ import { ActiveMark } from '../../../../src/features/admin/ActiveMark';
 import { ROLE_ICONS, ROLE_LABELS } from '../../../../src/features/admin/UserForm';
 import {
   useDeleteUser,
+  useResendInvite,
   useRevokeUserSessions,
-  useSetUserPassword,
+  useSendPasswordReset,
   useUpdateUser,
   useUser,
 } from '../../../../src/features/admin/hooks';
-import { generatePassword } from '../../../../src/features/admin/password';
 import { useAuth } from '../../../../src/features/auth/auth-context';
 import { ApiError } from '../../../../src/services/http';
 
-type Pending = 'deactivate' | 'activate' | 'revoke' | 'delete' | 'cantDelete' | null;
-
-const MIN_PASSWORD = 8;
+type Pending = 'deactivate' | 'activate' | 'revoke' | 'delete' | 'cantDelete' | 'email' | null;
 
 /** "12 March 2026": the day an account was made, not the minute. */
 function longDate(iso: string): string {
@@ -56,14 +52,12 @@ export default function UserDetailsScreen() {
 
   const user = useUser(userId);
   const updateUser = useUpdateUser(userId);
-  const setPassword = useSetUserPassword(userId);
+  const sendReset = useSendPasswordReset(userId);
+  const resendInvite = useResendInvite(userId);
   const revokeSessions = useRevokeUserSessions(userId);
   const deleteUser = useDeleteUser(userId);
 
   const [pending, setPending] = useState<Pending>(null);
-  const [passwordOpen, setPasswordOpen] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const fail = (actionError: unknown) => {
@@ -112,13 +106,14 @@ export default function UserDetailsScreen() {
   const managed = user.data;
   const first = managed.name.split(' ')[0] ?? managed.name;
   const isSelf = managed.id === signedInUser?.id;
+  const invited = managed.status === 'INVITED';
+  // A pending invitee has no password yet, so "reset" means sending the invite again.
+  const emailAction = invited ? resendInvite : sendReset;
   const busy =
     updateUser.isPending ||
-    setPassword.isPending ||
+    emailAction.isPending ||
     revokeSessions.isPending ||
     deleteUser.isPending;
-  const passwordLongEnough = newPassword.trim().length >= MIN_PASSWORD;
-  const passwordsMatch = newPassword.trim() === confirmPassword.trim();
 
   const setActive = (isActive: boolean) =>
     updateUser.mutate(
@@ -132,12 +127,6 @@ export default function UserDetailsScreen() {
         onError: fail,
       },
     );
-
-  const closePassword = () => {
-    setPasswordOpen(false);
-    setNewPassword('');
-    setConfirmPassword('');
-  };
 
   return (
     <View style={styles.screen}>
@@ -168,6 +157,14 @@ export default function UserDetailsScreen() {
             <View style={styles.tags}>
               <Badge label={ROLE_LABELS[managed.role]} icon={ROLE_ICONS[managed.role]} />
               <ActiveMark active={managed.isActive} testID="user-status" />
+              {invited ? (
+                <Badge
+                  label="Invited"
+                  icon="mail-unread-outline"
+                  tone="info"
+                  testID="user-invited"
+                />
+              ) : null}
             </View>
           </View>
         </View>
@@ -214,12 +211,16 @@ export default function UserDetailsScreen() {
           {managed.isActive ? (
             <>
               <ActionRow
-                icon="lock-closed-outline"
-                label="Set password"
-                testID="open-set-password"
+                icon={invited ? 'mail-unread-outline' : 'lock-closed-outline'}
+                label={invited ? 'Resend invitation' : 'Send password reset'}
+                detail={
+                  invited
+                    ? `${first} hasn’t set up their account yet`
+                    : `Emails ${first} a code to choose a new password`
+                }
+                testID="email-user"
                 disabled={busy}
-                onPress={() => setPasswordOpen(true)}
-                chevron
+                onPress={() => setPending('email')}
               />
               <ActionRow
                 icon="log-out-outline"
@@ -292,95 +293,29 @@ export default function UserDetailsScreen() {
         )}
       </ActionBar>
 
-      <BottomSheet
-        visible={passwordOpen}
-        title="Set password"
-        onClose={closePassword}
-        testID="set-password-sheet"
-      >
-        <View style={styles.sheetContent}>
-          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetLead}>
-            For {managed.name} · {managed.email}
-          </Text>
-          <Input
-            label="New password"
-            testID="new-password"
-            value={newPassword}
-            onChangeText={setNewPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.password}
-            editable={!setPassword.isPending}
-            accessory={
-              <Button
-                label="Generate"
-                variant="tonal"
-                size="md"
-                fullWidth={false}
-                testID="generate-password"
-                onPress={() => {
-                  const generated = generatePassword();
-                  setNewPassword(generated);
-                  setConfirmPassword(generated);
-                }}
-              />
-            }
-          />
-          <View style={styles.check}>
-            <Icon
-              name={passwordLongEnough ? 'checkmark' : 'ellipse-outline'}
-              size={16}
-              color={passwordLongEnough ? toneColors.success.text : colors.textSecondary}
-            />
-            <Text
-              maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
-              style={[styles.checkText, passwordLongEnough && styles.checkTextOk]}
-            >
-              At least {MIN_PASSWORD} characters
-            </Text>
-          </View>
-          <Input
-            label="Confirm password"
-            testID="confirm-password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.password}
-            editable={!setPassword.isPending}
-            {...(confirmPassword && !passwordsMatch ? { error: 'The passwords don’t match.' } : {})}
-          />
-          <View style={styles.info}>
-            <Icon name="information-circle-outline" size={20} color={colors.textPrimary} />
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.infoText}>
-              {first} is signed out on all devices.
-            </Text>
-          </View>
-          <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.sheetHint}>
-            Share the new password with {first} in person or by phone.
-          </Text>
-          <Button
-            label="Save password"
-            testID="set-password"
-            loading={setPassword.isPending}
-            disabled={!passwordLongEnough || !passwordsMatch}
-            disabledReason="Passwords must be at least 8 characters and match."
-            onPress={() =>
-              setPassword.mutate(newPassword.trim(), {
-                onSuccess: () => {
-                  closePassword();
-                  setError(null);
-                  showToast(`Password updated. ${first} is signed out.`);
-                },
-                onError: (passwordError) => {
-                  closePassword();
-                  fail(passwordError);
-                },
-              })
-            }
-          />
-        </View>
-      </BottomSheet>
+      <ConfirmationDialog
+        visible={pending === 'email'}
+        title={invited ? `Resend ${first}’s invitation?` : `Email ${first} a reset code?`}
+        message={
+          invited
+            ? `A new code goes to ${managed.email}. The one sent before stops working.`
+            : `A code goes to ${managed.email}. ${first} keeps their current password until they choose a new one, which signs them out on every device.`
+        }
+        confirmLabel={invited ? 'Resend invitation' : 'Send reset code'}
+        icon="mail-outline"
+        loading={emailAction.isPending}
+        onConfirm={() =>
+          emailAction.mutate(undefined, {
+            onSuccess: () => {
+              setPending(null);
+              setError(null);
+              showToast(`Email sent to ${managed.email}`);
+            },
+            onError: fail,
+          })
+        }
+        onCancel={() => setPending(null)}
+      />
 
       <ConfirmationDialog
         visible={pending === 'revoke'}
@@ -603,27 +538,4 @@ const styles = StyleSheet.create({
   actionText: { flex: 1, gap: 2 },
   actionLabel: { ...typography.bodyStrong, fontSize: 17 },
   actionDetail: { ...typography.secondary, color: colors.textSecondary },
-  sheetContent: { gap: spacing.md, paddingBottom: spacing.md },
-  sheetLead: { ...typography.secondary, color: colors.textSecondary },
-  password: { fontFamily: typography.mono.fontFamily, fontSize: 17 },
-  check: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2,
-    marginTop: -spacing.sm,
-  },
-  checkText: { ...typography.secondaryStrong, color: colors.textSecondary },
-  checkTextOk: { color: toneColors.success.text },
-  info: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radius.action,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  infoText: { ...typography.bodyStrong, color: colors.textPrimary, flex: 1 },
-  sheetHint: { ...typography.secondary, color: colors.textSecondary },
 });

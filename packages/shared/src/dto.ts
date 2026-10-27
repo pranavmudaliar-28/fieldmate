@@ -17,6 +17,8 @@ export type ManagedUser = User & {
   updatedAt: string;
   /** False when the account can be deleted outright; true means deactivate instead. */
   hasHistory: boolean;
+  /** INVITED until the user sets their own password from the emailed code. */
+  status: 'ACTIVE' | 'INVITED';
 };
 
 export type LoginResponse = { token: string; user: User };

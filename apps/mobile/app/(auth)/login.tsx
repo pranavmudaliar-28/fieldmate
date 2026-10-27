@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginInput } from '@fieldmate/shared';
-import { Redirect } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
@@ -57,12 +57,14 @@ export default function LoginScreen() {
   const { signIn, status, user, sessionExpired, clearSessionExpired } = useAuth();
   const isOnline = useIsOnline();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const passwordRef = useRef<TextInput>(null);
   const [formError, setFormError] = useState<Notice | null>(null);
 
   const {
     control,
     handleSubmit,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -85,6 +87,13 @@ export default function LoginScreen() {
   });
 
   const notice = formError ?? (sessionExpired ? SESSION_EXPIRED : null);
+
+  // The email typed so far comes along, so it is not typed twice.
+  const openSetPassword = (mode: 'reset' | 'invite') =>
+    router.push({
+      pathname: '/(auth)/set-password',
+      params: { mode, email: getValues('email').trim() },
+    });
 
   return (
     <KeyboardAvoidingView
@@ -212,6 +221,16 @@ export default function LoginScreen() {
               )}
             />
 
+            <Button
+              label="Forgot password?"
+              variant="ghost"
+              size="md"
+              fullWidth={false}
+              testID="forgot-password"
+              onPress={() => openSetPassword('reset')}
+              style={styles.forgot}
+            />
+
             {!isOnline ? (
               <View style={styles.hintRow}>
                 <Icon name="cloud-offline-outline" size={18} color={colors.errorText} />
@@ -219,17 +238,23 @@ export default function LoginScreen() {
                   {OFFLINE_HINT}
                 </Text>
               </View>
-            ) : notice ? null : (
-              <View style={styles.hintRow}>
-                <Icon name="information-circle-outline" size={18} color={colors.textSecondary} />
-                <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.hint}>
-                  Accounts are created by your admin. Ask them if you can’t sign in.
-                </Text>
-              </View>
-            )}
+            ) : null}
           </View>
 
           <View style={styles.footer}>
+            <View style={styles.inviteRow}>
+              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.hint}>
+                Got an invitation email?
+              </Text>
+              <Button
+                label="Set up your account"
+                variant="ghost"
+                size="md"
+                fullWidth={false}
+                testID="set-up-account"
+                onPress={() => openSetPassword('invite')}
+              />
+            </View>
             <Button
               label={formError ? 'Try again' : 'Sign in'}
               testID="login-submit"
@@ -252,7 +277,7 @@ function noticeFor(error: unknown): Notice {
     if (error.code === 'INVALID_CREDENTIALS') {
       return {
         title: 'Email or password is incorrect',
-        body: 'Check both and try again. Ask your admin if you’ve forgotten your password.',
+        body: 'Check both and try again, or use “Forgot password?” to choose a new one.',
         wrongCredentials: true,
         tone: 'error',
         icon: 'alert-circle-outline',
@@ -308,7 +333,16 @@ const styles = StyleSheet.create({
    * stops well short of the column on a wide window.
    */
   form: { width: '100%', maxWidth: layout.maxFormWidth, alignSelf: 'center', gap: spacing.mdPlus },
-  footer: { width: '100%', maxWidth: layout.maxFormWidth, alignSelf: 'center' },
+  footer: { width: '100%', maxWidth: layout.maxFormWidth, alignSelf: 'center', gap: spacing.sm },
+  /** Right under the password field, where someone stuck on it looks. */
+  forgot: { alignSelf: 'flex-end', marginTop: -spacing.sm },
+  inviteRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: spacing.xs,
+  },
   title: {
     ...typography.sectionTitle,
     fontFamily: typography.display.fontFamily,

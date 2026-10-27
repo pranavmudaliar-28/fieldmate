@@ -1,16 +1,17 @@
+import { randomBytes } from 'node:crypto';
 import type {
-  CreateUserInput,
+  InviteUserInput,
   ListManagedUsersQuery,
   ManagedUser,
   Paginated,
   Role,
-  SetPasswordInput,
   UpdateUserInput,
 } from '@fieldmate/shared';
 import { AppError } from '../../utils/app-error.js';
 import { hashPassword } from '../../utils/password.js';
 import { createAuthRepository } from '../auth/auth.repository.js';
-import type { Database } from '../../db/client.js';
+import type { AuthDeps } from '../auth/auth.service.js';
+import { createUserCodeService } from '../auth/user-code.service.js';
 import type { TaskWriter } from '../tasks/task.repository.js';
 import {
   createAdminUserRepository,
@@ -38,9 +39,14 @@ function decodeUserCursor(value: string): UserCursor {
 
 const userNotFound = () => new AppError('USER_NOT_FOUND', 'User was not found.');
 
-export function createAdminUserService(db: Database) {
+/** Who is inviting: managers may only bring in field workers. */
+export type Inviter = { id: string; role: Role };
+
+export function createAdminUserService(deps: AuthDeps) {
+  const { db } = deps;
   const repository = createAdminUserRepository(db);
   const auth = createAuthRepository(db);
+  const codes = createUserCodeService(deps);
 
   function toManagedUser(row: ManagedUserRow, hasHistory: boolean): ManagedUser {
     return {
@@ -52,7 +58,15 @@ export function createAdminUserService(db: Database) {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
       hasHistory,
+      status: row.passwordSetAt ? 'ACTIVE' : 'INVITED',
     };
+  }
+
+  /** An inactive account cannot finish signing up or reset, so emailing it would only confuse. */
+  function assertCanEmail(user: ManagedUserRow): void {
+    if (!user.isActive) {
+      throw new AppError('VALIDATION_ERROR', 'Reactivate this user before emailing them.');
+    }
   }
 
   async function load(userId: string): Promise<ManagedUserRow> {
@@ -75,7 +89,7 @@ export function createAdminUserService(db: Database) {
     }
   }
 
-  async function assertEmailFree(email: string, exceptUserId?: string): Promise<void> {
+  async function assertEmailFree(email: string, exceptUserId: string): Promise<void> {
     const existing = await repository.findByEmail(email);
     if (existing && existing.id !== exceptUserId) {
       throw new AppError('EMAIL_TAKEN', 'Another account already uses that email address.');
@@ -103,17 +117,55 @@ export function createAdminUserService(db: Database) {
       return toManagedUser(user, await repository.hasHistory(user.id));
     },
 
-    async create(input: CreateUserInput): Promise<ManagedUser> {
+    /**
+     * Creates the account as a pending invitation and emails the code the user
+     * signs up with. Inviting an address that is still pending, for the same
+     * role, sends a fresh code instead of failing. If the email cannot be sent
+     * the account stays pending and the error says so; "Resend" retries.
+     */
+    async invite(inviter: Inviter, input: InviteUserInput): Promise<ManagedUser> {
+      const role: Role = input.role ?? 'FIELD_WORKER';
+      if (inviter.role !== 'ADMIN' && role !== 'FIELD_WORKER') {
+        throw new AppError('FORBIDDEN', 'Managers can only invite field workers.');
+      }
+
       const email = input.email.trim().toLowerCase();
-      await assertEmailFree(email);
+      const existing = await repository.findByEmail(email);
+      if (existing) {
+        if (existing.passwordSetAt || existing.role !== role || !existing.isActive) {
+          throw new AppError('EMAIL_TAKEN', 'Another account already uses that email address.');
+        }
+        await codes.sendInvite(existing);
+        return toManagedUser(existing, false);
+      }
 
       const user = await repository.create({
         name: input.name.trim(),
         email,
-        role: input.role as Role,
-        passwordHash: await hashPassword(input.password),
+        role,
+        // Never told to anyone: the account cannot be signed into until the
+        // invitee sets their own password from the emailed code.
+        passwordHash: await hashPassword(randomBytes(32).toString('base64url')),
       });
+      await codes.sendInvite(user);
       return toManagedUser(user, false);
+    },
+
+    async resendInvite(userId: string): Promise<void> {
+      const user = await load(userId);
+      if (user.passwordSetAt) {
+        throw new AppError('ALREADY_ACTIVE', 'This user has already set up their account.');
+      }
+      assertCanEmail(user);
+      await codes.sendInvite(user);
+    },
+
+    /** The admin never sees or chooses the password; the user picks it from the code. */
+    async sendPasswordReset(userId: string): Promise<void> {
+      const user = await load(userId);
+      assertCanEmail(user);
+      if (user.passwordSetAt) await codes.sendPasswordReset(user);
+      else await codes.sendInvite(user);
     },
 
     async update(actorId: string, userId: string, input: UpdateUserInput): Promise<ManagedUser> {
@@ -153,13 +205,6 @@ export function createAdminUserService(db: Database) {
       }
 
       return toManagedUser(updated, await repository.hasHistory(userId));
-    },
-
-    async setPassword(userId: string, input: SetPasswordInput): Promise<void> {
-      await load(userId);
-      await repository.setPassword(userId, await hashPassword(input.password));
-      // Also drops the push tokens, so a lost phone stops showing task details.
-      await auth.revokeSessions(userId);
     },
 
     async revokeSessions(userId: string): Promise<void> {

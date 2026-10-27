@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createUserSchema, type CreateUserInput, type Role } from '@fieldmate/shared';
-import { Controller, useForm, type Resolver } from 'react-hook-form';
-import { z } from 'zod';
+import { Controller, useForm } from 'react-hook-form';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ActionBar } from '../../components/ActionBar';
 import { Button } from '../../components/Button';
@@ -18,7 +17,6 @@ import {
   typography,
   type IconName,
 } from '../../constants/theme';
-import { generatePassword } from './password';
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Admin',
@@ -48,36 +46,34 @@ export type UserFormProps = {
   defaultValues?: Partial<UserFormValues>;
   submitting?: boolean;
   submitError?: string | null;
+  /** Managers invite field workers only, so they get no role choice. */
+  roleChoice?: boolean;
   onSubmit: (values: UserFormValues) => void;
 };
 
-/** S-013 Add / edit user. In edit mode the password has its own action. */
+/**
+ * S-013 Add / edit user. Nobody types a password for someone else: a new user
+ * is emailed an invitation code and chooses their own.
+ */
 export function UserForm({
   mode,
   defaultValues,
   submitting = false,
   submitError = null,
+  roleChoice = true,
   onSubmit,
 }: UserFormProps) {
-  // In edit mode the password has its own action, so it is not validated here.
-  const schema =
-    mode === 'create'
-      ? createUserSchema
-      : createUserSchema.extend({ password: z.string().optional() });
-
   const {
     control,
     handleSubmit,
-    setValue,
     watch,
     formState: { errors, isDirty },
   } = useForm<UserFormValues>({
-    resolver: zodResolver(schema) as Resolver<UserFormValues>,
+    resolver: zodResolver(createUserSchema),
     defaultValues: {
       name: defaultValues?.name ?? '',
       email: defaultValues?.email ?? '',
       role: defaultValues?.role ?? 'FIELD_WORKER',
-      password: '',
     },
     mode: 'onSubmit',
   });
@@ -126,78 +122,44 @@ export function UserForm({
           )}
         />
 
-        <Controller
-          control={control}
-          name="role"
-          render={({ field: { onChange, value } }) => (
-            <View style={styles.field}>
-              <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
-                Role
-              </Text>
-              <ChoiceList
-                choices={ROLE_ORDER.map((role) => ({
-                  value: role,
-                  label: ROLE_LABELS[role],
-                  description: ROLE_DESCRIPTIONS[role],
-                  testID: `role-${role}`,
-                }))}
-                selected={value}
-                onSelect={onChange}
-                disabled={submitting}
-                accessibilityLabel="Role"
-              />
-            </View>
-          )}
-        />
-
-        {mode === 'create' ? (
+        {roleChoice ? (
           <Controller
             control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                label="Temporary password"
-                required
-                testID="user-password"
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                {...(errors.password?.message
-                  ? { error: errors.password.message }
-                  : {
-                      helper: `Share it with ${firstName} in person. They can sign in with it straight away.`,
-                    })}
-                // Shown in full: the admin reads it out, so hiding it only invites typos.
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.password}
-                editable={!submitting}
-                accessory={
-                  <Button
-                    label="Generate"
-                    variant="tonal"
-                    size="md"
-                    fullWidth={false}
-                    testID="generate-password"
-                    onPress={() =>
-                      setValue('password', generatePassword(), {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                  />
-                }
-              />
+            name="role"
+            render={({ field: { onChange, value } }) => (
+              <View style={styles.field}>
+                <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.label}>
+                  Role
+                </Text>
+                <ChoiceList
+                  choices={ROLE_ORDER.map((role) => ({
+                    value: role,
+                    label: ROLE_LABELS[role],
+                    description: ROLE_DESCRIPTIONS[role],
+                    testID: `role-${role}`,
+                  }))}
+                  selected={value}
+                  onSelect={onChange}
+                  disabled={submitting}
+                  accessibilityLabel="Role"
+                />
+              </View>
             )}
           />
-        ) : (
-          <View style={styles.note}>
-            <Icon name="information-circle-outline" size={18} color={colors.textSecondary} />
-            <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.noteText}>
-              To change the password, use Set password on the user’s details.
-            </Text>
-          </View>
-        )}
+        ) : null}
+
+        <View style={styles.note}>
+          <Icon name="information-circle-outline" size={18} color={colors.textSecondary} />
+          <Text
+            maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}
+            style={styles.noteText}
+            testID="user-form-note"
+          >
+            {mode === 'create'
+              ? `We’ll email ${firstName} a code. They tap “Set up your account” on the sign-in screen and choose their own password.`
+              : 'To reset the password, use Send password reset on the user’s details.'}
+          </Text>
+        </View>
 
         {submitError ? (
           <View style={styles.errorBox} accessibilityRole="alert">
@@ -215,7 +177,7 @@ export function UserForm({
 
       <ActionBar>
         <Button
-          label={mode === 'create' ? 'Create user' : 'Save changes'}
+          label={mode === 'create' ? 'Send invitation' : 'Save changes'}
           testID="user-submit"
           onPress={() => void submit()}
           loading={submitting}
@@ -234,7 +196,6 @@ const styles = StyleSheet.create({
   content: { padding: layout.screenPadding, paddingTop: spacing.xs, gap: spacing.mdPlus },
   field: { gap: spacing.sm },
   label: { ...typography.secondaryStrong, color: colors.textPrimary },
-  password: { fontFamily: typography.mono.fontFamily, fontSize: 17 },
   note: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   noteText: { ...typography.secondary, color: colors.textSecondary, flex: 1 },
   errorBox: {

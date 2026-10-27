@@ -61,8 +61,8 @@ A third role, **ADMIN**, that runs the system.
 ### What an admin can do [D]
 | Area | Allowed |
 |---|---|
-| Users | Create (any role), edit name/email/role, deactivate and reactivate, delete permanently |
-| Passwords | Set a new password for any user (typed by the admin) |
+| Users | Invite (any role), edit name/email/role, deactivate and reactivate, delete permanently |
+| Passwords | Email a user a reset code; the user chooses the new password (see §7) |
 | Sessions | Force sign-out on all of a user's devices |
 | Tasks | Everything a manager can do — create, assign, edit, reassign, cancel, reopen, complete — plus see every task |
 
@@ -89,8 +89,8 @@ Admins land on a **Users** screen and can switch to the manager task screens.
 | ID | Screen | Contents |
 |---|---|---|
 | S-011 | Users | Search and list of all users: name, email, role, active/inactive. "Add user" button. |
-| S-012 | User details | One user's details and the actions: edit, reset password, force sign-out, deactivate/reactivate, delete. |
-| S-013 | Add / edit user | Name, email, role; password on creation. |
+| S-012 | User details | One user's details and the actions: edit, send password reset (or resend invitation), force sign-out, deactivate/reactivate, delete. |
+| S-013 | Add / edit user | Name, email, role. Adding sends an invitation; no password is typed. |
 
 Admins also see the existing manager screens (S-002…S-005), so their dashboard offers both "Users" and "Tasks".
 
@@ -111,10 +111,11 @@ Migration is additive, so existing rows are untouched: everyone stays active, an
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/v1/admin/users` | List and search users (paged) |
-| POST | `/api/v1/admin/users` | Create a user |
+| POST | `/api/v1/admin/users` | Invite a user (§7) |
 | GET | `/api/v1/admin/users/:userId` | One user |
 | PATCH | `/api/v1/admin/users/:userId` | Edit name, email, role, active |
-| POST | `/api/v1/admin/users/:userId/password` | Set a new password |
+| POST | `/api/v1/admin/users/:userId/invite` | Resend a pending invitation |
+| POST | `/api/v1/admin/users/:userId/password-reset` | Email the user a reset code |
 | POST | `/api/v1/admin/users/:userId/sessions/revoke` | Force sign-out |
 | DELETE | `/api/v1/admin/users/:userId` | Delete, when the user has no history |
 
@@ -147,7 +148,7 @@ Each step ends with a report, as in the earlier phases. No step needs an account
 
 ## 5. What this does not include
 
-Unless you ask for them: audit logs of admin actions, self-service password reset by email, user import/export, teams or regions, per-user permissions beyond the three roles, and admin control of tasks beyond what a manager can already do.
+Unless you ask for them: audit logs of admin actions, user import/export, teams or regions, per-user permissions beyond the three roles, and admin control of tasks beyond what a manager can already do.
 
 ---
 
@@ -159,3 +160,44 @@ Unless you ask for them: audit logs of admin actions, self-service password rese
 | Q2 | Should a deactivated user's name still appear on their old tasks and photos? | Yes — removing it would rewrite history. Built that way. |
 | Q3 | For the Google keys: will you create the Google Cloud project, or should I write step-by-step instructions for it? | Neither: you asked for a free option, so the app uses Photon + OpenStreetMap. Google instructions remain in docs/08 if you ever switch. |
 | Q4 | What should happen when address search is unavailable? | Type the address by hand, as food-delivery apps allow, with a separate field for flat/floor/gate. Built that way. |
+
+---
+
+## 7. Invitations, password resets and the user's own account
+
+Nobody types a password for someone else. Every password is chosen by its owner, from a 6-digit code sent to their email.
+
+### Who does what [D]
+| Who | Can |
+|---|---|
+| Admin | Invite any role (S-013); resend a pending invitation or email a reset code (S-012) |
+| Manager | Invite **field workers only**, from Profile → "Invite a field worker" |
+| Anyone signed in | Change their own name, email (confirmed by a code to the new address) and password (current password required) from Profile |
+| Anyone signed out | "Forgot password?" and "Set up your account" on the sign-in screen |
+
+### How the codes work [D]
+- **One mechanism, three uses:** invitation (valid 7 days), password reset (30 minutes), email change (30 minutes). Codes are stored in `user_codes`, one per user and purpose; a new code replaces the old one, so only the latest email works.
+- **Stored safely:** only an HMAC of the code (keyed with `AUTH_SECRET`) is kept. The fifth wrong guess burns the code, and the endpoints share login's rate limit (10 tries per 15 minutes per IP + email).
+- **Single use:** a code is deleted the moment it is used. Setting a password ends every other session (the existing revocation) and signs the user in on this device.
+- **Nothing leaks:** "Forgot password?" answers the same whether or not the email has an account, and a wrong, expired or used code all give the same message.
+
+### Pending invitations [D]
+- An invited user exists with `users.password_set_at` NULL and an unguessable random hash. Sign-in refuses them with the usual "Incorrect email or password" until they set a password.
+- The Users list and details mark them **Invited**. Inviting the same address again, or "Forgot password?" from the invitee, sends a fresh invitation code.
+- If the email cannot be sent, the account still exists (pending) and the admin sees the error; "Resend invitation" retries.
+
+### Email [D]
+Sent through **Brevo**'s transactional API (free tier: one verified sender address, no domain needed). Configured with `BREVO_API_KEY` and `MAIL_FROM_EMAIL` (`MAIL_FROM_NAME` defaults to "FieldMate"). Staging and production refuse to start without them; in development, with no key, each email is written to the API log instead so a local invite can still be finished.
+
+### API
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| POST | `/api/v1/auth/password/forgot` | public | Email a reset code (always `204`) |
+| POST | `/api/v1/auth/password/set` | public | `{email, code, password}` → signed in |
+| PATCH | `/api/v1/users/me` | signed in | Change own name |
+| POST | `/api/v1/users/me/password` | signed in | `{currentPassword, newPassword}` → fresh token |
+| POST | `/api/v1/users/me/email` | signed in | `{newEmail, currentPassword}` → code to the new address |
+| POST | `/api/v1/users/me/email/confirm` | signed in | `{code}` → email changed |
+| POST | `/api/v1/users/invitations` | admin, manager | Invite (managers: field workers only) |
+
+`POST /api/v1/admin/users/:userId/password` (admin types a password) is removed.

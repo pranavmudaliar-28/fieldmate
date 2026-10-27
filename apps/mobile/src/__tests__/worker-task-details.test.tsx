@@ -101,6 +101,8 @@ beforeEach(() => {
     retryBootstrap: jest.fn(),
     sessionExpired: false,
     clearSessionExpired: jest.fn(),
+    completeSignIn: jest.fn(),
+    updateUser: jest.fn(),
   });
   mockApiRequest.mockResolvedValue(undefined as never);
 });

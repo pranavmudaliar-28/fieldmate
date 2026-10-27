@@ -10,6 +10,7 @@ export type ManagedUserRow = {
   email: string;
   role: Role;
   isActive: boolean;
+  passwordSetAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -22,6 +23,7 @@ const columns = {
   email: users.email,
   role: users.role,
   isActive: users.isActive,
+  passwordSetAt: users.passwordSetAt,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 };
@@ -54,15 +56,12 @@ export function createAdminUserRepository(db: Database) {
       return user;
     },
 
-    async findByEmail(email: string): Promise<{ id: string } | undefined> {
-      const [user] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+    async findByEmail(email: string): Promise<ManagedUserRow | undefined> {
+      const [user] = await db.select(columns).from(users).where(eq(users.email, email)).limit(1);
       return user;
     },
 
+    /** `password_set_at` stays null: the user is invited, not yet signed up. */
     async create(input: {
       name: string;
       email: string;
@@ -85,18 +84,6 @@ export function createAdminUserRepository(db: Database) {
         .where(eq(users.id, userId))
         .returning(columns);
       return user;
-    },
-
-    /** Also ends every session, so a new password or a lockout takes effect at once. */
-    async setPassword(userId: string, passwordHash: string): Promise<void> {
-      await db
-        .update(users)
-        .set({
-          passwordHash,
-          tokenVersion: sql`${users.tokenVersion} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
     },
 
     async delete(userId: string, tx: TaskWriter = db): Promise<void> {

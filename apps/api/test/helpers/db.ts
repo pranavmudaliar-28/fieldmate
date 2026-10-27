@@ -98,6 +98,7 @@ export async function insertUser(overrides: Partial<NewUserRow> = {}) {
       name: 'Test User',
       email: uniqueEmail(),
       passwordHash: 'not-a-real-hash',
+      passwordSetAt: new Date(),
       role: 'FIELD_WORKER',
       ...overrides,
     })

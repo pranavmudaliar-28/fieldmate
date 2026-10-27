@@ -1,7 +1,8 @@
 import type { Role } from '@fieldmate/shared';
 import Constants from 'expo-constants';
+import { useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AppHeader } from '../../components/AppHeader';
 import { Avatar } from '../../components/Avatar';
 import { Badge } from '../../components/Badge';
@@ -100,6 +101,41 @@ export function ProfileScreen() {
           </View>
         ) : null}
 
+        <View style={styles.details}>
+          <LinkRow
+            icon="person-outline"
+            label="Edit name"
+            href="/account/name"
+            testID="account-edit-name"
+          />
+          <View style={styles.divider} />
+          <LinkRow
+            icon="mail-outline"
+            label="Change email"
+            href="/account/email"
+            testID="account-edit-email"
+          />
+          <View style={styles.divider} />
+          <LinkRow
+            icon="lock-closed-outline"
+            label="Change password"
+            href="/account/password"
+            testID="account-edit-password"
+          />
+        </View>
+
+        {/* Managers bring in their own field workers; admins do it from Users. */}
+        {user?.role === 'MANAGER' ? (
+          <View style={styles.details}>
+            <LinkRow
+              icon="person-add-outline"
+              label="Invite a field worker"
+              href="/(manager)/invite"
+              testID="invite-worker"
+            />
+          </View>
+        ) : null}
+
         {user ? <NotificationPrompt role={user.role} /> : null}
 
         <Button
@@ -129,6 +165,35 @@ export function ProfileScreen() {
         onCancel={() => setConfirming(false)}
       />
     </View>
+  );
+}
+
+function LinkRow({
+  icon,
+  label,
+  href,
+  testID,
+}: {
+  icon: IconName;
+  label: string;
+  href: Href;
+  testID: string;
+}) {
+  const router = useRouter();
+  return (
+    <Pressable
+      onPress={() => router.push(href)}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      testID={testID}
+      style={({ pressed }) => [styles.linkRow, pressed && styles.linkRowPressed]}
+    >
+      <Icon name={icon} size={22} color={colors.textPrimary} />
+      <Text maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER} style={styles.linkLabel}>
+        {label}
+      </Text>
+      <Icon name="chevron-forward" size={20} color={colors.textSecondary} />
+    </Pressable>
   );
 }
 
@@ -178,5 +243,14 @@ const styles = StyleSheet.create({
   detailText: { flex: 1, gap: 2 },
   detailLabel: { ...typography.secondary, color: colors.textSecondary },
   detailValue: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.smPlus,
+    minHeight: 56,
+    paddingVertical: spacing.smPlus,
+  },
+  linkRowPressed: { opacity: 0.6 },
+  linkLabel: { ...typography.bodyStrong, fontSize: 17, color: colors.textPrimary, flex: 1 },
   version: { ...typography.mono, color: colors.textSecondary, textAlign: 'center' },
 });

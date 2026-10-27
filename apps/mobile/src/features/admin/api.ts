@@ -42,11 +42,18 @@ export function updateUser(userId: string, input: UpdateUserInput): Promise<Mana
   return apiRequest<ManagedUser>(`/admin/users/${userId}`, { method: 'PATCH', body: input });
 }
 
-export function setUserPassword(userId: string, password: string): Promise<void> {
-  return apiRequest<void>(`/admin/users/${userId}/password`, {
-    method: 'POST',
-    body: { password },
-  });
+/** Emails a code; the user picks their own password with it. */
+export function sendPasswordReset(userId: string): Promise<void> {
+  return apiRequest<void>(`/admin/users/${userId}/password-reset`, { method: 'POST' });
+}
+
+export function resendInvite(userId: string): Promise<void> {
+  return apiRequest<void>(`/admin/users/${userId}/invite`, { method: 'POST' });
+}
+
+/** Managers invite field workers; the role is fixed by the API. */
+export function inviteWorker(input: { name: string; email: string }): Promise<ManagedUser> {
+  return apiRequest<ManagedUser>('/users/invitations', { method: 'POST', body: input });
 }
 
 export function revokeUserSessions(userId: string): Promise<void> {

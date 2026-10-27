@@ -205,6 +205,9 @@ function UserRow({
         <View style={styles.tags}>
           <Badge label={ROLE_LABELS[user.role]} icon={ROLE_ICONS[user.role]} />
           <ActiveMark active={user.isActive} />
+          {user.status === 'INVITED' ? (
+            <Badge label="Invited" icon="mail-unread-outline" tone="info" />
+          ) : null}
         </View>
       </View>
       <Icon name="chevron-forward" size={20} color={colors.textSecondary} />

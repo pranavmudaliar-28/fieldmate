@@ -9,6 +9,7 @@ tier that needs no card.
 | API (Docker) | Render — free web service | 750 h/month, sleeps after 15 min idle |
 | Database | Neon — Postgres | 0.5 GB, does not expire |
 | Photo storage | Backblaze B2 — S3-compatible | 10 GB |
+| Email (invites, resets) | Brevo — transactional API | 300 emails/day |
 | Keep-awake | UptimeRobot | checks every 5 min |
 | APK | Local Gradle build (or EAS free tier) | — |
 
@@ -23,6 +24,8 @@ B2_REGION         = <region>            e.g. us-east-005
 B2_KEY_ID         = ...
 B2_APP_KEY        = ...                 shown once only
 AUTH_SECRET       = ...
+BREVO_API_KEY     = xkeysib-...         shown once only
+MAIL_FROM_EMAIL   = the sender address you verified in Brevo
 API_URL           = https://<name>.onrender.com
 ```
 
@@ -64,6 +67,21 @@ Render builds from GitHub, so the API code must be on the branch it deploys.
    - Type of access: Read and Write
 5. Copy **keyID** → `B2_KEY_ID` and **applicationKey** → `B2_APP_KEY`.
    The application key is shown only once.
+
+## Step 2b — Email (Brevo)
+
+Invitations and "Forgot password?" send a 6-digit code by email. The API
+refuses to start on staging without these settings.
+
+1. Sign up at https://www.brevo.com (free plan).
+2. **Senders, Domains & Dedicated IPs → Senders → Add a sender**: the address
+   emails come from (e.g. `team@yourcompany.com`). Click the link Brevo emails
+   to that address to verify it. Save it as `MAIL_FROM_EMAIL`.
+3. **SMTP & API → API Keys → Generate a new API key**, name `fieldmate-staging`.
+   Save it as `BREVO_API_KEY` (shown once only).
+
+Without your own domain, some inboxes may file the emails as spam at first;
+ask testers to check there.
 
 ## Step 3 — Generate the auth secret
 
@@ -127,6 +145,8 @@ terminal you later use for local work.
    FILE_STORAGE_SECRET_ACCESS_KEY=<B2_APP_KEY>
    FILE_STORAGE_FORCE_PATH_STYLE=true
    LOG_LEVEL=info
+   BREVO_API_KEY=<BREVO_API_KEY>
+   MAIL_FROM_EMAIL=<MAIL_FROM_EMAIL>
    ```
 
    Do not set `PORT`; Render supplies it and the API reads it.
@@ -227,11 +247,15 @@ phones but not for the Play Store.
 | Render log: `DATABASE_URL must not point to a local host` | You pasted the local URL. Use the Neon one. |
 | `db:migrate` fails with an SSL error | `?sslmode=require` is missing from the Neon URL. |
 | Photo upload fails | Wrong bucket name, region or key, or the key is not scoped to that bucket. Check the Render logs for the S3 error. |
+| Render log: `BREVO_API_KEY is required` | Add the Brevo settings from Step 2b under **Environment**. |
+| Invite says "The email could not be sent" | The Render log says why: usually an unverified sender (`MAIL_FROM_EMAIL`) or a wrong key. The user is still created; use **Resend invitation** once fixed. |
 | Push notifications don't arrive | Android release builds need Firebase (FCM) credentials configured in EAS; not covered here. |
 
 ## Redeploying
 
+- **Database changes first:** when the code being pushed adds a migration
+  (a new file in `apps/api/drizzle/`), run Step 4's `npm run db:migrate`
+  against Neon **before** pushing, so the new API never starts against an
+  old schema.
 - **API:** push to `main`; Render rebuilds automatically.
-- **Database changes:** after merging a new migration, rerun Step 4's
-  `npm run db:migrate` against Neon.
 - **App:** rerun Step 7. The API address only needs changing if the Render URL changes.

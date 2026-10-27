@@ -200,13 +200,21 @@ const email = z
   .max(FIELD_LIMITS.email, 'Enter a valid email address.')
   .pipe(z.email('Enter a valid email address.'));
 
+/** An admin invites the user, who sets their own password from the emailed code. */
 export const createUserSchema = z.strictObject({
   name: requiredText(FIELD_LIMITS.userName, 'Name'),
   email,
   role: z.enum(ROLES, 'Choose a role.'),
-  password,
 });
 export type CreateUserInput = z.input<typeof createUserSchema>;
+
+/** Managers may only invite field workers, so for them the role can be left out. */
+export const inviteUserSchema = z.strictObject({
+  name: requiredText(FIELD_LIMITS.userName, 'Name'),
+  email,
+  role: z.enum(ROLES, 'Choose a role.').optional(),
+});
+export type InviteUserInput = z.input<typeof inviteUserSchema>;
 
 export const updateUserSchema = z
   .strictObject({
@@ -219,9 +227,6 @@ export const updateUserSchema = z
     message: 'Provide at least one field to update.',
   });
 export type UpdateUserInput = z.input<typeof updateUserSchema>;
-
-export const setPasswordSchema = z.strictObject({ password });
-export type SetPasswordInput = z.input<typeof setPasswordSchema>;
 
 export const listManagedUsersQuerySchema = z.strictObject({
   /** Matches name or email. */
@@ -240,6 +245,40 @@ export const listManagedUsersQuerySchema = z.strictObject({
   cursor: z.string().max(400).optional(),
 });
 export type ListManagedUsersQuery = z.output<typeof listManagedUsersQuerySchema>;
+
+/* ------------------------------------------------- codes and own account */
+
+const code = z
+  .string({ error: 'Code is required.' })
+  .trim()
+  .regex(/^\d{6}$/, 'Enter the 6-digit code from the email.');
+
+export const forgotPasswordSchema = z.strictObject({ email });
+export type ForgotPasswordInput = z.input<typeof forgotPasswordSchema>;
+
+/** Finishes an invitation or a password reset; both send a code by email. */
+export const setPasswordWithCodeSchema = z.strictObject({ email, code, password });
+export type SetPasswordWithCodeInput = z.input<typeof setPasswordWithCodeSchema>;
+
+export const updateMeSchema = z.strictObject({
+  name: requiredText(FIELD_LIMITS.userName, 'Name'),
+});
+export type UpdateMeInput = z.input<typeof updateMeSchema>;
+
+export const changePasswordSchema = z.strictObject({
+  currentPassword: loginSchema.shape.password,
+  newPassword: password,
+});
+export type ChangePasswordInput = z.input<typeof changePasswordSchema>;
+
+export const changeEmailSchema = z.strictObject({
+  newEmail: email,
+  currentPassword: loginSchema.shape.password,
+});
+export type ChangeEmailInput = z.input<typeof changeEmailSchema>;
+
+export const confirmEmailSchema = z.strictObject({ code });
+export type ConfirmEmailInput = z.input<typeof confirmEmailSchema>;
 
 /** First issue formatted as "field: message" (or just "message" at the root). */
 export function formatZodError(error: z.ZodError): string {

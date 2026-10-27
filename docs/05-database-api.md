@@ -305,7 +305,7 @@ Notes:
 | IDs | UUID strings; a path parameter that isn't a valid UUID → **422 VALIDATION_ERROR**, reported as "not found" so a malformed id can't be told apart from someone else's |
 | Timestamps | ISO 8601 UTC strings, e.g. `"2026-09-16T09:12:00.000Z"` |
 | Coordinates | JSON numbers or `null` |
-| Auth | `Authorization: Bearer <jwt>` on every endpoint except `POST /auth/login` and `GET /health` [C] |
+| Auth | `Authorization: Bearer <jwt>` on every endpoint except `POST /auth/login`, `POST /auth/password/forgot`, `POST /auth/password/set` and `GET /health` [C]; the account and invitation endpoints are listed in docs/07 §7 |
 | Success status | `200` read or action with a body · `201` created · `204` no content |
 | Unknown JSON fields | **Rejected** with 422 (Zod `.strict()`), so clients can't sneak in fields such as `status` or `role` [T] |
 | Strings | Trimmed before validation; values that are empty after trimming fail `required` |

@@ -21,6 +21,11 @@ const ts = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' 
 const pk = () => uuid('id').primaryKey().defaultRandom();
 
 export const userRole = pgEnum('user_role', ROLES);
+export const userCodePurpose = pgEnum('user_code_purpose', [
+  'INVITE',
+  'PASSWORD_RESET',
+  'EMAIL_CHANGE',
+]);
 export const taskStatus = pgEnum('task_status', TASK_STATUSES);
 export const notificationType = pgEnum('notification_type', NOTIFICATION_TYPES);
 export const evidenceSource = pgEnum('evidence_source', EVIDENCE_SOURCES);
@@ -36,6 +41,11 @@ export const users = pgTable(
     /** A deactivated user cannot sign in and receives no new work (docs/07 §2). */
     isActive: boolean('is_active').notNull().default(true),
     tokenVersion: integer('token_version').notNull().default(0),
+    /**
+     * Null while an invitation is pending: the user exists (with an unusable
+     * random hash) but has not yet chosen a password from the emailed code.
+     */
+    passwordSetAt: ts('password_set_at'),
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
@@ -212,6 +222,29 @@ export const devicePushTokens = pgTable(
     index('device_push_tokens_user_id_idx').on(t.userId),
     check('device_push_tokens_platform', sql`${t.platform} IN ('ios', 'android')`),
   ],
+);
+
+/**
+ * One-time codes sent by email: an invitation, a password reset, or the
+ * confirmation of a new email address. Only a keyed hash of the code is kept,
+ * and a user has at most one code per purpose; issuing another replaces it.
+ */
+export const userCodes = pgTable(
+  'user_codes',
+  {
+    id: pk(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    purpose: userCodePurpose('purpose').notNull(),
+    codeHash: text('code_hash').notNull(),
+    /** The address being confirmed, for EMAIL_CHANGE only. */
+    newEmail: varchar('new_email', { length: 254 }),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: ts('expires_at').notNull(),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('user_codes_user_purpose_unique').on(t.userId, t.purpose)],
 );
 
 /**

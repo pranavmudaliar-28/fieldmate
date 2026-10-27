@@ -48,7 +48,11 @@ await runScript(async () => {
 
     if (missing.length > 0) {
       const passwordHash = await hashPassword(password);
-      await db.insert(users).values(missing.map((account) => ({ ...account, passwordHash })));
+      await db
+        .insert(users)
+        .values(
+          missing.map((account) => ({ ...account, passwordHash, passwordSetAt: new Date() })),
+        );
     }
 
     for (const account of accounts) {

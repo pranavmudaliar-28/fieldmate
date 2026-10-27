@@ -10,6 +10,12 @@ jest.mock('../features/auth/auth-context', () => ({
 }));
 jest.mock('../hooks/use-network-status');
 
+const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+jest.mock('expo-router', () => ({
+  ...jest.requireActual('expo-router'),
+  useRouter: () => mockRouter,
+}));
+
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockUseIsOnline = useIsOnline as jest.MockedFunction<typeof useIsOnline>;
 
@@ -26,6 +32,8 @@ function authState(overrides: Partial<ReturnType<typeof useAuth>> = {}) {
     retryBootstrap: jest.fn(),
     sessionExpired: false,
     clearSessionExpired,
+    completeSignIn: jest.fn(),
+    updateUser: jest.fn(),
     ...overrides,
   };
 }
@@ -55,7 +63,8 @@ describe('Login screen (S-001)', () => {
     await render(<LoginScreen />);
     expect(screen.getByRole('header', { name: 'FieldMate' })).toBeTruthy();
     expect(screen.getByRole('header', { name: 'Sign in' })).toBeTruthy();
-    expect(screen.getByText(/Accounts are created by your admin/)).toBeTruthy();
+    expect(screen.getByTestId('forgot-password')).toBeTruthy();
+    expect(screen.getByTestId('set-up-account')).toBeTruthy();
     expect(screen.getByTestId('login-email')).toBeTruthy();
     expect(screen.getByTestId('login-password')).toBeTruthy();
   });
@@ -96,7 +105,7 @@ describe('Login screen (S-001)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('login-error')).toHaveTextContent('Email or password is incorrect'),
     );
-    expect(screen.getByText(/Ask your admin if you’ve forgotten your password/)).toBeTruthy();
+    expect(screen.getByText(/use “Forgot password\?” to choose a new one/)).toBeTruthy();
     expect(screen.getByTestId('login-password')).toHaveProp('aria-invalid', true);
   });
 
@@ -129,5 +138,23 @@ describe('Login screen (S-001)', () => {
 
     expect(screen.getByTestId('login-error')).toHaveTextContent('Session expired');
     expect(screen.getByText('Sign in again to keep working.')).toBeTruthy();
+  });
+
+  it('opens the reset and set-up flows with the email already typed', async () => {
+    await render(<LoginScreen />);
+    const user = userEvent.setup();
+    await user.type(screen.getByTestId('login-email'), ' worker1@fieldmate.dev ');
+
+    await user.press(screen.getByTestId('forgot-password'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith({
+      pathname: '/(auth)/set-password',
+      params: { mode: 'reset', email: 'worker1@fieldmate.dev' },
+    });
+
+    await user.press(screen.getByTestId('set-up-account'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith({
+      pathname: '/(auth)/set-password',
+      params: { mode: 'invite', email: 'worker1@fieldmate.dev' },
+    });
   });
 });

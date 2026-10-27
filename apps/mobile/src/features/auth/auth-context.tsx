@@ -1,4 +1,4 @@
-import type { User } from '@fieldmate/shared';
+import type { LoginResponse, User } from '@fieldmate/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createContext,
@@ -25,6 +25,10 @@ type AuthState = {
 
 export type AuthContextValue = AuthState & {
   signIn: (email: string, password: string) => Promise<User>;
+  /** Adopts a session the API already issued (a code set the password, or it was changed). */
+  completeSignIn: (response: LoginResponse) => Promise<User>;
+  /** Reflects a change the user made to their own name or email. */
+  updateUser: (user: User) => void;
   signOut: () => Promise<void>;
   retryBootstrap: () => void;
   /** Set when the session expired or was revoked while the app was open. */
@@ -114,13 +118,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void bootstrap();
   }, [bootstrap]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const { token, user } = await authApi.login(email, password);
+  const completeSignIn = useCallback(async ({ token, user }: LoginResponse) => {
     tokenRef.current = token;
     await saveToken(token);
     setSessionExpired(false);
     setState({ status: 'signedIn', user, bootstrapError: null });
     return user;
+  }, []);
+
+  const signIn = useCallback(
+    async (email: string, password: string) => completeSignIn(await authApi.login(email, password)),
+    [completeSignIn],
+  );
+
+  const updateUser = useCallback((user: User) => {
+    setState((current) => (current.status === 'signedIn' ? { ...current, user } : current));
   }, []);
 
   const signOut = useCallback(async () => {
@@ -136,12 +148,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       signIn,
+      completeSignIn,
+      updateUser,
       signOut,
       retryBootstrap: () => void bootstrap(),
       sessionExpired,
       clearSessionExpired: () => setSessionExpired(false),
     }),
-    [state, signIn, signOut, bootstrap, sessionExpired],
+    [state, signIn, completeSignIn, updateUser, signOut, bootstrap, sessionExpired],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { devicePushTokens, users } from '../../src/db/schema.js';
 import { createAdminUserService } from '../../src/modules/admin/admin-user.service.js';
-import { createTestApp } from '../helpers/app.js';
+import { createTestApp, testMail } from '../helpers/app.js';
+import { silentLogger, testConfig } from '../helpers/config.js';
 import {
   createActor,
   createManager,
@@ -27,11 +28,11 @@ const newUser = () => ({
   name: 'New Person',
   email: uniqueEmail('new'),
   role: 'FIELD_WORKER' as const,
-  password: 'StrongPassword1',
 });
 
 beforeEach(async () => {
   await truncateAll();
+  testMail.reset();
   admin = await createActor('ADMIN', { name: 'Root Admin' });
   manager = await createManager();
   worker = await createWorker();
@@ -105,17 +106,70 @@ describe('GET /admin/users', () => {
 });
 
 describe('POST /admin/users', () => {
-  it('creates a user who can sign in straight away', async () => {
+  it('invites the user by email; they set their own password from the code', async () => {
     const input = newUser();
     const res = await asAdmin('post', '/api/v1/admin/users').send(input);
 
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ email: input.email, role: 'FIELD_WORKER', isActive: true });
+    expect(res.body).toMatchObject({
+      email: input.email,
+      role: 'FIELD_WORKER',
+      isActive: true,
+      status: 'INVITED',
+    });
+    expect(testMail.sent.at(-1)?.subject).toMatch(/invited/i);
+
+    const setUp = await request(app)
+      .post('/api/v1/auth/password/set')
+      .send({
+        email: input.email,
+        code: testMail.lastCode(input.email),
+        password: 'MyOwnPassword1',
+      });
+    expect(setUp.status).toBe(200);
+    expect(setUp.body.user.email).toBe(input.email);
 
     const login = await request(app)
       .post('/api/v1/auth/login')
-      .send({ email: input.email, password: input.password });
+      .send({ email: input.email, password: 'MyOwnPassword1' });
     expect(login.status).toBe(200);
+
+    const detail = await asAdmin('get', `/api/v1/admin/users/${res.body.id}`);
+    expect(detail.body.status).toBe('ACTIVE');
+  });
+
+  it('refuses to sign in a pending invitation, whatever the password', async () => {
+    const input = newUser();
+    await asAdmin('post', '/api/v1/admin/users').send(input);
+
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: input.email, password: 'anything-at-all' });
+    expect(login.status).toBe(401);
+    expect(login.body.error.code).toBe('INVALID_CREDENTIALS');
+  });
+
+  it('keeps the account pending and says so when the email fails', async () => {
+    const input = newUser();
+    testMail.failNext();
+    const res = await asAdmin('post', '/api/v1/admin/users').send(input);
+    expect(res.status).toBe(502);
+    expect(res.body.error.code).toBe('EMAIL_FAILED');
+
+    const [row] = await db.select().from(users).where(eq(users.email, input.email));
+    expect(row?.passwordSetAt).toBeNull();
+
+    const resend = await asAdmin('post', `/api/v1/admin/users/${row?.id}/invite`);
+    expect(resend.status).toBe(204);
+    expect(testMail.lastCode(input.email)).toMatch(/^\d{6}$/);
+  });
+
+  it('accepts no password: nobody types one for someone else', async () => {
+    const res = await asAdmin('post', '/api/v1/admin/users').send({
+      ...newUser(),
+      password: 'StrongPassword1',
+    });
+    expect(res.status).toBe(422);
   });
 
   it('can create another admin', async () => {
@@ -140,7 +194,6 @@ describe('POST /admin/users', () => {
     ['missing name', { name: undefined }],
     ['invalid email', { email: 'nope' }],
     ['unknown role', { role: 'SUPERUSER' }],
-    ['short password', { password: 'short' }],
   ])('rejects %s', async (_case, override) => {
     const res = await asAdmin('post', '/api/v1/admin/users').send({ ...newUser(), ...override });
     expect(res.status).toBe(422);
@@ -271,7 +324,12 @@ describe('guardrails', () => {
     // Straight to the service: over HTTP the loser can fail at sign-in instead,
     // and the test would pass without the lock it is here to check.
     // Repeated because a single try often runs the two one after the other.
-    const service = createAdminUserService(db);
+    const service = createAdminUserService({
+      db,
+      config: testConfig(),
+      mail: testMail,
+      logger: silentLogger,
+    });
     for (let round = 0; round < 20; round += 1) {
       await db.update(users).set({ isActive: true }).where(eq(users.role, 'ADMIN'));
       const results = await Promise.allSettled([
@@ -316,11 +374,24 @@ describe('guardrails', () => {
 });
 
 describe('passwords and sessions', () => {
-  it('sets a new password and ends the old sessions', async () => {
-    const res = await asAdmin('post', `/api/v1/admin/users/${worker.id}/password`).send({
-      password: 'BrandNewPassword9',
-    });
+  it('emails a reset code; the new password ends the old sessions', async () => {
+    const res = await asAdmin('post', `/api/v1/admin/users/${worker.id}/password-reset`);
     expect(res.status).toBe(204);
+    expect(testMail.sent.at(-1)?.subject).toMatch(/reset/i);
+
+    // Nothing changes until the user acts on the email.
+    const stillSignedIn = await request(app)
+      .get('/api/v1/users/me')
+      .auth(worker.token, { type: 'bearer' });
+    expect(stillSignedIn.status).toBe(200);
+
+    await request(app)
+      .post('/api/v1/auth/password/set')
+      .send({
+        email: worker.email,
+        code: testMail.lastCode(worker.email),
+        password: 'BrandNewPassword9',
+      });
 
     const oldSession = await request(app)
       .get('/api/v1/users/me')
@@ -331,22 +402,22 @@ describe('passwords and sessions', () => {
       .post('/api/v1/auth/login')
       .send({ email: worker.email, password: TEST_PASSWORD });
     expect(oldPassword.status).toBe(401);
-
-    const newPassword = await request(app)
-      .post('/api/v1/auth/login')
-      .send({ email: worker.email, password: 'BrandNewPassword9' });
-    expect(newPassword.status).toBe(200);
   });
 
-  it('stops pushes to the old devices when the password is reset', async () => {
+  it('stops pushes to the old devices once the password is reset', async () => {
     await request(app)
       .post('/api/v1/users/me/push-tokens')
       .auth(worker.token, { type: 'bearer' })
       .send({ token: 'ExponentPushToken[lost-phone]', platform: 'android' });
 
-    await asAdmin('post', `/api/v1/admin/users/${worker.id}/password`).send({
-      password: 'BrandNewPassword9',
-    });
+    await asAdmin('post', `/api/v1/admin/users/${worker.id}/password-reset`);
+    await request(app)
+      .post('/api/v1/auth/password/set')
+      .send({
+        email: worker.email,
+        code: testMail.lastCode(worker.email),
+        password: 'BrandNewPassword9',
+      });
 
     const tokens = await db
       .select()
@@ -355,11 +426,17 @@ describe('passwords and sessions', () => {
     expect(tokens).toHaveLength(0);
   });
 
-  it('rejects a weak password', async () => {
+  it('no longer lets an admin type someone else’s password', async () => {
     const res = await asAdmin('post', `/api/v1/admin/users/${worker.id}/password`).send({
-      password: 'short',
+      password: 'BrandNewPassword9',
     });
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(404);
+  });
+
+  it('resends an invitation only while it is pending', async () => {
+    const res = await asAdmin('post', `/api/v1/admin/users/${worker.id}/invite`);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('ALREADY_ACTIVE');
   });
 
   it('forces a sign-out without changing the password', async () => {

@@ -18,6 +18,7 @@ export function testConfig(overrides: Partial<AppConfig> = {}): AppConfig {
       forcePathStyle: true,
     },
     push: { expoAccessToken: undefined },
+    mail: { brevoApiKey: undefined, fromEmail: undefined, fromName: 'FieldMate' },
     ...overrides,
   };
 }

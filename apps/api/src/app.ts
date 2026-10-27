@@ -12,6 +12,7 @@ import { createNotificationRouter } from './modules/notifications/notification.r
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createTaskRouter } from './modules/tasks/task.routes.js';
 import { createUsersRouter } from './modules/users/users.routes.js';
+import type { MailService } from './services/mail/mail.service.js';
 import type { PushService } from './services/push/push.service.js';
 import type { StorageService } from './services/storage/storage.service.js';
 
@@ -21,9 +22,10 @@ export type AppDeps = {
   db: Database;
   storage: StorageService;
   push: PushService;
+  mail: MailService;
 };
 
-export function createApp({ config, logger, db, storage, push }: AppDeps): Express {
+export function createApp({ config, logger, db, storage, push, mail }: AppDeps): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -53,9 +55,9 @@ export function createApp({ config, logger, db, storage, push }: AppDeps): Expre
   });
 
   const api = express.Router();
-  api.use('/auth', createAuthRouter({ db, config }));
-  api.use('/users', createUsersRouter({ db, config }));
-  api.use('/admin', createAdminRouter({ db, config }));
+  api.use('/auth', createAuthRouter({ db, config, mail, logger }));
+  api.use('/users', createUsersRouter({ db, config, mail, logger }));
+  api.use('/admin', createAdminRouter({ db, config, mail, logger }));
   api.use('/notifications', createNotificationRouter({ db, config }));
   api.use('/tasks', createTaskRouter({ db, config, storage, logger, push }));
   app.use('/api/v1', api);

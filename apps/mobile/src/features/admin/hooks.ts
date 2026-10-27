@@ -53,8 +53,21 @@ export function useUpdateUser(userId: string) {
   });
 }
 
-export function useSetUserPassword(userId: string) {
-  return useMutation({ mutationFn: (password: string) => api.setUserPassword(userId, password) });
+export function useSendPasswordReset(userId: string) {
+  return useMutation({ mutationFn: () => api.sendPasswordReset(userId) });
+}
+
+export function useResendInvite(userId: string) {
+  return useMutation({ mutationFn: () => api.resendInvite(userId) });
+}
+
+export function useInviteWorker() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.inviteWorker,
+    // An invited worker can be assigned work before they finish signing up.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['users', 'workers'] }),
+  });
 }
 
 export function useRevokeUserSessions(userId: string) {

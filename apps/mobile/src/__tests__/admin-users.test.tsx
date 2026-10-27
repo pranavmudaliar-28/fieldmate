@@ -36,6 +36,7 @@ function managed(overrides: Partial<ManagedUser> = {}): ManagedUser {
     hasHistory: false,
     createdAt: '2026-09-16T09:12:00.000Z',
     updatedAt: '2026-09-16T09:12:00.000Z',
+    status: 'ACTIVE',
     ...overrides,
   };
 }
@@ -62,6 +63,8 @@ beforeEach(() => {
     retryBootstrap: jest.fn(),
     sessionExpired: false,
     clearSessionExpired: jest.fn(),
+    completeSignIn: jest.fn(),
+    updateUser: jest.fn(),
   });
   api.fetchUsers.mockResolvedValue(
     page([
@@ -126,6 +129,13 @@ describe('Users screen (S-011)', () => {
     await waitFor(() => expect(screen.getByText('Priya Nair')).toBeTruthy());
     expect(screen.getAllByText('Active')).toHaveLength(2);
   });
+
+  it('marks users who have not accepted their invitation', async () => {
+    api.fetchUsers.mockResolvedValue(page([managed({ status: 'INVITED' })]));
+    await renderScreen(<UsersScreen />);
+
+    await waitFor(() => expect(screen.getByText('Invited')).toBeTruthy());
+  });
 });
 
 describe('User details (S-012)', () => {
@@ -162,7 +172,7 @@ describe('User details (S-012)', () => {
     expect(screen.queryByTestId('deactivate-user')).toBeNull();
     // Nothing that needs a working sign-in until they are back (A-Reactivate).
     expect(screen.getByTestId('edit-user')).toBeTruthy();
-    expect(screen.queryByTestId('open-set-password')).toBeNull();
+    expect(screen.queryByTestId('email-user')).toBeNull();
     expect(screen.queryByTestId('force-signout')).toBeNull();
     expect(screen.queryByTestId('delete-user')).toBeNull();
   });
@@ -212,39 +222,33 @@ describe('User details (S-012)', () => {
     expect(screen.getByText('You can’t deactivate your own account.')).toBeTruthy();
   });
 
-  it('requires a long enough, confirmed password before setting one', async () => {
-    api.setUserPassword.mockResolvedValue(undefined);
+  it('emails a password reset code after confirmation; the admin never types a password', async () => {
+    api.sendPasswordReset.mockResolvedValue(undefined);
     await renderScreen(<UserDetailsScreen />);
-    await waitFor(() => expect(screen.getByTestId('open-set-password')).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId('email-user')).toHaveTextContent(/Send password reset/),
+    );
 
     const user = userEvent.setup();
-    await user.press(screen.getByTestId('open-set-password'));
-    await waitFor(() => expect(screen.getByTestId('set-password')).toBeDisabled());
-    // Setting a password always signs the user out; it is said, not offered.
-    expect(screen.getByText('Priya is signed out on all devices.')).toBeTruthy();
+    await user.press(screen.getByTestId('email-user'));
+    await waitFor(() => expect(screen.getByText('Email Priya a reset code?')).toBeTruthy());
+    expect(api.sendPasswordReset).not.toHaveBeenCalled();
 
-    await user.type(screen.getByTestId('new-password'), 'LongEnough1');
-    expect(screen.getByTestId('set-password')).toBeDisabled();
-    await user.type(screen.getByTestId('confirm-password'), 'LongEnough1');
-    await waitFor(() => expect(screen.getByTestId('set-password')).toBeEnabled());
-
-    await user.press(screen.getByTestId('set-password'));
-    await waitFor(() => expect(api.setUserPassword).toHaveBeenCalledWith('user-2', 'LongEnough1'));
+    await user.press(screen.getByRole('button', { name: 'Send reset code' }));
+    await waitFor(() => expect(api.sendPasswordReset).toHaveBeenCalledWith('user-2'));
+    expect(api.resendInvite).not.toHaveBeenCalled();
   });
 
-  it('generates a password that fills both fields', async () => {
+  it('resends the invitation to someone who has not set up their account', async () => {
+    api.fetchUser.mockResolvedValue(managed({ status: 'INVITED' }));
+    api.resendInvite.mockResolvedValue(undefined);
     await renderScreen(<UserDetailsScreen />);
-    await waitFor(() => expect(screen.getByTestId('open-set-password')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('user-invited')).toBeTruthy());
 
     const user = userEvent.setup();
-    await user.press(screen.getByTestId('open-set-password'));
-    await waitFor(() => expect(screen.getByTestId('generate-password')).toBeTruthy());
-    await user.press(screen.getByTestId('generate-password'));
-
-    const generated = screen.getByTestId('new-password').props.value as string;
-    expect(generated.length).toBeGreaterThanOrEqual(8);
-    expect(screen.getByTestId('confirm-password').props.value).toBe(generated);
-    await waitFor(() => expect(screen.getByTestId('set-password')).toBeEnabled());
+    await user.press(screen.getByTestId('email-user'));
+    await user.press(screen.getByRole('button', { name: 'Resend invitation' }));
+    await waitFor(() => expect(api.resendInvite).toHaveBeenCalledWith('user-2'));
   });
 
   it('shows a server refusal, such as the last-admin guard', async () => {

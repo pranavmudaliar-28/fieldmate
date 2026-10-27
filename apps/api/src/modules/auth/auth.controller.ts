@@ -1,4 +1,4 @@
-import type { LoginInput } from '@fieldmate/shared';
+import type { ForgotPasswordInput, LoginInput, SetPasswordWithCodeInput } from '@fieldmate/shared';
 import type { RequestHandler } from 'express';
 import { validated } from '../../middleware/validate.js';
 import { AppError } from '../../utils/app-error.js';
@@ -16,5 +16,15 @@ export function createAuthController(service: AuthService) {
     res.status(204).end();
   };
 
-  return { login, logout };
+  const forgotPassword: RequestHandler = async (req, res) => {
+    await service.forgotPassword(validated<ForgotPasswordInput>(req).email);
+    res.status(204).end();
+  };
+
+  const setPassword: RequestHandler = async (req, res) => {
+    const { email, code, password } = validated<SetPasswordWithCodeInput>(req);
+    res.json(await service.setPasswordWithCode(email, code, password));
+  };
+
+  return { login, logout, forgotPassword, setPassword };
 }

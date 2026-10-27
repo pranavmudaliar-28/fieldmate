@@ -87,7 +87,8 @@ try {
   const passwordHash = await hashPassword(password);
   const [created] = await db
     .insert(users)
-    .values({ email, name, role, passwordHash })
+    // Chosen by the person running the script, so the account is ready to use.
+    .values({ email, name, role, passwordHash, passwordSetAt: new Date() })
     .returning({ id: users.id });
   console.log(`Created ${role} ${email} (${created?.id}).`);
 } catch (error) {

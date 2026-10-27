@@ -30,6 +30,9 @@ const envSchema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   PUSH_NOTIFICATION_EXPO_ACCESS_TOKEN: z.preprocess(emptyToUndefined, z.string().optional()),
+  BREVO_API_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  MAIL_FROM_EMAIL: z.preprocess(emptyToUndefined, z.email().optional()),
+  MAIL_FROM_NAME: z.string().min(1).default('FieldMate'),
 });
 
 export type AppConfig = {
@@ -49,6 +52,12 @@ export type AppConfig = {
   };
   push: {
     expoAccessToken: string | undefined;
+  };
+  /** Without a key (development, test) emails are logged instead of sent. */
+  mail: {
+    brevoApiKey: string | undefined;
+    fromEmail: string | undefined;
+    fromName: string;
   };
 };
 
@@ -81,6 +90,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     if (isLocalUrl(e.DATABASE_URL)) problems.push('DATABASE_URL must not point to a local host.');
     if (e.FILE_STORAGE_ENDPOINT && isLocalUrl(e.FILE_STORAGE_ENDPOINT))
       problems.push('FILE_STORAGE_ENDPOINT must not point to a local host.');
+    // Invitations and password resets only work if the email actually goes out.
+    if (!e.BREVO_API_KEY) problems.push('BREVO_API_KEY is required.');
+    if (!e.MAIL_FROM_EMAIL) problems.push('MAIL_FROM_EMAIL is required.');
     if (problems.length > 0) {
       throw new ConfigError(`Invalid ${e.APP_ENV} configuration:\n- ${problems.join('\n- ')}`);
     }
@@ -103,6 +115,11 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     },
     push: {
       expoAccessToken: e.PUSH_NOTIFICATION_EXPO_ACCESS_TOKEN,
+    },
+    mail: {
+      brevoApiKey: e.BREVO_API_KEY,
+      fromEmail: e.MAIL_FROM_EMAIL,
+      fromName: e.MAIL_FROM_NAME,
     },
   };
 }

@@ -7,7 +7,7 @@ const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
 
 /**
- * Slows password guessing: 10 attempts per 15 minutes per IP + email
+ * Slows password and code guessing: 10 attempts per 15 minutes per IP + email
  * (docs/05 §7.2). In-memory, so it applies per API instance.
  */
 export function loginRateLimiter(config: AppConfig): RequestHandler {
@@ -23,7 +23,7 @@ export function loginRateLimiter(config: AppConfig): RequestHandler {
       return `${ipKeyGenerator(req.ip ?? '')}:${email}`;
     },
     handler: (_req, _res, next) => {
-      next(new AppError('RATE_LIMITED', 'Too many login attempts. Try again later.'));
+      next(new AppError('RATE_LIMITED', 'Too many attempts. Try again later.'));
     },
   });
 }

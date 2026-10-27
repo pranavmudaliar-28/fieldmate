@@ -18,6 +18,8 @@ const remote = {
   DATABASE_URL: 'postgres://user:pass@db.example.com:5432/fieldmate',
   FILE_STORAGE_ENDPOINT: '',
   FILE_STORAGE_FORCE_PATH_STYLE: 'false',
+  BREVO_API_KEY: 'xkeysib-test',
+  MAIL_FROM_EMAIL: 'team@example.com',
 };
 
 describe('loadConfig', () => {
@@ -30,6 +32,7 @@ describe('loadConfig', () => {
       corsOrigins: [],
       storage: { endpoint: 'http://localhost:9000', region: 'us-east-1', forcePathStyle: true },
       push: { expoAccessToken: undefined },
+      mail: { brevoApiKey: undefined, fromEmail: undefined, fromName: 'FieldMate' },
     });
   });
 
@@ -71,6 +74,13 @@ describe('loadConfig', () => {
   it('refuses local storage in production', () => {
     expect(() => loadConfig({ ...remote, FILE_STORAGE_ENDPOINT: 'http://127.0.0.1:9000' })).toThrow(
       /FILE_STORAGE_ENDPOINT must not point to a local host/,
+    );
+  });
+
+  it.each(['staging', 'production'])('refuses to start without email in %s', (appEnv) => {
+    const { BREVO_API_KEY: _key, MAIL_FROM_EMAIL: _from, ...withoutMail } = remote;
+    expect(() => loadConfig({ ...withoutMail, APP_ENV: appEnv })).toThrow(
+      /BREVO_API_KEY is required[\s\S]*MAIL_FROM_EMAIL is required/,
     );
   });
 });

@@ -17,11 +17,17 @@ export const ERROR_CODES = {
   /** The user has tasks, photos or notes, so deactivate instead of deleting. */
   USER_HAS_HISTORY: 409,
   EMAIL_TAKEN: 409,
+  /** Resending an invitation to someone who has already set their password. */
+  ALREADY_ACTIVE: 409,
+  /** A wrong, expired or already-used emailed code; one message for all three. */
+  INVALID_CODE: 422,
   VALIDATION_ERROR: 422,
   INVALID_WORKER: 422,
   INVALID_FILE: 422,
   RATE_LIMITED: 429,
   INTERNAL_ERROR: 500,
+  /** The email provider refused or could not be reached. */
+  EMAIL_FAILED: 502,
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;
